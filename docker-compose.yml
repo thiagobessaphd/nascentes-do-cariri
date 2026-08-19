@@ -1,0 +1,94 @@
+name: nascentes-do-cariri
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_TILE_URL: ${NEXT_PUBLIC_TILE_URL}
+        NEXT_PUBLIC_TILE_ATTRIBUTION: ${NEXT_PUBLIC_TILE_ATTRIBUTION}
+        NEXT_PUBLIC_TILE_MAX_ZOOM: ${NEXT_PUBLIC_TILE_MAX_ZOOM:-19}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL no arquivo .env}
+      APP_URL: ${APP_URL:?Defina APP_URL no arquivo .env}
+      AUTH_URL: ${AUTH_URL:?Defina AUTH_URL no arquivo .env}
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no arquivo .env}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:-}
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-5242880}
+      NEXT_PUBLIC_TILE_URL: ${NEXT_PUBLIC_TILE_URL}
+      NEXT_PUBLIC_TILE_ATTRIBUTION: ${NEXT_PUBLIC_TILE_ATTRIBUTION}
+      NEXT_PUBLIC_TILE_MAX_ZOOM: ${NEXT_PUBLIC_TILE_MAX_ZOOM:-19}
+    expose:
+      - "3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - frontend
+      - backend
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Defina MYSQL_DATABASE no arquivo .env}
+      MYSQL_USER: ${MYSQL_USER:?Defina MYSQL_USER no arquivo .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD no arquivo .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no arquivo .env}
+      TZ: America/Fortaleza
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    stop_grace_period: 30s
+    networks:
+      - backend
+
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+      target: http
+    restart: unless-stopped
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-localhost}
+      HTTPS_REDIRECT_PORT: ${HTTPS_REDIRECT_PORT-:8443}
+      NGINX_ENVSUBST_FILTER: ^(SERVER_NAME|HTTPS_REDIRECT_PORT)$$
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/nginx-health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - frontend
+
+volumes:
+  mysql_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

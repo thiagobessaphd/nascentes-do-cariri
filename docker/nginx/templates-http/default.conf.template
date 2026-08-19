@@ -1,0 +1,38 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${SERVER_NAME};
+
+    client_max_body_size 6m;
+
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location = /mapa {
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header X-Content-Type-Options;
+        include /etc/nginx/snippets/security-common.conf;
+        add_header Content-Security-Policy "frame-ancestors 'self' https://nascentesdocariri.ufca.edu.br" always;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+
+    location ^~ /mapa/ {
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header X-Content-Type-Options;
+        include /etc/nginx/snippets/security-common.conf;
+        add_header Content-Security-Policy "frame-ancestors 'self' https://nascentesdocariri.ufca.edu.br" always;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+
+    location / {
+        include /etc/nginx/snippets/security-common.conf;
+        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+        add_header X-Frame-Options "DENY" always;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+}

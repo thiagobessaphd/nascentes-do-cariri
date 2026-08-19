@@ -1,0 +1,9 @@
+services:
+  nginx:
+    build:
+      target: tls
+    ports:
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ${TLS_CERTIFICATE_FILE:?Defina TLS_CERTIFICATE_FILE no arquivo .env}:/etc/nginx/certs/fullchain.pem:ro
+      - ${TLS_PRIVATE_KEY_FILE:?Defina TLS_PRIVATE_KEY_FILE no arquivo .env}:/etc/nginx/certs/privkey.pem:ro

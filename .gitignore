@@ -1,0 +1,17 @@
+# Dependências e artefatos do Next.js
+/node_modules/
+/.next/
+/out/
+/coverage/
+
+# Variáveis locais e segredos
+.env
+.env.*
+!.env.example
+
+# Logs e arquivos locais
+*.log
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
