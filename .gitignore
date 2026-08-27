@@ -3,6 +3,7 @@
 /.next/
 /out/
 /coverage/
+/.vscode
 
 # Variáveis locais e segredos
 .env
