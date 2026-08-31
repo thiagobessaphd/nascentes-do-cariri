@@ -144,6 +144,9 @@ O comando inicia o Next.js em <http://localhost:3000>. Quando o Prisma for adici
 | `NEXT_PUBLIC_TILE_URL` | pública | Template da URL do serviço de tiles |
 | `NEXT_PUBLIC_TILE_ATTRIBUTION` | pública | Atribuição obrigatória do mapa-base |
 | `NEXT_PUBLIC_TILE_MAX_ZOOM` | pública | Zoom máximo oferecido pelo provedor |
+| `NEXT_PUBLIC_MAP_DEFAULT_LAT` | pública | Latitude do centro inicial do mapa |
+| `NEXT_PUBLIC_MAP_DEFAULT_LNG` | pública | Longitude do centro inicial do mapa |
+| `NEXT_PUBLIC_MAP_DEFAULT_ZOOM` | pública | Nível de zoom inicial do mapa |
 | `SERVER_NAME` | Nginx | Domínio aceito pelo virtual host |
 | `HTTP_PORT` / `HTTPS_PORT` | host | Portas publicadas pelo Compose |
 | `HTTPS_REDIRECT_PORT` | Nginx | Sufixo da porta no redirecionamento; vazio quando HTTPS usa 443 |

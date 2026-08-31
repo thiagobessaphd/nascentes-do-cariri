@@ -18,13 +18,13 @@ const envSchema = z.object({
   MAX_UPLOAD_SIZE_BYTES: z.coerce.number().positive().default(5242880), // 5MB padrão
   BLOB_READ_WRITE_TOKEN: z.string().optional(), // Vercel Blob (Opcional até habilitar funcionalidade)
 
-  // Tiles do Mapa (Variáveis públicas)
+  // Tiles do Mapa
   NEXT_PUBLIC_TILE_URL: z.string().url("A URL do servidor de tiles deve ser válida"),
   NEXT_PUBLIC_TILE_ATTRIBUTION: z.string().min(1, "A atribuição do mapa é obrigatória"),
   NEXT_PUBLIC_TILE_MAX_ZOOM: z.coerce.number().positive().default(19),
 
-  // Mapa Padrão (Variáveis públicas)
-  NEXT_PUBLIC_MAP_DEFAULT_LAT: z.coerce.number().min(-90).max(90).default(-7.23456789), // Exemplo: Crato
+  // Mapa Padrão
+  NEXT_PUBLIC_MAP_DEFAULT_LAT: z.coerce.number().min(-90).max(90).default(-7.23456789),
   NEXT_PUBLIC_MAP_DEFAULT_LNG: z.coerce.number().min(-180).max(180).default(-39.12345678),
   NEXT_PUBLIC_MAP_DEFAULT_ZOOM: z.coerce.number().positive().default(10),
 });
