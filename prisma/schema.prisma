@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Usuario {
+  id           Int          @id @default(autoincrement())
+  nome         String       @db.VarChar(255)
+  email        String       @unique @db.VarChar(255)
+  passwordHash String       @map("password_hash") @db.VarChar(255)
+  ativo        Boolean      @default(true)
+  lastLoginAt  DateTime?    @map("last_login_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  importacoes  Importacao[]
+
+  @@map("usuarios")
+}
+
+model Importacao {
+  id                    Int              @id @default(autoincrement())
+  usuarioId             Int              @map("usuario_id")
+  nomeArquivo           String           @map("nome_arquivo") @db.VarChar(255)
+  caminhoPrivadoArquivo String           @map("caminho_privado_arquivo") @db.VarChar(512)
+  hashArquivo           String           @map("hash_arquivo") @db.VarChar(64)
+  totalLinhas           Int              @default(0) @map("total_linhas")
+  totalValidas          Int              @default(0) @map("total_validas")
+  totalInvalidas        Int              @default(0) @map("total_invalidas")
+  totalDuplicadas       Int              @default(0) @map("total_duplicadas")
+  status                StatusImportacao @default(VALIDANDO)
+  mensagemErro          String?          @map("mensagem_erro") @db.Text
+  createdAt             DateTime         @default(now()) @map("created_at")
+  concluidaAt           DateTime?        @map("concluida_at")
+
+  // Integridade referencial (Evita apagar o usuário e deixar registros órfãos)
+  usuario               Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  nascentes             Nascente[]
+
+  @@map("importacoes")
+}
+
+model Nascente {
+  id           Int        @id @default(autoincrement())
+  latitude     Decimal    @db.Decimal(10, 8)
+  longitude    Decimal    @db.Decimal(11, 8)
+  municipio    String     @db.VarChar(150)
+  fonte        String     @db.VarChar(255)
+  localidade   String     @db.VarChar(255)
+  dataCriacao  DateTime   @map("data_criacao") @db.Date
+  vazaoMedia   Decimal    @map("vazao_media") @db.Decimal(10, 3)
+  ativo        Boolean    @default(true)
+  importacaoId Int        @map("importacao_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Integridade referencial (Evita apagar a importação e deixar nascentes órfãs)
+  importacao   Importacao @relation(fields: [importacaoId], references: [id], onDelete: Restrict)
+
+  @@map("nascentes")
+}
+
+enum StatusImportacao {
+  VALIDANDO
+  AGUARDANDO_CONFIRMACAO
+  PROCESSANDO
+  CONCLUIDA
+  FALHOU
+
+  @@map("status_importacao")
+}

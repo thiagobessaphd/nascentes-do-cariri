@@ -1,3 +1,4 @@
+import "./src/config/env";
 import type { NextConfig } from "next";
 
 const iframePolicy =
