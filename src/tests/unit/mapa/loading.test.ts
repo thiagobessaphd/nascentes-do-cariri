@@ -15,6 +15,6 @@ describe('Estado de Carregamento da Rota do Mapa', () => {
     expect(mapLoadingElement.type).toBe('div');
     expect(mapLoadingElement.props.role).toBe('status');
     expect(mapLoadingElement.props['aria-live']).toBe('polite');
-    expect(mapLoadingElement.props['aria-label']).toBe('Carregando mapa interativo');
+    expect(mapLoadingElement.props['aria-label']).toBe('Carregando mapa interativo das nascentes');
   });
 });
