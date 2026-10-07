@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import styles from "./layout.module.css";
+import styles from "@/components/map/map.module.css";
 
 export const metadata: Metadata = {
   title: "Mapa das Nascentes do Cariri",

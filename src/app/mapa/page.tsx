@@ -1,21 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import styles from './page.module.css';
+import MapLoading from '@/components/map/MapLoading';
+import styles from '@/components/map/map.module.css';
 
 const LeafletMap = dynamic(() => import('@/components/map/LeafletMap'), {
   ssr: false,
-  loading: () => (
-    <div
-      className={styles.loadingWrapper}
-      role="status"
-      aria-live="polite"
-      aria-label="Carregando mapa interativo"
-    >
-      <div className={styles.loadingSpinner} aria-hidden="true" />
-      <p className={styles.loadingText}>Carregando mapa das nascentes...</p>
-    </div>
-  ),
+  loading: () => <MapLoading />,
 });
 
 export default function MapaPage() {

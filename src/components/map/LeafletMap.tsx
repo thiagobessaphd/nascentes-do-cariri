@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useRef } from 'react';
 import { mapConfig } from '@/config/map';
-import styles from './LeafletMap.module.css';
+import styles from './map.module.css';
 
 export interface LeafletMapProps {
   readonly className?: string;
