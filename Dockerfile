@@ -18,7 +18,10 @@ ARG NEXT_PUBLIC_TILE_MAX_ZOOM
 ENV NEXT_PUBLIC_TILE_URL=$NEXT_PUBLIC_TILE_URL
 ENV NEXT_PUBLIC_TILE_ATTRIBUTION=$NEXT_PUBLIC_TILE_ATTRIBUTION
 ENV NEXT_PUBLIC_TILE_MAX_ZOOM=$NEXT_PUBLIC_TILE_MAX_ZOOM
-RUN npm run lint && npm run typecheck && npm run build
+
+# Usado apenas para gerar o cliente prisma
+ENV DATABASE_URL="mysql://build-time:build-time@localhost:3306/nascentes_do_cariri"
+RUN npx prisma generate && npm run lint && npm run typecheck && npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
