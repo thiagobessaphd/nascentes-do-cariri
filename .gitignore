@@ -16,3 +16,8 @@
 
 # TypeScript
 *.tsbuildinfo
+
+# Certificados TLS e chaves privadas
+/certs/
+*.pem
+*.key

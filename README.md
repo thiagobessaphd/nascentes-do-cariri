@@ -155,6 +155,12 @@ Variáveis `NEXT_PUBLIC_*` são incorporadas ao bundle durante o build da imagem
 
 O endpoint público padrão do OpenStreetMap presente no exemplo serve apenas como configuração inicial de desenvolvimento. Antes da produção, deve ser escolhido um serviço de tiles com política, capacidade e disponibilidade compatíveis com o tráfego esperado.
 
+### Rotação de Segredos (`AUTH_SECRET`)
+
+- **Geração:** Gere chaves criptograficamente seguras com no mínimo 32 bytes via `openssl rand -base64 32`.
+- **Procedimento de rotação:** Atualize `AUTH_SECRET` no ambiente de hospedagem e reinicie o serviço. Todas as sessões ativas serão invalidadas de forma limpa, forçando novo login sem afetar os dados do banco.
+- **Regra de isolamento:** Segredos de infraestrutura (`AUTH_SECRET`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`) operam exclusivamente no servidor e jamais devem receber prefixo `NEXT_PUBLIC_*`, ser versionados no Git ou embutidos em imagens Docker.
+
 ## HTTPS direto no Nginx
 
 O arquivo principal usa HTTP para desenvolvimento local. Para o Nginx terminar TLS, disponibilize um certificado e uma chave privada fora do repositório e ajuste no `.env`:
@@ -176,7 +182,7 @@ Inicie com o overlay TLS:
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build --wait
 ```
 
-Essa configuração redireciona HTTP para HTTPS, aceita TLS 1.2/1.3 e envia HSTS. A emissão e a renovação do certificado devem ser realizadas pelo mecanismo operacional escolhido, por exemplo Certbot no host ou um load balancer gerenciado.
+Essa configuração redireciona HTTP para HTTPS (código 308), aceita TLS 1.2/1.3 e envia HSTS. A emissão e a renovação do certificado devem ser realizadas pelo mecanismo operacional escolhido, por exemplo Certbot no host ou um load balancer gerenciado.
 
 ## Incorporação por iframe
 
