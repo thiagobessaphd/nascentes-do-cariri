@@ -241,6 +241,25 @@ Escolha apenas uma borda pública por ambiente:
 
 Em ambos os casos são obrigatórios ambientes separados, backups, política de retenção dos blobs, logs sem segredos, migrações controladas e teste de restauração.
 
+## Privacidade, Logs e Retenção (LGPD)
+
+A aplicação segue as diretrizes da LGPD (Lei nº 13.709/2018) e o princípio de *Privacy by Design*:
+
+### 1. Coleta e Minimização de Dados de Visitantes
+- **Navegação anônima:** Visitantes no mapa (`/` e `/mapa`) não possuem dados pessoais coletados nem utilizam cookies de rastreamento.
+- **Isolamento de dados pessoais:** Dados cadastrais limitam-se aos administradores autorizados do sistema, armazenados com hash de senha e controle de acesso restrito.
+
+### 2. Estrutura e Sanitização de Logs
+- **Formato:** Logs em produção são emitidos de forma estruturada em JSON, prontos para ingestão pela plataforma de observabilidade (Vercel ou Docker).
+- **Mascaramento automático de segredos e PII:** Chaves como senhas, tokens e documentos pessoais são automaticamente mascarados como `[REDACTED]`.
+- **Anonimização de IP:** Endereços de rede registrados em contextos técnicos têm seus identificadores minimizados (último octeto zerado em IPv4, e prefixo `/48` em IPv6).
+- **Sanitização de caminhos locais:** Caminhos absolutos do sistema operacional (`C:\...` ou `/home/...`) em mensagens ou erros são substituídos por `[PATH]`, prevenindo vazamento da topologia do servidor host.
+- **Supressão de stack traces:** Em ambiente de produção, stack traces e detalhes internos do banco de dados são omitidos das respostas da API e dos logs.
+
+### 3. Política de Retenção e Ciclo de Vida
+- **Logs operacionais:** Recomenda-se a retenção de logs de acesso e erros por 30 a 90 dias nos coletores de infraestrutura, prazo adequado para auditoria técnica sem retenção excessiva.
+- **Histórico de importações:** Registros de arquivos TXT importados são mantidos na tabela `importacoes` vinculados ao store privado do Vercel Blob. O descarte de arquivos legados ou backups obsoletos deve ser coordenado entre o banco de dados e o Blob Storage.
+
 ## Estrutura principal
 
 ```text
