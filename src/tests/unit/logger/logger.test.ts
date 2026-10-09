@@ -45,13 +45,22 @@ describe('Módulo de Logging e Sanitização (logger.ts)', () => {
         ],
       };
 
-      const resultado = sanitize(input) as any;
+      const resultado = sanitize(input) as {
+        meta: {
+          versao: string;
+          credenciais: {
+            senha: string;
+            api_key_secret: string;
+          };
+        };
+        usuarios: Array<{ id: number; password: string }>;
+      };
 
       expect(resultado.meta.versao).toBe('1.0');
       expect(resultado.meta.credenciais.senha).toBe('[REDACTED]');
       expect(resultado.meta.credenciais.api_key_secret).toBe('[REDACTED]');
-      expect(resultado.usuarios[0].password).toBe('[REDACTED]');
-      expect(resultado.usuarios[1].password).toBe('[REDACTED]');
+      expect(resultado.usuarios[0]?.password).toBe('[REDACTED]');
+      expect(resultado.usuarios[1]?.password).toBe('[REDACTED]');
     });
 
     it('deve lidar com referências circulares sem estourar pilha de recursão', () => {
