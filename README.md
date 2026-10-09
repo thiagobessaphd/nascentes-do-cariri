@@ -228,7 +228,7 @@ docker compose exec -T mysql sh -c \
 
 O backup do MySQL deve ser coordenado com a retenção do Vercel Blob, pois o banco guarda as referências dos arquivos originais. Um backup isolado do banco não garante a recuperação completa das importações.
 
-Procedimentos de restauração devem ser testados primeiro em ambiente separado. Nunca restaure diretamente sobre produção sem backup, janela de manutenção e plano de rollback.
+Procedimentos de restauração devem ser testados primeiro em ambiente separado. Nunca restaure diretamente sobre produção sem backup, janela de manutenção e plano de rollback. Para o roteiro completo de publicação na Vercel, migrações com Prisma, rollback de emergência, rotina de backup conjunto coordenado (MySQL + Vercel Blob) e ensaio de restauração, consulte o **[Runbook Operacional](.docs/RUNBOOK_OPERACIONAL.md)**.
 
 ## Produção: Docker ou Vercel
 
@@ -245,7 +245,7 @@ Em ambos os casos são obrigatórios ambientes separados, backups, política de 
 
 ```text
 .
-├── .docs/                         # requisitos e arquitetura
+├── .docs/                         # requisitos, arquitetura e runbook operacional
 ├── .spec/                         # orientações técnicas dos especialistas
 ├── docker/nginx/                  # imagem e configuração do proxy
 │   ├── conf.d/
