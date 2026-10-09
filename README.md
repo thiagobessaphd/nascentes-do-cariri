@@ -241,11 +241,13 @@ Escolha apenas uma borda pública por ambiente:
 
 Em ambos os casos são obrigatórios ambientes separados, backups, política de retenção dos blobs, logs sem segredos, migrações controladas e teste de restauração.
 
+Para o roteiro completo de publicação na Vercel, migrações com Prisma, rollback de emergência, backup conjunto coordenado (MySQL + Vercel Blob) e ensaio de restauração, consulte o **[Runbook Operacional](.docs/RUNBOOK_OPERACIONAL.md)**.
+
 ## Estrutura principal
 
 ```text
 .
-├── .docs/                         # requisitos e arquitetura
+├── .docs/                         # requisitos, arquitetura e runbook operacional
 ├── .spec/                         # orientações técnicas dos especialistas
 ├── docker/nginx/                  # imagem e configuração do proxy
 │   ├── conf.d/
