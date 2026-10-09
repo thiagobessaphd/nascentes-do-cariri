@@ -6,11 +6,13 @@ describe('Validação de Variáveis de Ambiente (env.ts)', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     // Restaura o ambiente original
     process.env = originalEnv;
+    vi.restoreAllMocks();
   });
 
   const validEnvSetup = () => {
