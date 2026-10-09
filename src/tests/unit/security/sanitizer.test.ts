@@ -1,10 +1,15 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import {
+  buildSafeNascenteFilters,
   escapeHtml,
   generateSafeBlobPathname,
   sanitizeFilename,
   sanitizeMapText,
+  sanitizeSearchTerm,
   stripHtml,
+  validatePaginationParams,
   validateUploadFilename,
 } from '@/lib/security/sanitizer';
 
@@ -203,6 +208,163 @@ describe('Módulo de Sanitização e Defesa Web', () => {
 
         expect(pathname.startsWith('staging/')).toBe(true);
         expect(pathname.endsWith('-dados.txt')).toBe(true);
+      });
+    });
+  });
+
+  describe('Verificação de Consultas e Parametrização ORM', () => {
+    describe('sanitizeSearchTerm()', () => {
+      it('deve normalizar e limitar tamanho de termos de busca comuns', () => {
+        const termo = '  Nascente da Serra dos Cavalos  ';
+        expect(sanitizeSearchTerm(termo)).toBe('Nascente da Serra dos Cavalos');
+      });
+
+      it('deve neutralizar caracteres nulos e de controle em termos de consulta', () => {
+        const inputComControles = 'Crato\u0000\u001F - CE';
+        expect(sanitizeSearchTerm(inputComControles)).toBe('Crato - CE');
+      });
+
+      it('deve tratar payloads clássicos de SQL Injection como literais de string inofensivos', () => {
+        const sqlPayloads = [
+          "' OR '1'='1",
+          "'; DROP TABLE nascentes; --",
+          '1 UNION SELECT id, password_hash FROM usuarios--',
+          '" OR ""="',
+          "admin' --",
+        ];
+
+        for (const payload of sqlPayloads) {
+          const sanitized = sanitizeSearchTerm(payload);
+          expect(sanitized).toBe(payload.trim());
+          // O termo é limpo de caracteres de controle, tornando-se literal seguro para o ORM parametrizar
+          expect(typeof sanitized).toBe('string');
+        }
+      });
+
+      it('deve truncar termos que excedam o limite para mitigar ataques de DoS por regex/like', () => {
+        const longTerm = 'a'.repeat(250);
+        const sanitized = sanitizeSearchTerm(longTerm, 100);
+
+        expect(sanitized.length).toBe(100);
+      });
+
+      it('deve retornar string vazia para entradas nulas, indefinidas ou não-string', () => {
+        expect(sanitizeSearchTerm(null)).toBe('');
+        expect(sanitizeSearchTerm(undefined)).toBe('');
+        expect(sanitizeSearchTerm('')).toBe('');
+        expect(sanitizeSearchTerm(12345)).toBe('');
+      });
+    });
+
+    describe('validatePaginationParams()', () => {
+      it('deve retornar valores padrão seguros quando nenhum parâmetro for fornecido', () => {
+        const pagination = validatePaginationParams();
+
+        expect(pagination.page).toBe(1);
+        expect(pagination.pageSize).toBe(50);
+        expect(pagination.skip).toBe(0);
+        expect(pagination.take).toBe(50);
+      });
+
+      it('deve calcular corretamente skip e take para páginas e tamanhos customizados', () => {
+        const pagination = validatePaginationParams({ page: 3, pageSize: 20 });
+
+        expect(pagination.page).toBe(3);
+        expect(pagination.pageSize).toBe(20);
+        expect(pagination.skip).toBe(40);
+        expect(pagination.take).toBe(20);
+      });
+
+      it('deve aplicar teto rígido de pageSize (MAX 100) prevenindo DoS por exaustão de memória', () => {
+        const payloadAgressivo = validatePaginationParams({ page: 1, pageSize: 100000 });
+
+        expect(payloadAgressivo.pageSize).toBe(100);
+        expect(payloadAgressivo.take).toBe(100);
+      });
+
+      it('deve corrigir valores inválidos, negativos ou strings malformadas', () => {
+        expect(validatePaginationParams({ page: -5, pageSize: -10 })).toEqual({
+          page: 1,
+          pageSize: 50,
+          skip: 0,
+          take: 50,
+        });
+
+        expect(validatePaginationParams({ page: 'invalid', pageSize: NaN })).toEqual({
+          page: 1,
+          pageSize: 50,
+          skip: 0,
+          take: 50,
+        });
+      });
+    });
+
+    describe('buildSafeNascenteFilters()', () => {
+      it('deve montar objeto de filtros fortemente tipado e limpo', () => {
+        const filters = buildSafeNascenteFilters({
+          municipio: 'Crato',
+          fonte: 'Fonte dos Milagres',
+          ativo: true,
+        });
+
+        expect(filters).toEqual({
+          municipio: 'Crato',
+          fonte: 'Fonte dos Milagres',
+          ativo: true,
+        });
+      });
+
+      it('deve aceitar coerção de boolean em strings', () => {
+        expect(buildSafeNascenteFilters({ ativo: 'true' })).toEqual({ ativo: true });
+        expect(buildSafeNascenteFilters({ ativo: 'false' })).toEqual({ ativo: false });
+        expect(buildSafeNascenteFilters({ ativo: 'outro' })).toEqual({});
+      });
+
+      it('deve omitir filtros vazios ou nulos', () => {
+        const filters = buildSafeNascenteFilters({
+          municipio: '',
+          fonte: null,
+          localidade: undefined,
+        });
+
+        expect(filters).toEqual({});
+      });
+    });
+
+    describe('Auditoria de Parametrização e Prevenção de Raw SQL Inseguro', () => {
+      it('deve garantir que o código-fonte em src/ NUNCA invoque métodos $queryRawUnsafe ou $executeRawUnsafe', () => {
+        const srcDir = path.resolve(process.cwd(), 'src');
+
+        function scanFiles(dir: string): string[] {
+          const results: string[] = [];
+          const list = fs.readdirSync(dir);
+
+          for (const file of list) {
+            const filePath = path.join(dir, file);
+            const stat = fs.statSync(filePath);
+
+            if (stat.isDirectory()) {
+              results.push(...scanFiles(filePath));
+            } else if (
+              (file.endsWith('.ts') || file.endsWith('.tsx')) &&
+              !file.includes('.test.') &&
+              !file.includes('.spec.')
+            ) {
+              results.push(filePath);
+            }
+          }
+          return results;
+        }
+
+        const sourceFiles = scanFiles(srcDir);
+        expect(sourceFiles.length).toBeGreaterThan(0);
+
+        for (const filePath of sourceFiles) {
+          const content = fs.readFileSync(filePath, 'utf-8');
+
+          expect(content).not.toContain('$queryRawUnsafe');
+          expect(content).not.toContain('$executeRawUnsafe');
+        }
       });
     });
   });
