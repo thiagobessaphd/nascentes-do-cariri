@@ -12,6 +12,10 @@
     "start": "next start",
     "lint": "eslint src next.config.ts eslint.config.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/tests/unit",
+    "test:integration": "vitest run src/tests/integration",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma skills sync || exit 0"
   },

@@ -6,6 +6,8 @@ export default defineConfig({
     // Desabilita paralelismo entre arquivos para evitar condições de corrida nos testes de integração com o MySQL
     fileParallelism: false,
     environment: 'node',
+    testTimeout: 10000,
+    hookTimeout: 10000,
   },
   resolve: {
     alias: {
