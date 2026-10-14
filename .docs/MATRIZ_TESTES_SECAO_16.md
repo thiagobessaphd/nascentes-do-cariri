@@ -45,7 +45,7 @@ A matriz estabelece para cada requisito:
 | **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Planejado |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
-| **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Em Implementação |
+| **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Ativo |
 
 ---
 
