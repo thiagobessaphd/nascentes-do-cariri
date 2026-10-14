@@ -78,15 +78,20 @@ A matriz estabelece para cada requisito:
   - Integridade referencial: Restrição de exclusão (`onDelete: Restrict`) impedindo exclusão acidental de `Usuario` vinculado a `Importacao` e `Importacao` vinculada a `Nascente`.
   - Atomicidade transacional: Execuções via `prisma.$transaction` garantindo rollback integral quando ocorre erro intermediário no lote.
 
-### 3.4. Resiliência de Erros e Responsividade em Iframe (`CT-FE-06`, `CT-FE-07`)
+### 3.4. Resiliência de Erros, Responsividade e Isolamento de Framing (`CT-FE-06`, `CT-FE-07`)
 * **Arquivos:**
   - `src/tests/unit/errors/api-error-handler.test.ts`
   - `src/tests/unit/mapa/viewport-responsive.test.ts`
   - `src/tests/unit/mapa/layout.test.ts`
+  - `src/tests/unit/security/iframe-integration.test.ts`
 * **Regras Verificadas:**
   - Respostas da API formatadas sem vazamento de detalhes internos ou stack traces em ambiente de produção.
-  - Renderização fluida da rota pública `/mapa` sob simulação de viewport desktop (1920x1080) e móvel (375x667).
-  - Isolamento estrito de framing com cabeçalhos CSP autorizando exclusivamente o domínio institucional da UFCA.
+  - Renderização fluida da rota pública `/mapa` sob simulação de viewports (Desktop 1920x1080 até Mobile compacto 320x568).
+  - Isolamento estrito de framing com cabeçalhos CSP autorizando exclusivamente o domínio institucional da UFCA (`frame-ancestors 'self' https://nascentesdocariri.ufca.edu.br`) na rota pública `/mapa`.
+  - Ausência de `X-Frame-Options: DENY` na rota `/mapa` para não quebrar a incorporação em iframe pelo portal da UFCA.
+  - Bloqueio total de incorporação em iframes (`frame-ancestors 'none'` e `X-Frame-Options: DENY`) nas rotas sensíveis e administrativas.
+  - Configuração de `Permissions-Policy` restringindo APIs de hardware sensíveis (`camera=(), microphone=(), geolocation=()`) dentro do iframe.
+  - Injeção condicional de `Strict-Transport-Security` (HSTS) apenas em ambiente produtivo.
 
 ### 3.5. Monitoramento, Uptime e Resiliência da API (`/api/health`)
 * **Arquivo:** `src/tests/integration/api/health.test.ts`

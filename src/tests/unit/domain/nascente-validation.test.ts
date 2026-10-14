@@ -3,7 +3,6 @@ import {
   CARIRI_BOUNDS,
   isWithinCaririBounds,
   validateNascente,
-  nascenteDomainSchema,
 } from '../../../lib/domain/nascente';
 
 describe('Validações de Domínio de Nascentes (Seção 16)', () => {
