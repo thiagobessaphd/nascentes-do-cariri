@@ -29,12 +29,12 @@ A matriz estabelece para cada requisito:
 | **CT-BE-04** | Extensão inválida (diferente de `.txt`) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-05** | Arquivo acima do limite (5 MB) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-06** | Cabeçalho ausente ou incorreto | Backend | Unitário | Importação TXT | `src/tests/unit/import/txt-parser.test.ts` | Planejado |
-| **CT-BE-07** | Coordenada fora dos limites (Cariri) | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Em Implementação |
-| **CT-BE-08** | Data inválida | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Em Implementação |
-| **CT-BE-09** | Vazão negativa ou não numérica | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Em Implementação |
-| **CT-BE-10** | Campo obrigatório vazio | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Em Implementação |
+| **CT-BE-07** | Coordenada fora dos limites (Cariri) | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
+| **CT-BE-08** | Data inválida | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
+| **CT-BE-09** | Vazão negativa ou não numérica | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
+| **CT-BE-10** | Campo obrigatório vazio | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-11** | Linha duplicada (Unique Constraint) | Backend | Integração | Persistência / Banco | `src/tests/integration/database/constraints.test.ts` | Ativo |
-| **CT-BE-12** | Rollback em caso de falha | Backend | Integração | Persistência / Transação | `src/tests/integration/database/transactions.test.ts` | Em Implementação |
+| **CT-BE-12** | Rollback em caso de falha | Backend | Integração | Persistência / Transação | `src/tests/integration/database/transactions.test.ts` | Ativo |
 | **CT-BE-13** | Adição de novos registros à base após confirmação | Backend | Integração | Importação TXT | `src/tests/integration/import/import-commit.test.ts` | Planejado |
 | **CT-BE-14** | Preservação dos registros de importações anteriores | Backend | Integração | Persistência / Integridade | `src/tests/integration/database/database.test.ts` | Ativo |
 | **CT-BE-15** | Preservação dos arquivos TXT originais | Backend | Unitário | Storage e Sanitização | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
@@ -87,6 +87,14 @@ A matriz estabelece para cada requisito:
   - Respostas da API formatadas sem vazamento de detalhes internos ou stack traces em ambiente de produção.
   - Renderização fluida da rota pública `/mapa` sob simulação de viewport desktop (1920x1080) e móvel (375x667).
   - Isolamento estrito de framing com cabeçalhos CSP autorizando exclusivamente o domínio institucional da UFCA.
+
+### 3.5. Monitoramento, Uptime e Resiliência da API (`/api/health`)
+* **Arquivo:** `src/tests/integration/api/health.test.ts`
+* **Regras Verificadas:**
+  - Liveness/Readiness probe respondendo `200 OK` com `{"status": "ok", "database": "healthy"}` em condições normais de operação.
+  - Fail-fast com timeout de 3.000 ms e retorno `503 Service Unavailable` com `{"status": "error", "database": "unhealthy"}` em caso de indisponibilidade ou lentidão do banco de dados.
+  - Cabeçalho anti-cache `Cache-Control: no-store, no-cache, must-revalidate` impedindo que proxies e CDN mascarem o estado real do serviço.
+  - Ocultação estrita de mensagens de erro internas ou stack traces em conformidade com as diretrizes de segurança da aplicação.
 
 ---
 
