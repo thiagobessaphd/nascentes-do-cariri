@@ -11,3 +11,8 @@ coverage
 *.log
 .DS_Store
 README.md
+
+# Certificados TLS e chaves privadas
+certs/
+*.pem
+*.key

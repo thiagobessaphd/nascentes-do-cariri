@@ -155,6 +155,12 @@ Variáveis `NEXT_PUBLIC_*` são incorporadas ao bundle durante o build da imagem
 
 O endpoint público padrão do OpenStreetMap presente no exemplo serve apenas como configuração inicial de desenvolvimento. Antes da produção, deve ser escolhido um serviço de tiles com política, capacidade e disponibilidade compatíveis com o tráfego esperado.
 
+### Rotação de Segredos (`AUTH_SECRET`)
+
+- **Geração:** Gere chaves criptograficamente seguras com no mínimo 32 bytes via `openssl rand -base64 32`.
+- **Procedimento de rotação:** Atualize `AUTH_SECRET` no ambiente de hospedagem e reinicie o serviço. Todas as sessões ativas serão invalidadas de forma limpa, forçando novo login sem afetar os dados do banco.
+- **Regra de isolamento:** Segredos de infraestrutura (`AUTH_SECRET`, `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`) operam exclusivamente no servidor e jamais devem receber prefixo `NEXT_PUBLIC_*`, ser versionados no Git ou embutidos em imagens Docker.
+
 ## HTTPS direto no Nginx
 
 O arquivo principal usa HTTP para desenvolvimento local. Para o Nginx terminar TLS, disponibilize um certificado e uma chave privada fora do repositório e ajuste no `.env`:
@@ -176,7 +182,7 @@ Inicie com o overlay TLS:
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build --wait
 ```
 
-Essa configuração redireciona HTTP para HTTPS, aceita TLS 1.2/1.3 e envia HSTS. A emissão e a renovação do certificado devem ser realizadas pelo mecanismo operacional escolhido, por exemplo Certbot no host ou um load balancer gerenciado.
+Essa configuração redireciona HTTP para HTTPS (código 308), aceita TLS 1.2/1.3 e envia HSTS. A emissão e a renovação do certificado devem ser realizadas pelo mecanismo operacional escolhido, por exemplo Certbot no host ou um load balancer gerenciado.
 
 ## Incorporação por iframe
 
@@ -222,7 +228,7 @@ docker compose exec -T mysql sh -c \
 
 O backup do MySQL deve ser coordenado com a retenção do Vercel Blob, pois o banco guarda as referências dos arquivos originais. Um backup isolado do banco não garante a recuperação completa das importações.
 
-Procedimentos de restauração devem ser testados primeiro em ambiente separado. Nunca restaure diretamente sobre produção sem backup, janela de manutenção e plano de rollback.
+Procedimentos de restauração devem ser testados primeiro em ambiente separado. Nunca restaure diretamente sobre produção sem backup, janela de manutenção e plano de rollback. Para o roteiro completo de publicação na Vercel, migrações com Prisma, rollback de emergência, rotina de backup conjunto coordenado (MySQL + Vercel Blob) e ensaio de restauração, consulte o **[Runbook Operacional](.docs/RUNBOOK_OPERACIONAL.md)**.
 
 ## Produção: Docker ou Vercel
 
@@ -235,11 +241,30 @@ Escolha apenas uma borda pública por ambiente:
 
 Em ambos os casos são obrigatórios ambientes separados, backups, política de retenção dos blobs, logs sem segredos, migrações controladas e teste de restauração.
 
+## Privacidade, Logs e Retenção (LGPD)
+
+A aplicação segue as diretrizes da LGPD (Lei nº 13.709/2018) e o princípio de *Privacy by Design*:
+
+### 1. Coleta e Minimização de Dados de Visitantes
+- **Navegação anônima:** Visitantes no mapa (`/` e `/mapa`) não possuem dados pessoais coletados nem utilizam cookies de rastreamento.
+- **Isolamento de dados pessoais:** Dados cadastrais limitam-se aos administradores autorizados do sistema, armazenados com hash de senha e controle de acesso restrito.
+
+### 2. Estrutura e Sanitização de Logs
+- **Formato:** Logs em produção são emitidos de forma estruturada em JSON, prontos para ingestão pela plataforma de observabilidade (Vercel ou Docker).
+- **Mascaramento automático de segredos e PII:** Chaves como senhas, tokens e documentos pessoais são automaticamente mascarados como `[REDACTED]`.
+- **Anonimização de IP:** Endereços de rede registrados em contextos técnicos têm seus identificadores minimizados (último octeto zerado em IPv4, e prefixo `/48` em IPv6).
+- **Sanitização de caminhos locais:** Caminhos absolutos do sistema operacional (`C:\...` ou `/home/...`) em mensagens ou erros são substituídos por `[PATH]`, prevenindo vazamento da topologia do servidor host.
+- **Supressão de stack traces:** Em ambiente de produção, stack traces e detalhes internos do banco de dados são omitidos das respostas da API e dos logs.
+
+### 3. Política de Retenção e Ciclo de Vida
+- **Logs operacionais:** Recomenda-se a retenção de logs de acesso e erros por 30 a 90 dias nos coletores de infraestrutura, prazo adequado para auditoria técnica sem retenção excessiva.
+- **Histórico de importações:** Registros de arquivos TXT importados são mantidos na tabela `importacoes` vinculados ao store privado do Vercel Blob. O descarte de arquivos legados ou backups obsoletos deve ser coordenado entre o banco de dados e o Blob Storage.
+
 ## Estrutura principal
 
 ```text
 .
-├── .docs/                         # requisitos e arquitetura
+├── .docs/                         # requisitos, arquitetura e runbook operacional
 ├── .spec/                         # orientações técnicas dos especialistas
 ├── docker/nginx/                  # imagem e configuração do proxy
 │   ├── conf.d/
