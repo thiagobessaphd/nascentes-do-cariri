@@ -12,8 +12,8 @@ export const runtime = 'nodejs';
  * Utilizado para alimentar o filtro de municípios no mapa público.
  *
  * Respostas:
- * 200 OK: { data: readonly string[], meta: { total: number } }
- * 500 Internal Server Error: { error: string, code: 'INTERNAL_SERVER_ERROR' }
+ * - 200 OK: { data: readonly string[], meta: { total: number } }
+ * - 500 Internal Server Error: { error: string, code: 'INTERNAL_SERVER_ERROR' }
  */
 export async function GET(): Promise<NextResponse> {
   try {
