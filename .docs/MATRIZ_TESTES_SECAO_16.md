@@ -2,7 +2,6 @@
 
 > **Especificação de Cobertura e Qualidade**  
 > **Referência:** Seção 16 de [.docs/REQUISITOS_MAPA_NASCENTES_DO_CARIRI.md](.docs/REQUISITOS_MAPA_NASCENTES_DO_CARIRI.md) e Seção 16 de [.docs/ARQUITETURA_RECOMENDADA_NASCENTES_DO_CARIRI.md](.docs/ARQUITETURA_RECOMENDADA_NASCENTES_DO_CARIRI.md).  
-> **Rastreabilidade:** Task-9 (#53), US-5 (#52), Feature-2 (#45).
 
 ---
 
@@ -38,7 +37,7 @@ A matriz estabelece para cada requisito:
 | **CT-BE-13** | Adição de novos registros à base após confirmação | Backend | Integração | Importação TXT | `src/tests/integration/import/import-commit.test.ts` | Planejado |
 | **CT-BE-14** | Preservação dos registros de importações anteriores | Backend | Integração | Persistência / Integridade | `src/tests/integration/database/database.test.ts` | Ativo |
 | **CT-BE-15** | Preservação dos arquivos TXT originais | Backend | Unitário | Storage e Sanitização | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
-| **CT-BE-16** | Resposta da API somente com registros ativos | Backend | Integração | API Pública | `src/tests/integration/api/nascentes.test.ts` | Planejado |
+| **CT-BE-16** | Resposta da API somente com registros ativos | Backend | Integração | API Pública | `src/tests/integration/api/nascentes.test.ts` | Ativo |
 | **CT-FE-01** | Criação correta dos marcadores | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/markers.test.ts` | Planejado |
 | **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Planejado |
 | **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Planejado |
@@ -100,6 +99,16 @@ A matriz estabelece para cada requisito:
   - Fail-fast com timeout de 3.000 ms e retorno `503 Service Unavailable` com `{"status": "error", "database": "unhealthy"}` em caso de indisponibilidade ou lentidão do banco de dados.
   - Cabeçalho anti-cache `Cache-Control: no-store, no-cache, must-revalidate` impedindo que proxies e CDN mascarem o estado real do serviço.
   - Ocultação estrita de mensagens de erro internas ou stack traces em conformidade com as diretrizes de segurança da aplicação.
+
+### 3.6. API Pública de Nascentes, Filtros e Registros Ativos (`CT-BE-16`)
+* **Arquivos:**
+  - `src/tests/integration/api/nascentes.test.ts`
+  - `src/tests/unit/modules/nascentes/nascentes-schema.test.ts`
+* **Regras Verificadas:**
+  - Filtragem estrita de status: registros com `ativo = false` são excluídos do retorno e nunca constam no payload público da API.
+  - Allowlist e segurança de dados: exclusão mandatória de campos administrativos (`usuarioId`, `importacaoId`, `caminhoPrivadoArquivo`, `hashArquivo`, `createdAt`).
+  - Filtros públicos combinados: filtragem por município exato, busca textual `q` por termo contido na fonte ou na localidade.
+  - Bounding Box geográfico: restrição espacial por coordenadas (`north`, `south`, `east`, `west`), validação de limites mundiais $[-90, 90]$ e $[-180, 180]$, consistência espacial (`north >= south` e `east >= west`) e rejeição de coordenadas parciais com status 400 (`VALIDATION_ERROR`).
 
 ---
 
