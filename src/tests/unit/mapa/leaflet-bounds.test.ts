@@ -64,7 +64,7 @@ describe('Lógica Cartográfica de Enquadramento e Bounds (src/components/map/ma
   });
 
   describe('2. Enquadramento de Zero Registros (Dataset Vazio ou Inválido)', () => {
-    it('deve enquadrar os limites padrão do Cariri (DEFAULT_CARIRI_BOUNDS) quando o array for vazio', () => {
+    it('deve enquadrar os limites padrão do Cariri quando o array for vazio', () => {
       adjustMapBounds(mockMap, []);
 
       expect(mockMap.setView).not.toHaveBeenCalled();
@@ -155,6 +155,55 @@ describe('Lógica Cartográfica de Enquadramento e Bounds (src/components/map/ma
           maxZoom: 15,
         }
       );
+    });
+  });
+
+  describe('5. Cenários de Borda e Tolerância Cartográfica', () => {
+    it('deve processar corretamente DTOs completos de nascentes públicas', () => {
+      const nascentesDtos = [
+        {
+          id: 1,
+          latitude: -7.2345,
+          longitude: -39.4123,
+          municipio: 'Crato',
+          fonte: 'Fonte Batateiras',
+          localidade: 'Sítio Fundão',
+          data_criacao: '2024-05-10',
+          vazao_media: 15.4,
+          unidade_vazao: 'm³/s',
+        },
+        {
+          id: 2,
+          latitude: -7.2025,
+          longitude: -39.3138,
+          municipio: 'Juazeiro do Norte',
+          fonte: "Olho d'Água do Horto",
+          localidade: 'Horto',
+          data_criacao: '2024-06-15',
+          vazao_media: 8.25,
+          unidade_vazao: 'm³/s',
+        },
+      ];
+
+      adjustMapBounds(mockMap, nascentesDtos);
+
+      expect(mockMap.fitBounds).toHaveBeenCalledWith(
+        expect.anything(),
+        {
+          padding: DEFAULT_BOUNDS_PADDING,
+          maxZoom: DEFAULT_MAX_BOUNDS_ZOOM,
+        }
+      );
+    });
+
+    it('deve lidar com pontos coincidentes (mesma latitude e longitude) aplicando fitBounds sem exceção', () => {
+      const coincidentPoints = [
+        { latitude: -7.2345, longitude: -39.4123 },
+        { latitude: -7.2345, longitude: -39.4123 },
+      ];
+
+      expect(() => adjustMapBounds(mockMap, coincidentPoints)).not.toThrow();
+      expect(mockMap.fitBounds).toHaveBeenCalled();
     });
   });
 });

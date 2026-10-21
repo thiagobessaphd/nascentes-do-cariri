@@ -61,6 +61,34 @@ describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.
       expect(html).toContain('Falha temporária');
       expect(html).not.toContain('Tentar novamente');
     });
+
+    it('deve renderizar a mensagem amigável não-técnica quando ocorrer erro 400 de filtros inválidos', () => {
+      const msg400 = 'Os filtros de busca informados são inválidos. Por favor, revise sua pesquisa.';
+      const html = renderToString(
+        React.createElement(MapFeedback, {
+          status: 'error',
+          error: msg400,
+          onRetry: vi.fn(),
+        })
+      );
+
+      expect(html).toContain(msg400);
+      expect(html).not.toContain('400');
+      expect(html).not.toContain('VALIDATION_ERROR');
+    });
+
+    it('deve renderizar a mensagem humanizada para erros de conexão de rede', () => {
+      const networkMsg = 'Dificuldade de conexão com o servidor. Verifique sua internet.';
+      const html = renderToString(
+        React.createElement(MapFeedback, {
+          status: 'error',
+          error: networkMsg,
+          onRetry: vi.fn(),
+        })
+      );
+
+      expect(html).toContain(networkMsg);
+    });
   });
 
   describe('3. Estado Vazio (empty)', () => {

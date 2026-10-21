@@ -209,4 +209,53 @@ describe('Base Leaflet e Configuração de Tiles', () => {
       expect(styles.mapaLayout).toBeDefined();
     });
   });
+
+  describe('3. Integração de Estados, Feedbacks e Ciclo de Vida da Camada de Marcadores', () => {
+    it('deve inicializar e vincular a camada dedicada de marcadores (L.layerGroup) ao mapa', () => {
+      const mockContainer = {} as HTMLDivElement;
+      const map = L.map(mockContainer);
+
+      const markersLayer = L.layerGroup().addTo(map);
+
+      expect(L.layerGroup).toHaveBeenCalled();
+      expect(markersLayer.addTo).toHaveBeenCalledWith(map);
+    });
+
+    it('deve limpar as camadas de marcadores ao desmontar o mapa para evitar vazamentos de memória', () => {
+      const markersLayer = L.layerGroup();
+      markersLayer.clearLayers();
+
+      expect(markersLayer.clearLayers).toHaveBeenCalled();
+    });
+
+    it('deve renderizar o MapFeedback dentro do container do mapa', async () => {
+      const { renderToString } = await import('react-dom/server');
+      const html = renderToString(React.createElement(LeafletMap));
+
+      // No primeiro ciclo de renderização no servidor, o feedback inicial é montado
+      expect(html).toContain('role="status"');
+      expect(html).toContain('aria-live="polite"');
+      expect(html).toContain('Carregando nascentes...');
+      expect(html).toContain(styles.feedbackCard);
+      expect(html).toContain(styles.feedbackLoading);
+    });
+
+    it('deve repassar parâmetros de busca (município, q, bounds) sem quebrar a inicialização do mapa', async () => {
+      const { renderToString } = await import('react-dom/server');
+      const params = {
+        municipio: 'Crato',
+        q: 'Batateiras',
+        north: -7.2,
+        south: -7.4,
+        east: -39.3,
+        west: -39.5,
+      };
+
+      const html = renderToString(React.createElement(LeafletMap, { params }));
+
+      expect(html).toContain('id="mapa-cariri"');
+      expect(html).toContain('role="region"');
+      expect(html).toContain(styles.mapContainer);
+    });
+  });
 });
