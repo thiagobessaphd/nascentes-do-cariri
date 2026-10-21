@@ -4,16 +4,23 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { mapConfig } from '@/config/map';
+import { useNascentesPublicas } from '@/hooks/useNascentesPublicas';
+import type { NascentesQueryParams } from '@/modules/nascentes/nascentes.dto';
+import { adjustMapBounds } from './map-bounds';
 import styles from './map.module.css';
 
 export interface LeafletMapProps {
-  readonly className?: string;
+  readonly className?: string | undefined;
+  readonly params?: NascentesQueryParams | undefined;
 }
 
-export default function LeafletMap({ className }: LeafletMapProps) {
+export default function LeafletMap({ className, params }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const [hasTileError, setHasTileError] = useState<boolean>(false);
+
+  const { status, data } = useNascentesPublicas(params);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -52,6 +59,9 @@ export default function LeafletMap({ className }: LeafletMapProps) {
 
     L.control.scale({ imperial: false, metric: true }).addTo(map);
 
+    const markersLayer = L.layerGroup().addTo(map);
+    markersLayerRef.current = markersLayer;
+
     mapRef.current = map;
 
     let resizeObserver: ResizeObserver | null = null;
@@ -80,10 +90,26 @@ export default function LeafletMap({ className }: LeafletMapProps) {
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
+      if (markersLayerRef.current) {
+        markersLayerRef.current.clearLayers();
+        markersLayerRef.current = null;
+      }
       map.remove();
       mapRef.current = null;
     };
   }, []);
+
+  // Enquadramento dinâmico da visualização cartográfica quando os dados estiverem disponíveis
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    if (status === 'success' || status === 'empty') {
+      adjustMapBounds(map, data);
+    }
+  }, [status, data]);
 
   const containerClassName = className
     ? `${styles.mapContainer} ${className}`

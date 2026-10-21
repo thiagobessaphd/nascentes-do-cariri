@@ -7,6 +7,8 @@ import styles from '@/components/map/map.module.css';
 const mockMapInstance = {
   remove: vi.fn(),
   invalidateSize: vi.fn(),
+  fitBounds: vi.fn(),
+  setView: vi.fn(),
 };
 
 const registeredEventHandlers: Record<string, () => void> = {};
@@ -23,6 +25,11 @@ const mockScaleControlInstance = {
   addTo: vi.fn().mockReturnThis(),
 };
 
+const mockLayerGroupInstance = {
+  addTo: vi.fn().mockReturnThis(),
+  clearLayers: vi.fn(),
+};
+
 vi.mock('leaflet', () => ({
   default: {
     map: vi.fn(() => mockMapInstance),
@@ -30,6 +37,10 @@ vi.mock('leaflet', () => ({
     control: {
       scale: vi.fn(() => mockScaleControlInstance),
     },
+    layerGroup: vi.fn(() => mockLayerGroupInstance),
+    latLngBounds: vi.fn((latLngs: [number, number][]) => ({
+      isValid: () => Array.isArray(latLngs) && latLngs.length > 0,
+    })),
   },
 }));
 
