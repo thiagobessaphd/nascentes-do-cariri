@@ -368,4 +368,143 @@ describe('API Pública de Nascentes (GET /api/public/nascentes) - Integração',
       expect(typeof body.meta.updated_at).toBe('string');
     });
   });
+
+  describe('Segurança, Integridade Relacional e Entradas Hostis', () => {
+    it('deve garantir que buscas textuais coincidentes com dados de nascentes inativas NUNCA quebrem a cláusula ativo=true', async () => {
+      // "Nascente Inativa do Riacho" (n3) possui "Riacho" e "Araripe", mas ativo=false
+      const queries = [
+        '/api/public/nascentes?q=Riacho',
+        '/api/public/nascentes?q=Inativa',
+        '/api/public/nascentes?q=Araripe',
+        '/api/public/nascentes?municipio=Crato&q=Riacho',
+      ];
+
+      for (const query of queries) {
+        const response = await GET(createRequest(query));
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        const returnedIds = body.data.map((n: { id: number }) => n.id);
+
+        // A nascente inativa JAMAIS pode ser vazada, mesmo com busca de texto idêntica
+        expect(returnedIds).not.toContain(createdNascenteIds[2]);
+      }
+    });
+
+    it('deve neutralizar tentativas de SQL Injection em parâmetros de busca tratando-os como literais seguros', async () => {
+      const sqliPayloads = [
+        "' OR '1'='1",
+        "'; DROP TABLE nascente; --",
+        "Crato' UNION SELECT 1, 2, 3, 4, 5, 6, 7, 8 --",
+        "' OR 1=1 --",
+        "admin'--",
+        "1' OR '1' = '1' /*",
+      ];
+
+      for (const payload of sqliPayloads) {
+        // Testa via município
+        const resMunicipio = await GET(
+          createRequest(`/api/public/nascentes?municipio=${encodeURIComponent(payload)}`)
+        );
+        expect(resMunicipio.status).toBe(200);
+        const bodyMun = await resMunicipio.json();
+        expect(Array.isArray(bodyMun.data)).toBe(true);
+        // Não deve retornar nascente inativa e deve ser payload válido
+        const validatedMun = parseNascentesPublicResponse(bodyMun);
+        expect(validatedMun.data.some((n) => n.id === createdNascenteIds[2])).toBe(false);
+
+        // Testa via termo de busca 'q'
+        const resQ = await GET(
+          createRequest(`/api/public/nascentes?q=${encodeURIComponent(payload)}`)
+        );
+        expect(resQ.status).toBe(200);
+        const bodyQ = await resQ.json();
+        expect(Array.isArray(bodyQ.data)).toBe(true);
+        const validatedQ = parseNascentesPublicResponse(bodyQ);
+        expect(validatedQ.data.some((n) => n.id === createdNascenteIds[2])).toBe(false);
+      }
+
+      // Prova de integridade de banco de dados: a tabela 'nascente' continua íntegra e acessível
+      const totalCount = await prisma.nascente.count();
+      expect(totalCount).toBeGreaterThanOrEqual(4);
+    });
+
+    it('deve neutralizar vetores de XSS em query strings sem quebra de execução ou injeção de HTML (QA)', async () => {
+      const xssPayloads = [
+        '<script>alert("xss")</script>',
+        '<svg/onload=alert(1)>',
+        '"><img src=x onerror=alert(1)>',
+        '<iframe src="javascript:alert(1)"></iframe>',
+        'javascript:/*--></title></style></textarea>*/<script>alert(1)</script>',
+      ];
+
+      for (const payload of xssPayloads) {
+        const response = await GET(
+          createRequest(`/api/public/nascentes?q=${encodeURIComponent(payload)}`)
+        );
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Content-Type')).toContain('application/json');
+
+        const body = await response.json();
+        const validated = parseNascentesPublicResponse(body);
+        expect(Array.isArray(validated.data)).toBe(true);
+      }
+    });
+
+    it('deve rejeitar com 400 VALIDATION_ERROR tentativas de overflow/DoS que excedam o tamanho máximo permitido', async () => {
+      // Limite máximo: municipio <= 150 caracteres, q <= 100 caracteres
+      const oversizedMunicipio = 'A'.repeat(151);
+      const resMunicipio = await GET(
+        createRequest(`/api/public/nascentes?municipio=${oversizedMunicipio}`)
+      );
+      expect(resMunicipio.status).toBe(400);
+      const bodyMun = await resMunicipio.json();
+      expect(bodyMun.code).toBe('VALIDATION_ERROR');
+      expect(bodyMun.details.some((d: { campo: string }) => d.campo === 'municipio')).toBe(true);
+
+      const oversizedQ = 'B'.repeat(101);
+      const resQ = await GET(
+        createRequest(`/api/public/nascentes?q=${oversizedQ}`)
+      );
+      expect(resQ.status).toBe(400);
+      const bodyQ = await resQ.json();
+      expect(bodyQ.code).toBe('VALIDATION_ERROR');
+      expect(bodyQ.details.some((d: { campo: string }) => d.campo === 'q')).toBe(true);
+    });
+
+    it('deve rejeitar com 400 VALIDATION_ERROR coordenadas de Bounding Box fora da escala global ou inválidas', async () => {
+      // Coordenadas fora da faixa [-90, 90] ou [-180, 180]
+      const invalidQueries = [
+        '/api/public/nascentes?north=91&south=0&east=0&west=0',
+        '/api/public/nascentes?north=0&south=-91&east=0&west=0',
+        '/api/public/nascentes?north=0&south=0&east=181&west=0',
+        '/api/public/nascentes?north=0&south=0&east=0&west=-181',
+        '/api/public/nascentes?north=not_a_number&south=0&east=0&west=0',
+      ];
+
+      for (const query of invalidQueries) {
+        const response = await GET(createRequest(query));
+        expect(response.status).toBe(400);
+        const body = await response.json();
+        expect(body.code).toBe('VALIDATION_ERROR');
+      }
+    });
+
+    it('deve garantir que payloads de erro 400 não vazem stack traces, paths internos ou credenciais', async () => {
+      const response = await GET(
+        createRequest('/api/public/nascentes?north=invalido&south=0&east=0&west=0')
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      const serialized = JSON.stringify(body);
+
+      // Não deve vazar caminhos de arquivos, stack trace ou variáveis de ambiente
+      expect(serialized).not.toContain('node_modules');
+      expect(serialized).not.toContain('stack');
+      expect(serialized).not.toContain('DATABASE_URL');
+      expect(serialized).not.toContain('password');
+      expect(serialized).not.toContain('mysql://');
+    });
+  });
 });
