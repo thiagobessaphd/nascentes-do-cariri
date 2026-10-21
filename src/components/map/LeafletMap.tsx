@@ -7,6 +7,7 @@ import { mapConfig } from '@/config/map';
 import { useNascentesPublicas } from '@/hooks/useNascentesPublicas';
 import type { NascentesQueryParams } from '@/modules/nascentes/nascentes.dto';
 import { adjustMapBounds } from './map-bounds';
+import MapFeedback from './MapFeedback';
 import styles from './map.module.css';
 
 export interface LeafletMapProps {
@@ -20,7 +21,7 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const [hasTileError, setHasTileError] = useState<boolean>(false);
 
-  const { status, data } = useNascentesPublicas(params);
+  const { status, data, error, refetch } = useNascentesPublicas(params);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -124,6 +125,7 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
       aria-label="Mapa cartográfico das nascentes do Cariri"
       tabIndex={0}
     >
+      <MapFeedback status={status} error={error} onRetry={refetch} />
       {hasTileError && (
         <div
           className={styles.tileErrorBanner}
