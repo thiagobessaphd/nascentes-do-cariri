@@ -2,17 +2,26 @@
 
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { mapConfig } from '@/config/map';
+import { useNascentesPublicas } from '@/hooks/useNascentesPublicas';
+import type { NascentesQueryParams } from '@/modules/nascentes/nascentes.dto';
+import { adjustMapBounds } from './map-bounds';
+import MapFeedback from './MapFeedback';
 import styles from './map.module.css';
 
 export interface LeafletMapProps {
-  readonly className?: string;
+  readonly className?: string | undefined;
+  readonly params?: NascentesQueryParams | undefined;
 }
 
-export default function LeafletMap({ className }: LeafletMapProps) {
+export default function LeafletMap({ className, params }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const [hasTileError, setHasTileError] = useState<boolean>(false);
+
+  const { status, data, error, refetch } = useNascentesPublicas(params);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -22,19 +31,37 @@ export default function LeafletMap({ className }: LeafletMapProps) {
     const map = L.map(containerRef.current, {
       center: [mapConfig.defaultLat, mapConfig.defaultLng],
       zoom: mapConfig.defaultZoom,
+      minZoom: mapConfig.minZoom,
+      maxZoom: mapConfig.maxZoom,
       zoomControl: true,
       attributionControl: true,
       keyboard: true,
       scrollWheelZoom: true,
+      dragging: true,
+      touchZoom: true,
       preferCanvas: false,
     });
 
-    L.tileLayer(mapConfig.tileUrl, {
+    const tileLayer = L.tileLayer(mapConfig.tileUrl, {
       attribution: mapConfig.attribution,
+      minZoom: mapConfig.minZoom,
       maxZoom: mapConfig.maxZoom,
-    }).addTo(map);
+    });
 
-    L.control.scale({ imperial: false }).addTo(map);
+    tileLayer.on('tileerror', () => {
+      setHasTileError(true);
+    });
+
+    tileLayer.on('tileload', () => {
+      setHasTileError(false);
+    });
+
+    tileLayer.addTo(map);
+
+    L.control.scale({ imperial: false, metric: true }).addTo(map);
+
+    const markersLayer = L.layerGroup().addTo(map);
+    markersLayerRef.current = markersLayer;
 
     mapRef.current = map;
 
@@ -64,10 +91,26 @@ export default function LeafletMap({ className }: LeafletMapProps) {
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
+      if (markersLayerRef.current) {
+        markersLayerRef.current.clearLayers();
+        markersLayerRef.current = null;
+      }
       map.remove();
       mapRef.current = null;
     };
   }, []);
+
+  // Enquadramento dinâmico da visualização cartográfica quando os dados estiverem disponíveis
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    if (status === 'success' || status === 'empty') {
+      adjustMapBounds(map, data);
+    }
+  }, [status, data]);
 
   const containerClassName = className
     ? `${styles.mapContainer} ${className}`
@@ -78,9 +121,20 @@ export default function LeafletMap({ className }: LeafletMapProps) {
       ref={containerRef}
       id="mapa-cariri"
       className={containerClassName}
-      role="application"
+      role="region"
       aria-label="Mapa cartográfico das nascentes do Cariri"
       tabIndex={0}
-    />
+    >
+      <MapFeedback status={status} error={error} onRetry={refetch} />
+      {hasTileError && (
+        <div
+          className={styles.tileErrorBanner}
+          role="status"
+          aria-live="polite"
+        >
+          <span>Dificuldade em carregar os blocos do mapa. Verifique sua conexão.</span>
+        </div>
+      )}
+    </div>
   );
 }

@@ -15,6 +15,7 @@ describe('Configuração do Mapa do Cliente (src/config/map.ts)', () => {
   it('deve carregar com valores customizados válidos das variáveis de ambiente', async () => {
     process.env.NEXT_PUBLIC_TILE_URL = 'https://custom-tiles.org/{z}/{x}/{y}.png';
     process.env.NEXT_PUBLIC_TILE_ATTRIBUTION = '&copy; Custom Provider';
+    process.env.NEXT_PUBLIC_TILE_MIN_ZOOM = '8';
     process.env.NEXT_PUBLIC_TILE_MAX_ZOOM = '18';
     process.env.NEXT_PUBLIC_MAP_DEFAULT_LAT = '-7.2000';
     process.env.NEXT_PUBLIC_MAP_DEFAULT_LNG = '-39.3000';
@@ -24,15 +25,21 @@ describe('Configuração do Mapa do Cliente (src/config/map.ts)', () => {
 
     expect(mapConfig.tileUrl).toBe('https://custom-tiles.org/{z}/{x}/{y}.png');
     expect(mapConfig.attribution).toBe('&copy; Custom Provider');
+    expect(mapConfig.minZoom).toBe(8);
     expect(mapConfig.maxZoom).toBe(18);
     expect(mapConfig.defaultLat).toBe(-7.2);
     expect(mapConfig.defaultLng).toBe(-39.3);
     expect(mapConfig.defaultZoom).toBe(12);
+    expect(mapConfig.caririBounds).toEqual([
+      [-8.0, -40.5],
+      [-6.5, -38.5],
+    ]);
   });
 
   it('deve aplicar fallbacks padrão da região do Cariri quando variáveis estiverem ausentes', async () => {
     delete process.env.NEXT_PUBLIC_TILE_URL;
     delete process.env.NEXT_PUBLIC_TILE_ATTRIBUTION;
+    delete process.env.NEXT_PUBLIC_TILE_MIN_ZOOM;
     delete process.env.NEXT_PUBLIC_TILE_MAX_ZOOM;
     delete process.env.NEXT_PUBLIC_MAP_DEFAULT_LAT;
     delete process.env.NEXT_PUBLIC_MAP_DEFAULT_LNG;
@@ -42,10 +49,15 @@ describe('Configuração do Mapa do Cliente (src/config/map.ts)', () => {
 
     expect(mapConfig.tileUrl).toBe('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
     expect(mapConfig.attribution).toContain('OpenStreetMap');
+    expect(mapConfig.minZoom).toBe(6);
     expect(mapConfig.maxZoom).toBe(19);
     expect(mapConfig.defaultLat).toBeCloseTo(-7.23456789);
     expect(mapConfig.defaultLng).toBeCloseTo(-39.12345678);
     expect(mapConfig.defaultZoom).toBe(10);
+    expect(mapConfig.caririBounds).toEqual([
+      [-8.0, -40.5],
+      [-6.5, -38.5],
+    ]);
   });
 
   it('deve aplicar fallback seguro se a URL do tile for malformada', async () => {
@@ -64,5 +76,15 @@ describe('Configuração do Mapa do Cliente (src/config/map.ts)', () => {
 
     expect(mapConfig.defaultLat).toBe(-7.23456789);
     expect(mapConfig.defaultLng).toBe(-39.12345678);
+  });
+
+  it('deve aplicar fallback seguro se minZoom for maior que maxZoom', async () => {
+    process.env.NEXT_PUBLIC_TILE_MIN_ZOOM = '15';
+    process.env.NEXT_PUBLIC_TILE_MAX_ZOOM = '10';
+
+    const { mapConfig } = await import('@/config/map');
+
+    expect(mapConfig.minZoom).toBe(6);
+    expect(mapConfig.maxZoom).toBe(19);
   });
 });
