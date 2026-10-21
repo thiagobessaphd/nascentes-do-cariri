@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { NextRequest } from 'next/server';
+import { ZodError } from 'zod';
 import { GET } from '@/app/api/public/nascentes/route';
 import { prisma } from '@/lib/db/prisma';
+import {
+  parseNascentesPublicResponse,
+  nascentePublicItemContractSchema,
+} from '@/modules/nascentes';
 
 function createRequest(pathAndQuery: string = '/api/public/nascentes'): NextRequest {
   const url = `http://localhost:3000${pathAndQuery}`;
@@ -183,6 +188,80 @@ describe('API Pública de Nascentes (GET /api/public/nascentes) - Integração',
         expect(typeof item.vazao_media).toBe('number');
         expect(item.unidade_vazao).toBe('m³/s');
         expect(item.data_criacao).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      }
+    });
+
+    it('deve validar estritamente o payload retornado da API real contra o contrato Zod público', async () => {
+      const response = await GET(createRequest('/api/public/nascentes'));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Type')).toContain('application/json');
+
+      // Validação formal com schema Zod estrito em runtime
+      const validated = parseNascentesPublicResponse(body);
+      expect(validated.data.length).toBeGreaterThanOrEqual(3);
+      expect(validated.meta.total).toBe(validated.data.length);
+      expect(typeof validated.meta.updated_at).toBe('string');
+    });
+
+    it('deve validar contrato Zod mesmo quando a consulta pública retornar conjunto vazio', async () => {
+      const response = await GET(createRequest('/api/public/nascentes?municipio=MunicipioInexistenteXYZ'));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      const validated = parseNascentesPublicResponse(body);
+      expect(validated.data).toEqual([]);
+      expect(validated.meta.total).toBe(0);
+      expect(validated.meta.updated_at).toBeNull();
+    });
+
+    it('deve reprovar a validação de contrato se qualquer campo interno for injetado nos itens', async () => {
+      const response = await GET(createRequest('/api/public/nascentes?municipio=Crato'));
+      const body = await response.json();
+
+      expect(body.data.length).toBeGreaterThanOrEqual(1);
+      const firstItem = body.data[0];
+
+      // Prova de mutação negativa: simulação de vazamento inadvertido de dados internos
+      const sensitiveInjections = [
+        { usuarioId: 999 },
+        { importacaoId: 888 },
+        { caminhoPrivadoArquivo: '/blobs/segredo.txt' },
+        { hashArquivo: 'sha256_injetado' },
+        { passwordHash: '$2b$10$hashsecreto' },
+        { createdAt: new Date().toISOString() },
+        { ativo: true },
+      ];
+
+      for (const injection of sensitiveInjections) {
+        const mutatedItem = { ...firstItem, ...injection };
+        expect(() => nascentePublicItemContractSchema.parse(mutatedItem)).toThrow(ZodError);
+
+        try {
+          nascentePublicItemContractSchema.parse(mutatedItem);
+        } catch (error) {
+          const zodError = error as ZodError;
+          expect(zodError.issues.some((issue) => issue.code === 'unrecognized_keys')).toBe(true);
+        }
+      }
+    });
+
+    it('deve reprovar a validação de contrato se campos desconhecidos forem injetados na raiz do envelope', async () => {
+      const response = await GET(createRequest('/api/public/nascentes'));
+      const body = await response.json();
+
+      const mutatedEnvelope = {
+        ...body,
+        adminAuditLog: 'registro_interno_indevido',
+      };
+
+      expect(() => parseNascentesPublicResponse(mutatedEnvelope)).toThrow(ZodError);
+      try {
+        parseNascentesPublicResponse(mutatedEnvelope);
+      } catch (error) {
+        const zodError = error as ZodError;
+        expect(zodError.issues.some((issue) => issue.code === 'unrecognized_keys')).toBe(true);
       }
     });
   });
