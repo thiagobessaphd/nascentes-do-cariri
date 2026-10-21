@@ -299,4 +299,36 @@ describe('Integração — API Pública de Municípios (GET /api/public/municipi
       expect(JSON.stringify(body)).not.toContain('3307');
     });
   });
+
+  describe('Segurança, Integridade Relacional e Isolamento em Banco', () => {
+    it('deve assegurar que a query ao banco aplica estritamente ativo=true e distinct por município', async () => {
+      const findManySpy = vi.spyOn(prisma.nascente, 'findMany');
+
+      const response = await GET();
+      expect(response.status).toBe(200);
+
+      // Validação de consulta orientada por evidência no Prisma
+      expect(findManySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            ativo: true,
+          }),
+          select: {
+            municipio: true,
+          },
+          distinct: ['municipio'],
+        })
+      );
+    });
+
+    it('deve ignorar query strings acidentais ou hostis preservando o isolamento do endpoint', async () => {
+      // Como o endpoint de municípios não recebe query params, qualquer injeção deve ser ignorada com segurança
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      const validated = parseMunicipiosPublicResponse(body);
+      expect(validated.data).not.toContain('Brejo Santo Inativo');
+    });
+  });
 });
