@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { NascentesQueryParams } from './nascentes.dto';
+import { UNIDADE_VAZAO_PADRAO, type NascentesQueryParams } from './nascentes.dto';
 
 /**
  * Validador e normalizador para coordenadas geográficas opcionais recebidas via query string.
@@ -141,4 +141,90 @@ export type NascentesQueryInput = z.infer<typeof nascentesQuerySchema>;
  */
 export function parseNascentesQueryParams(rawInput: unknown): NascentesQueryParams {
   return nascentesQuerySchema.parse(rawInput);
+}
+
+/**
+ * Schema Zod para validação em runtime do DTO de item público de Nascente.
+ * Impõe o fechamento estrito do objeto, garantindo que nenhum campo
+ * interno ou administrativo seja exposto.
+ */
+export const nascentePublicItemContractSchema = z
+  .object({
+    id: z.number().int().positive({ message: 'O id deve ser um número inteiro positivo.' }),
+    latitude: z
+      .number()
+      .finite({ message: 'A latitude deve ser um número finito.' })
+      .min(-90, { message: 'A latitude deve estar entre -90 e 90 graus.' })
+      .max(90, { message: 'A latitude deve estar entre -90 e 90 graus.' }),
+    longitude: z
+      .number()
+      .finite({ message: 'A longitude deve ser um número finito.' })
+      .min(-180, { message: 'A longitude deve estar entre -180 e 180 graus.' })
+      .max(180, { message: 'A longitude deve estar entre -180 e 180 graus.' }),
+    municipio: z
+      .string()
+      .trim()
+      .min(1, { message: 'O município não pode ser vazio.' })
+      .max(150, { message: 'O município deve ter no máximo 150 caracteres.' }),
+    fonte: z
+      .string()
+      .trim()
+      .min(1, { message: 'A fonte não pode ser vazia.' })
+      .max(255, { message: 'A fonte deve ter no máximo 255 caracteres.' }),
+    localidade: z
+      .string()
+      .trim()
+      .min(1, { message: 'A localidade não pode ser vazia.' })
+      .max(255, { message: 'A localidade deve ter no máximo 255 caracteres.' }),
+    data_criacao: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, {
+        message: 'data_criacao deve ser uma data civil estrita no formato AAAA-MM-DD.',
+      }),
+    vazao_media: z
+      .number()
+      .finite({ message: 'A vazão média deve ser um número finito.' })
+      .nonnegative({ message: 'A vazão média não pode ser negativa.' }),
+    unidade_vazao: z.literal(UNIDADE_VAZAO_PADRAO),
+  })
+  .strict();
+
+export type NascentePublicItemContract = z.infer<typeof nascentePublicItemContractSchema>;
+
+/**
+ * Schema Zod estrito para validação em runtime dos metadados da consulta pública de Nascentes.
+ */
+export const nascentesPublicMetaContractSchema = z
+  .object({
+    total: z.number().int().nonnegative({
+      message: 'O total deve ser um número inteiro maior ou igual a zero.',
+    }),
+    updated_at: z
+      .string()
+      .datetime({ message: 'updated_at deve ser uma data/hora no padrão ISO 8601 UTC ou null.' })
+      .nullable(),
+  })
+  .strict();
+
+export type NascentesPublicMetaContract = z.infer<typeof nascentesPublicMetaContractSchema>;
+
+/**
+ * Schema Zod estrito para validação do envelope de resposta pública: GET /api/public/nascentes.
+ * Garante em runtime conformidade total com o contrato público e rejeição de atributos não previstos.
+ */
+export const nascentesPublicResponseContractSchema = z
+  .object({
+    data: z.array(nascentePublicItemContractSchema),
+    meta: nascentesPublicMetaContractSchema,
+  })
+  .strict();
+
+export type NascentesPublicResponseContract = z.infer<typeof nascentesPublicResponseContractSchema>;
+
+/**
+ * Validador e deserializador em runtime do contrato de resposta pública de nascentes.
+ * Lança ZodError caso o payload viole os tipos, limites ou contenha propriedades adicionais vazadas.
+ */
+export function parseNascentesPublicResponse(raw: unknown): NascentesPublicResponseContract {
+  return nascentesPublicResponseContractSchema.parse(raw);
 }
