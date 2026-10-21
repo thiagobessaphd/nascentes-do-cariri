@@ -62,7 +62,7 @@ describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.
       expect(html).not.toContain('Tentar novamente');
     });
 
-    it('deve renderizar a mensagem amigável não-técnica quando ocorrer erro 400 de filtros inválidos', () => {
+    it('deve renderizar a mensagem quando ocorrer erro 400 de filtros inválidos', () => {
       const msg400 = 'Os filtros de busca informados são inválidos. Por favor, revise sua pesquisa.';
       const html = renderToString(
         React.createElement(MapFeedback, {
@@ -77,7 +77,7 @@ describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.
       expect(html).not.toContain('VALIDATION_ERROR');
     });
 
-    it('deve renderizar a mensagem humanizada para erros de conexão de rede', () => {
+    it('deve renderizar a mensagem para erros de conexão de rede', () => {
       const networkMsg = 'Dificuldade de conexão com o servidor. Verifique sua internet.';
       const html = renderToString(
         React.createElement(MapFeedback, {
