@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { ZodError } from 'zod';
 import { GET } from '@/app/api/public/nascentes/route';
@@ -6,6 +6,10 @@ import { prisma } from '@/lib/db/prisma';
 import {
   parseNascentesPublicResponse,
   nascentePublicItemContractSchema,
+  invalidateNascentesCache,
+  getNascentesCacheStats,
+  resetNascentesCacheStats,
+  onImportacaoConcluida,
 } from '@/modules/nascentes';
 
 function createRequest(pathAndQuery: string = '/api/public/nascentes'): NextRequest {
@@ -505,6 +509,85 @@ describe('API Pública de Nascentes (GET /api/public/nascentes) - Integração',
       expect(serialized).not.toContain('DATABASE_URL');
       expect(serialized).not.toContain('password');
       expect(serialized).not.toContain('mysql://');
+    });
+  });
+
+  describe('Otimização e Cache em Memória', () => {
+    beforeEach(() => {
+      invalidateNascentesCache();
+      resetNascentesCacheStats();
+    });
+
+    it('deve incluir o cabeçalho Cache-Control com diretivas públicas corretas', async () => {
+      const response = await GET(createRequest('/api/public/nascentes'));
+      expect(response.status).toBe(200);
+
+      const cacheControl = response.headers.get('Cache-Control');
+      expect(cacheControl).toBe('public, s-maxage=60, stale-while-revalidate=300');
+    });
+
+    it('deve armazenar a primeira resposta em cache e atender chamadas subsequentes com cache hit', async () => {
+      const query = '/api/public/nascentes?municipio=Crato';
+
+      // 1ª requisição (Cache MISS -> Banco de Dados)
+      const res1 = await GET(createRequest(query));
+      expect(res1.status).toBe(200);
+      const json1 = await res1.json();
+
+      const stats1 = getNascentesCacheStats();
+      expect(stats1.size).toBe(1);
+      expect(stats1.misses).toBe(1);
+      expect(stats1.hits).toBe(0);
+
+      // 2ª requisição idêntica (Cache HIT -> Memória)
+      const res2 = await GET(createRequest(query));
+      expect(res2.status).toBe(200);
+      const json2 = await res2.json();
+
+      const stats2 = getNascentesCacheStats();
+      expect(stats2.size).toBe(1);
+      expect(stats2.hits).toBe(1);
+      expect(stats2.misses).toBe(1);
+
+      // Integridade referencial do contrato retornado
+      expect(json2).toEqual(json1);
+    });
+
+    it('deve invalidar o cache atomicamente via invalidateNascentesCache restaurando leitura fresca', async () => {
+      const query = '/api/public/nascentes?municipio=Barbalha';
+
+      // Popula o cache
+      const res1 = await GET(createRequest(query));
+      expect(res1.status).toBe(200);
+      expect(getNascentesCacheStats().size).toBe(1);
+
+      // Invalidação atômica
+      invalidateNascentesCache();
+      expect(getNascentesCacheStats().size).toBe(0);
+
+      // Nova chamada deve computar MISS e consultar o banco
+      const res2 = await GET(createRequest(query));
+      expect(res2.status).toBe(200);
+      expect(getNascentesCacheStats().size).toBe(1);
+      expect(getNascentesCacheStats().misses).toBe(2);
+    });
+
+    it('deve invalidar o cache quando o gatilho onImportacaoConcluida for acionado', async () => {
+      const query = '/api/public/nascentes?municipio=Crato';
+
+      // Popula o cache
+      const res1 = await GET(createRequest(query));
+      expect(res1.status).toBe(200);
+      expect(getNascentesCacheStats().size).toBe(1);
+
+      // Gatilho de importação concluída
+      onImportacaoConcluida(testImportacao.id);
+      expect(getNascentesCacheStats().size).toBe(0);
+
+      // Próxima requisição computa miss
+      const res2 = await GET(createRequest(query));
+      expect(res2.status).toBe(200);
+      expect(getNascentesCacheStats().size).toBe(1);
     });
   });
 });
