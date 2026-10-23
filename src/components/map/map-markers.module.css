@@ -1,0 +1,109 @@
+/**
+ * Nascentes do Cariri — Estilos de Marcadores e Agrupamentos Cartográficos (Leaflet)
+ * Responsável pela identidade visual dos pins SVG e pela paleta temática dos clusters.
+ */
+
+/* Marcador Individual da Nascente (Pin SVG) */
+:global(.nascente-marker-pin) {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.3));
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+  outline: none;
+}
+
+:global(.nascente-marker-pin:hover) {
+  transform: scale(1.15) translateY(-3px);
+  filter: drop-shadow(0 4px 8px rgba(2, 132, 199, 0.45));
+  z-index: 1000 !important;
+}
+
+:global(.nascente-marker-pin:focus-visible) {
+  transform: scale(1.15) translateY(-3px);
+  filter: drop-shadow(0 4px 8px rgba(2, 132, 199, 0.45));
+  outline: 2px solid #0284c7;
+  outline-offset: 3px;
+  border-radius: 50%;
+  z-index: 1000 !important;
+}
+
+:global(.nascente-pin-svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Agrupamento Temático de Marcadores (Marker Clusters Cariri) */
+:global(.marker-cluster) {
+  background-clip: padding-box;
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+:global(.marker-cluster:hover),
+:global(.marker-cluster:focus-visible) {
+  transform: scale(1.08);
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+:global(.marker-cluster div) {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+  margin-top: 4px;
+  text-align: center;
+  border-radius: 50%;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+:global(.marker-cluster span) {
+  line-height: 1;
+}
+
+/* Cluster Pequeno (< 10 nascentes) */
+:global(.marker-cluster-small) {
+  background-color: rgba(186, 230, 253, 0.55);
+}
+
+:global(.marker-cluster-small div) {
+  background-color: #0284c7;
+  color: #ffffff;
+}
+
+/* Cluster Médio (10 a 99 nascentes) */
+:global(.marker-cluster-medium) {
+  background-color: rgba(125, 211, 252, 0.65);
+}
+
+:global(.marker-cluster-medium div) {
+  background-color: #0369a1;
+  color: #ffffff;
+}
+
+/* Cluster Grande (>= 100 nascentes) */
+:global(.marker-cluster-large) {
+  background-color: rgba(56, 189, 248, 0.7);
+}
+
+:global(.marker-cluster-large div) {
+  background-color: #075985;
+  color: #ffffff;
+}
+
+/* Respeito à Preferência do Usuário por Redução de Movimento */
+@media (prefers-reduced-motion: reduce) {
+  :global(.nascente-marker-pin),
+  :global(.marker-cluster) {
+    animation: none !important;
+    transition: none !important;
+  }
+}

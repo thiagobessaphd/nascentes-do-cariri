@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import MapFeedback from '@/components/map/MapFeedback';
-import styles from '@/components/map/map.module.css';
+import styles from '@/components/map/MapFeedback.module.css';
 
 describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.tsx)', () => {
   describe('1. Estado de Carregamento (loading)', () => {

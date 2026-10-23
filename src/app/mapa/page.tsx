@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import MapLoading from '@/components/map/MapLoading';
-import styles from '@/components/map/map.module.css';
+import styles from './mapa.module.css';
 
 const LeafletMap = dynamic(() => import('@/components/map/LeafletMap'), {
   ssr: false,
