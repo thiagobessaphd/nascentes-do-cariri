@@ -8,7 +8,8 @@ import { useNascentesPublicas } from '@/hooks/useNascentesPublicas';
 import type { NascentesQueryParams } from '@/modules/nascentes/nascentes.dto';
 import { adjustMapBounds } from './map-bounds';
 import MapFeedback from './MapFeedback';
-import styles from './map.module.css';
+import styles from './LeafletMap.module.css';
+import './map-markers.module.css';
 
 export interface LeafletMapProps {
   readonly className?: string | undefined;

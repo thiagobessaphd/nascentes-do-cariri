@@ -1,4 +1,4 @@
-import styles from './map.module.css';
+import styles from './MapLoading.module.css';
 
 export default function MapLoading() {
   return (

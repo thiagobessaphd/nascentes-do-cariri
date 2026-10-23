@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { mapConfig } from '@/config/map';
-import styles from '@/components/map/map.module.css';
+import styles from '@/components/map/LeafletMap.module.css';
+import feedbackStyles from '@/components/map/MapFeedback.module.css';
 
 // Mock do módulo Leaflet para testes determinísticos em ambiente Node
 const mockMapInstance = {
@@ -205,8 +206,6 @@ describe('Base Leaflet e Configuração de Tiles', () => {
     it('deve conter as classes de estilo para responsividade de layout, escala e atribuição mobile', () => {
       expect(styles.mapContainer).toBeDefined();
       expect(styles.tileErrorBanner).toBeDefined();
-      expect(styles.mapaMain).toBeDefined();
-      expect(styles.mapaLayout).toBeDefined();
     });
   });
 
@@ -236,8 +235,8 @@ describe('Base Leaflet e Configuração de Tiles', () => {
       expect(html).toContain('role="status"');
       expect(html).toContain('aria-live="polite"');
       expect(html).toContain('Carregando nascentes...');
-      expect(html).toContain(styles.feedbackCard);
-      expect(html).toContain(styles.feedbackLoading);
+      expect(html).toContain(feedbackStyles.feedbackCard);
+      expect(html).toContain(feedbackStyles.feedbackLoading);
     });
 
     it('deve repassar parâmetros de busca (município, q, bounds) sem quebrar a inicialização do mapa', async () => {
