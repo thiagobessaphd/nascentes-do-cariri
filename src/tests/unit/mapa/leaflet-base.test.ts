@@ -31,6 +31,12 @@ const mockLayerGroupInstance = {
   clearLayers: vi.fn(),
 };
 
+const mockClusterGroupInstance = {
+  addTo: vi.fn().mockReturnThis(),
+  clearLayers: vi.fn(),
+  addLayers: vi.fn(),
+};
+
 vi.mock('leaflet', () => ({
   default: {
     map: vi.fn(() => mockMapInstance),
@@ -39,14 +45,16 @@ vi.mock('leaflet', () => ({
       scale: vi.fn(() => mockScaleControlInstance),
     },
     layerGroup: vi.fn(() => mockLayerGroupInstance),
+    markerClusterGroup: vi.fn(() => mockClusterGroupInstance),
     latLngBounds: vi.fn((latLngs: [number, number][]) => ({
       isValid: () => Array.isArray(latLngs) && latLngs.length > 0,
     })),
   },
 }));
 
-// Mock do CSS para import 'leaflet/dist/leaflet.css'
+// Mock do CSS para imports de estilos externos Leaflet
 vi.mock('leaflet/dist/leaflet.css', () => ({}));
+vi.mock('leaflet.markercluster/dist/MarkerCluster.css', () => ({}));
 
 import L from 'leaflet';
 import LeafletMap from '@/components/map/LeafletMap';
@@ -210,21 +218,21 @@ describe('Base Leaflet e Configuração de Tiles', () => {
   });
 
   describe('3. Integração de Estados, Feedbacks e Ciclo de Vida da Camada de Marcadores', () => {
-    it('deve inicializar e vincular a camada dedicada de marcadores (L.layerGroup) ao mapa', () => {
+    it('deve inicializar e vincular a camada dedicada de agrupamento de marcadores (L.markerClusterGroup) ao mapa', () => {
       const mockContainer = {} as HTMLDivElement;
       const map = L.map(mockContainer);
 
-      const markersLayer = L.layerGroup().addTo(map);
+      const clusterGroup = L.markerClusterGroup().addTo(map);
 
-      expect(L.layerGroup).toHaveBeenCalled();
-      expect(markersLayer.addTo).toHaveBeenCalledWith(map);
+      expect(L.markerClusterGroup).toHaveBeenCalled();
+      expect(clusterGroup.addTo).toHaveBeenCalledWith(map);
     });
 
     it('deve limpar as camadas de marcadores ao desmontar o mapa para evitar vazamentos de memória', () => {
-      const markersLayer = L.layerGroup();
-      markersLayer.clearLayers();
+      const clusterGroup = L.markerClusterGroup();
+      clusterGroup.clearLayers();
 
-      expect(markersLayer.clearLayers).toHaveBeenCalled();
+      expect(clusterGroup.clearLayers).toHaveBeenCalled();
     });
 
     it('deve renderizar o MapFeedback dentro do container do mapa', async () => {
