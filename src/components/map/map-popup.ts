@@ -7,10 +7,9 @@
 import type L from 'leaflet';
 import type { NascentePublicDto } from '@/modules/nascentes/nascentes.dto';
 import { UNIDADE_VAZAO_PADRAO } from '@/modules/nascentes/nascentes.dto';
-import {
-  NASCENTE_POPUP_ANCHOR,
-  NASCENTE_TOOLTIP_ANCHOR,
-} from './map-markers';
+
+export const NASCENTE_POPUP_ANCHOR: [number, number] = [0, -36];
+export const NASCENTE_TOOLTIP_ANCHOR: [number, number] = [14, -18];
 
 /**
  * Formata o valor da vazão média com 2 casas decimais no padrão brasileiro
@@ -103,7 +102,7 @@ export const DEFAULT_POPUP_OPTIONS: L.PopupOptions = {
   autoPanPadding: [20, 20],
   className: 'nascente-leaflet-popup',
   maxWidth: 320,
-  minWidth: 260,
+  minWidth: 285,
 };
 
 export const DEFAULT_TOOLTIP_OPTIONS: L.TooltipOptions = {
@@ -163,16 +162,24 @@ export function createNascenteTooltipElement(nascente: NascentePublicDto): HTMLE
 /**
  * Cria uma linha de par chave-valor para o elemento `<dl>` do popup.
  */
-function createDetailRow(term: string, value: string): HTMLDivElement {
+function createDetailRow(
+  term: string,
+  value: string,
+  variant: 'default' | 'flow' | 'coords' = 'default'
+): HTMLDivElement {
   const row = document.createElement('div');
-  row.className = 'nascente-popup-row';
+  row.className = variant !== 'default'
+    ? `nascente-popup-row nascente-popup-row--${variant}`
+    : 'nascente-popup-row';
 
   const dt = document.createElement('dt');
   dt.className = 'nascente-popup-term';
   dt.textContent = term;
 
   const dd = document.createElement('dd');
-  dd.className = 'nascente-popup-value';
+  dd.className = variant === 'coords'
+    ? 'nascente-popup-value nascente-popup-value--coords'
+    : 'nascente-popup-value';
   dd.textContent = value;
 
   row.appendChild(dt);
@@ -209,11 +216,11 @@ export function createNascentePopupElement(nascente: NascentePublicDto): HTMLEle
   const dl = document.createElement('dl');
   dl.className = 'nascente-popup-details';
 
+  dl.appendChild(createDetailRow('Vazão média', formatVazao(nascente.vazao_media, nascente.unidade_vazao), 'flow'));
   dl.appendChild(createDetailRow('Município', nascente.municipio?.trim() || 'Não informado'));
   dl.appendChild(createDetailRow('Localidade', nascente.localidade?.trim() || 'Não informada'));
   dl.appendChild(createDetailRow('Data de criação', formatDataCriacao(nascente.data_criacao)));
-  dl.appendChild(createDetailRow('Vazão média', formatVazao(nascente.vazao_media, nascente.unidade_vazao)));
-  dl.appendChild(createDetailRow('Coordenadas', formatCoordenadas(nascente.latitude, nascente.longitude)));
+  dl.appendChild(createDetailRow('Coordenadas', formatCoordenadas(nascente.latitude, nascente.longitude), 'coords'));
 
   article.appendChild(dl);
 
@@ -242,39 +249,47 @@ export function bindNascenteInteractions(
     return;
   }
 
-  const tooltipElement = createNascenteTooltipElement(nascente);
-  marker.bindTooltip(tooltipElement, {
-    ...DEFAULT_TOOLTIP_OPTIONS,
-    ...tooltipOptions,
-  });
+  if (typeof marker.bindTooltip === 'function') {
+    const tooltipElement = createNascenteTooltipElement(nascente);
+    marker.bindTooltip(tooltipElement, {
+      ...DEFAULT_TOOLTIP_OPTIONS,
+      ...tooltipOptions,
+    });
+  }
 
-  const popupElement = createNascentePopupElement(nascente);
-  marker.bindPopup(popupElement, {
-    ...DEFAULT_POPUP_OPTIONS,
-    ...popupOptions,
-  });
+  if (typeof marker.bindPopup === 'function') {
+    const popupElement = createNascentePopupElement(nascente);
+    marker.bindPopup(popupElement, {
+      ...DEFAULT_POPUP_OPTIONS,
+      ...popupOptions,
+    });
+  }
 
-  marker.on('keydown', (event: L.LeafletKeyboardEvent) => {
-    const key = event.originalEvent?.key;
-    if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
-      event.originalEvent?.preventDefault();
-      marker.openPopup();
-    }
-  });
-
-  marker.on('popupopen', (event: L.PopupEvent) => {
-    const container = event.popup?.getElement();
-    if (container) {
-      const closeButton = container.querySelector<HTMLAnchorElement>('.leaflet-popup-close-button');
-      if (closeButton) {
-        const fonteNome = nascente.fonte?.trim();
-        const ariaLabel = fonteNome
-          ? `Fechar detalhes da nascente ${fonteNome}`
-          : 'Fechar detalhes da nascente';
-
-        closeButton.setAttribute('aria-label', ariaLabel);
-        closeButton.setAttribute('title', ariaLabel);
+  if (typeof marker.on === 'function') {
+    marker.on('keydown', (event: L.LeafletKeyboardEvent) => {
+      const key = event.originalEvent?.key;
+      if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+        event.originalEvent?.preventDefault();
+        if (typeof marker.openPopup === 'function') {
+          marker.openPopup();
+        }
       }
-    }
-  });
+    });
+
+    marker.on('popupopen', (event: L.PopupEvent) => {
+      const container = event.popup?.getElement();
+      if (container) {
+        const closeButton = container.querySelector<HTMLAnchorElement>('.leaflet-popup-close-button');
+        if (closeButton) {
+          const fonteNome = nascente.fonte?.trim();
+          const ariaLabel = fonteNome
+            ? `Fechar detalhes da nascente ${fonteNome}`
+            : 'Fechar detalhes da nascente';
+
+          closeButton.setAttribute('aria-label', ariaLabel);
+          closeButton.setAttribute('title', ariaLabel);
+        }
+      }
+    });
+  }
 }
