@@ -13,3 +13,4 @@ export { default as MapLoading } from './MapLoading';
 
 export * from './map-bounds';
 export * from './map-markers';
+export * from './map-popup';

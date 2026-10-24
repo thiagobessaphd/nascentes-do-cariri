@@ -7,6 +7,13 @@
 import L from 'leaflet';
 import type { NascentePublicDto } from '@/modules/nascentes/nascentes.dto';
 import { isValidCoordinate } from './map-bounds';
+import {
+  NASCENTE_POPUP_ANCHOR,
+  NASCENTE_TOOLTIP_ANCHOR,
+  bindNascenteInteractions,
+} from './map-popup';
+
+export { NASCENTE_POPUP_ANCHOR, NASCENTE_TOOLTIP_ANCHOR };
 
 /**
  * Dimensões e pontos de ancoragem cartográfica do ícone de nascente.
@@ -17,8 +24,6 @@ import { isValidCoordinate } from './map-bounds';
  */
 export const NASCENTE_ICON_SIZE: [number, number] = [28, 36];
 export const NASCENTE_ICON_ANCHOR: [number, number] = [14, 36];
-export const NASCENTE_POPUP_ANCHOR: [number, number] = [0, -36];
-export const NASCENTE_TOOLTIP_ANCHOR: [number, number] = [14, -18];
 
 export const NASCENTE_PIN_CSS_CLASS = 'nascente-marker-pin';
 
@@ -77,7 +82,8 @@ export interface NascenteMarker extends L.Marker {
 export function createNascenteMarker(
   nascente: NascentePublicDto,
   leafletInstance: typeof L = L,
-  customIcon?: L.DivIcon | L.Icon
+  customIcon?: L.DivIcon | L.Icon,
+  bindInteractions: boolean = true
 ): NascenteMarker | null {
   if (!isValidCoordinate(nascente.latitude, nascente.longitude)) {
     return null;
@@ -103,6 +109,10 @@ export function createNascenteMarker(
 
   marker.nascenteData = nascente;
 
+  if (bindInteractions) {
+    bindNascenteInteractions(marker, nascente);
+  }
+
   return marker;
 }
 
@@ -112,12 +122,13 @@ export function createNascenteMarker(
  */
 export function createNascentesMarkers(
   nascentes: readonly NascentePublicDto[],
-  leafletInstance: typeof L = L
+  leafletInstance: typeof L = L,
+  bindInteractions: boolean = true
 ): NascenteMarker[] {
   const markers: NascenteMarker[] = [];
 
   for (const nascente of nascentes) {
-    const marker = createNascenteMarker(nascente, leafletInstance);
+    const marker = createNascenteMarker(nascente, leafletInstance, undefined, bindInteractions);
     if (marker) {
       markers.push(marker);
     }

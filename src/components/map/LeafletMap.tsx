@@ -16,6 +16,7 @@ import {
 import MapFeedback from './MapFeedback';
 import styles from './LeafletMap.module.css';
 import './map-markers.module.css';
+import './map-popup.module.css';
 
 export interface LeafletMapProps {
   readonly className?: string | undefined;
