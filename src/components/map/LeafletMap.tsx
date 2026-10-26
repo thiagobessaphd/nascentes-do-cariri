@@ -85,12 +85,13 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
           await initMarkerClusterPlugin(L);
         }
 
-        if (!mapRef.current) {
+        // Uma inicialização antiga não deve anexar camadas ao mapa recriado no StrictMode.
+        if (mapRef.current !== map) {
           return;
         }
 
         const clusterGroup = createNascenteClusterGroup(L);
-        clusterGroup.addTo(mapRef.current);
+        clusterGroup.addTo(map);
         clusterGroupRef.current = clusterGroup;
 
         // Se os dados já estiverem disponíveis antes da inicialização do plugin
