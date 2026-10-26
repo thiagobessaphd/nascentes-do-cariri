@@ -6,6 +6,11 @@ import {
   type NascentesPublicResponse,
   type NascentesQueryParams,
 } from './nascentes.dto';
+import {
+  buildNascentesCacheKey,
+  getNascentesFromCache,
+  setNascentesInCache,
+} from './nascentes.cache';
 
 /**
  * Converte um objeto Date em string no formato estrito AAAA-MM-DD baseado em UTC,
@@ -20,10 +25,21 @@ function formatDateToIsoDate(date: Date): string {
 
 /**
  * Consulta e serializa as nascentes ativas para o consumo público da API e do mapa Leaflet.
+ * Implementa estratégia de cache em memória para prevenir consultas repetidas ao banco de dados.
  */
 export async function getNascentesPublicas(
-  filters: NascentesQueryParams = {}
+  filters: NascentesQueryParams = {},
+  options?: { readonly bypassCache?: boolean }
 ): Promise<NascentesPublicResponse> {
+  const cacheKey = buildNascentesCacheKey(filters);
+
+  if (!options?.bypassCache) {
+    const cachedResponse = getNascentesFromCache(cacheKey);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  }
+
   const where: Prisma.NascenteWhereInput = {
     ativo: true,
   };
@@ -105,11 +121,17 @@ export async function getNascentesPublicas(
     ? latestUpdatedAt.toISOString()
     : null;
 
-  return {
+  const response: NascentesPublicResponse = {
     data,
     meta: {
       total: data.length,
       updated_at: formattedUpdatedAt,
     },
   };
+
+  if (!options?.bypassCache) {
+    setNascentesInCache(cacheKey, response);
+  }
+
+  return response;
 }
