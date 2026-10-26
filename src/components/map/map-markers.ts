@@ -135,7 +135,9 @@ export const DEFAULT_CLUSTER_OPTIONS: L.MarkerClusterGroupOptions = {
   showCoverageOnHover: false,
   zoomToBoundsOnClick: true,
   removeOutsideVisibleBounds: true,
-  chunkedLoading: true,
+  // O plugin não cancela os lotes pendentes em clearLayers/removeLayer.
+  // A inserção síncrona impede que filtros antigos repovoem a camada atual.
+  chunkedLoading: false,
   animate: true,
 };
 

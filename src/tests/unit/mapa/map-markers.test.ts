@@ -309,7 +309,7 @@ describe('Módulo de Marcadores e Agrupamento Leaflet (src/components/map/map-ma
         showCoverageOnHover: false,
         zoomToBoundsOnClick: true,
         removeOutsideVisibleBounds: true,
-        chunkedLoading: true,
+        chunkedLoading: false,
         animate: true,
       });
     });
@@ -324,7 +324,7 @@ describe('Módulo de Marcadores e Agrupamento Leaflet (src/components/map/map-ma
           showCoverageOnHover: false,
           zoomToBoundsOnClick: true,
           removeOutsideVisibleBounds: true,
-          chunkedLoading: true,
+          chunkedLoading: false,
         })
       );
       expect(clusterGroup).toBeDefined();
