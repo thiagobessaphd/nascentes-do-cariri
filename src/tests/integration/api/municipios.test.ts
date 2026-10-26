@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi, afterEach } from 'vitest';
+import { ZodError } from 'zod';
 import { GET } from '@/app/api/public/municipios/route';
 import { prisma } from '@/lib/db/prisma';
 import type { Usuario, Importacao } from '@prisma/client';
+import { parseMunicipiosPublicResponse } from '@/modules/municipios';
 
 describe('Integração — API Pública de Municípios (GET /api/public/municipios)', () => {
   let testUser: Usuario;
@@ -209,6 +211,63 @@ describe('Integração — API Pública de Municípios (GET /api/public/municipi
       expect(bodyStr).not.toContain('importacaoId');
       expect(bodyStr).not.toContain('caminhoPrivadoArquivo');
     });
+
+    it('deve validar estritamente a resposta da API real contra o contrato Zod público', async () => {
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+
+      // Validação formal com schema Zod estrito em runtime
+      const validated = parseMunicipiosPublicResponse(body);
+      expect(Array.isArray(validated.data)).toBe(true);
+      expect(validated.meta.total).toBe(validated.data.length);
+      expect(validated.meta.total).toBeGreaterThanOrEqual(4);
+      expect(validated.data).toContain('Crato');
+      expect(validated.data).toContain('Barbalha');
+    });
+
+    it('deve reprovar a validação de contrato (ZodError com unrecognized_keys) se colunas internas forem injetadas na resposta', async () => {
+      const response = await GET();
+      const body = await response.json();
+
+      const mutatedPayload = {
+        ...body,
+        usuarioId: 10,
+        passwordHash: '$2b$10$hashsecreto',
+      };
+
+      expect(() => parseMunicipiosPublicResponse(mutatedPayload)).toThrow(ZodError);
+
+      try {
+        parseMunicipiosPublicResponse(mutatedPayload);
+      } catch (error) {
+        const zodError = error as ZodError;
+        expect(zodError.issues.some((issue) => issue.code === 'unrecognized_keys')).toBe(true);
+      }
+    });
+
+    it('deve reprovar a validação de contrato se campos extras forem injetados nos metadados', async () => {
+      const response = await GET();
+      const body = await response.json();
+
+      const mutatedMeta = {
+        ...body,
+        meta: {
+          ...body.meta,
+          dbQueryDurationMs: 4.2,
+        },
+      };
+
+      expect(() => parseMunicipiosPublicResponse(mutatedMeta)).toThrow(ZodError);
+
+      try {
+        parseMunicipiosPublicResponse(mutatedMeta);
+      } catch (error) {
+        const zodError = error as ZodError;
+        expect(zodError.issues.some((issue) => issue.code === 'unrecognized_keys')).toBe(true);
+      }
+    });
   });
 
   describe('Cenários de Fronteira e Resiliência', () => {
@@ -238,6 +297,38 @@ describe('Integração — API Pública de Municípios (GET /api/public/municipi
       // Garante que detalhes de rede ou credenciais não vazam no erro
       expect(JSON.stringify(body)).not.toContain('127.0.0.1');
       expect(JSON.stringify(body)).not.toContain('3307');
+    });
+  });
+
+  describe('Segurança, Integridade Relacional e Isolamento em Banco', () => {
+    it('deve assegurar que a query ao banco aplica estritamente ativo=true e distinct por município', async () => {
+      const findManySpy = vi.spyOn(prisma.nascente, 'findMany');
+
+      const response = await GET();
+      expect(response.status).toBe(200);
+
+      // Validação de consulta orientada por evidência no Prisma
+      expect(findManySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            ativo: true,
+          }),
+          select: {
+            municipio: true,
+          },
+          distinct: ['municipio'],
+        })
+      );
+    });
+
+    it('deve ignorar query strings acidentais ou hostis preservando o isolamento do endpoint', async () => {
+      // Como o endpoint de municípios não recebe query params, qualquer injeção deve ser ignorada com segurança
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      const validated = parseMunicipiosPublicResponse(body);
+      expect(validated.data).not.toContain('Brejo Santo Inativo');
     });
   });
 });

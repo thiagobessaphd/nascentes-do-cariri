@@ -39,8 +39,8 @@ A matriz estabelece para cada requisito:
 | **CT-BE-15** | Preservação dos arquivos TXT originais | Backend | Unitário | Storage e Sanitização | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-16** | Resposta da API somente com registros ativos | Backend | Integração | API Pública | `src/tests/integration/api/nascentes.test.ts` | Ativo |
 | **CT-FE-01** | Criação correta dos marcadores | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/markers.test.ts` | Planejado |
-| **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Planejado |
-| **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Planejado |
+| **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Ativo |
+| **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Ativo |
 | **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Planejado |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
@@ -109,6 +109,23 @@ A matriz estabelece para cada requisito:
   - Allowlist e segurança de dados: exclusão mandatória de campos administrativos (`usuarioId`, `importacaoId`, `caminhoPrivadoArquivo`, `hashArquivo`, `createdAt`).
   - Filtros públicos combinados: filtragem por município exato, busca textual `q` por termo contido na fonte ou na localidade.
   - Bounding Box geográfico: restrição espacial por coordenadas (`north`, `south`, `east`, `west`), validação de limites mundiais $[-90, 90]$ e $[-180, 180]$, consistência espacial (`north >= south` e `east >= west`) e rejeição de coordenadas parciais com status 400 (`VALIDATION_ERROR`).
+
+### 3.7. Interatividade do Mapa, Tooltip, Popup e Acessibilidade (`CT-FE-02`, `CT-FE-03`)
+* **Arquivos:**
+  - `src/tests/unit/mapa/tooltip.test.ts`
+  - `src/tests/unit/mapa/popup.test.ts`
+* **Regras Verificadas:**
+  - **Tooltip (`CT-FE-02`):**
+    - Construção de elemento com semântica acessível `role="tooltip"`, classe `.nascente-tooltip` e hierarquia visual (`.nascente-tooltip-title`, `.nascente-tooltip-location`, `.nascente-tooltip-flow`).
+    - Imunidade total a ataques de XSS via atribuição estrita com `textContent` (rejeição de payloads maliciosos `<script>`, `<img>`, `<iframe>`, `<svg>`).
+    - Fallbacks elegantes para ausência de fonte ("Nascente sem denominação"), localidade/município ("Cariri") e vazão ("Não informada").
+    - Vinculação com Leaflet respeitando âncora `[14, -18]` e direção `right`.
+  - **Popup e Acessibilidade (`CT-FE-03`):**
+    - Construção semântica com `<article aria-labelledby="...">`, `<header>`, badge e lista de pares `<dl>`, `<dt>`, `<dd>`.
+    - Formatadores puros determinísticos: vazão em pt-BR com 2 decimais, data civil em `DD/MM/AAAA` imune a fuso horário e coordenadas com 6 decimais cartográficas.
+    - Suporte integral a navegação por teclado: abertura via teclas `Enter` e `Espaço` com interceptação de `preventDefault`.
+    - Acessibilidade do botão de fechar (`.leaflet-popup-close-button`) com injeção dinâmica de `aria-label` e `title` descritivos contextualizados ao nome da nascente.
+    - Degradação graciosa em ambientes SSR sem DOM global.
 
 ---
 

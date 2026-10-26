@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import type { NascentesStatus } from '@/hooks/useNascentesPublicas';
-import styles from './map.module.css';
+import styles from './MapFeedback.module.css';
 
 export interface MapFeedbackProps {
   readonly status: NascentesStatus;

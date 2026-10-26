@@ -1,0 +1,207 @@
+/**
+ * Nascentes do Cariri — Estilos de Feedback Visual do Mapa (MapFeedback)
+ * Responsável pelos cards de status (loading, erro com retry e aviso de dataset vazio).
+ */
+
+.feedbackCard {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-left: 3px solid #0284c7;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  color: #334155;
+  font-size: 0.84375rem;
+  font-weight: 500;
+  pointer-events: auto;
+  animation: fadeInDown 0.3s ease-out;
+  max-width: 90%;
+  text-align: left;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.feedbackLoading {
+  border-left-color: #0284c7;
+  pointer-events: none;
+}
+
+.feedbackError {
+  border-left-color: #dc2626;
+  color: #991b1b;
+}
+
+.feedbackEmpty {
+  border-left-color: #0284c7;
+  color: #0369a1;
+}
+
+.feedbackLoadingIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.feedbackSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #bae6fd;
+  border-top-color: #0284c7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.feedbackErrorIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.feedbackInfoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.feedbackMessage {
+  flex: 1;
+}
+
+.feedbackRetryButton {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.feedbackRetryButton:hover {
+  background: #b91c1c;
+}
+
+.feedbackRetryButton:active {
+  background: #991b1b;
+  transform: scale(0.98);
+}
+
+.feedbackRetryButton:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
+}
+
+.feedbackDismissButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0;
+  background: transparent;
+  color: #64748b;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.feedbackDismissButton:hover {
+  color: #0f172a;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.feedbackDismissButton:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 1px;
+}
+
+/* Adaptações para Viewports Compactos / Mobile (<= 640px) */
+@media (max-width: 640px) {
+  .feedbackLoading,
+  .feedbackError,
+  .feedbackEmpty {
+    top: 12px;
+    width: calc(100% - 32px);
+    max-width: 360px;
+    padding: 10px 14px;
+    gap: 10px;
+    font-size: 0.8125rem;
+    margin: 0 16px;
+  }
+}
+
+/* Telas Ultra-Compactas (<= 380px) */
+@media (max-width: 380px) {
+  .feedbackLoading,
+  .feedbackError,
+  .feedbackEmpty {
+    width: calc(100% - 24px);
+    padding: 8px 10px;
+    margin: 0 12px;
+  }
+}
+
+/* Respeito à Preferência do Usuário por Redução de Movimento */
+@media (prefers-reduced-motion: reduce) {
+  .feedbackLoading,
+  .feedbackError,
+  .feedbackEmpty,
+  .feedbackSpinner {
+    animation: none !important;
+  }
+}
