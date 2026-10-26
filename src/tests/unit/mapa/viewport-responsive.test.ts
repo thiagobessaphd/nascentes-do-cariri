@@ -3,7 +3,9 @@ import React from 'react';
 import MapaLayout from '@/app/mapa/layout';
 import MapaPage from '@/app/mapa/page';
 import MapLoading from '@/components/map/MapLoading';
-import styles from '@/components/map/map.module.css';
+import layoutStyles from '@/app/mapa/mapa.module.css';
+import loadingStyles from '@/components/map/MapLoading.module.css';
+import mapStyles from '@/components/map/LeafletMap.module.css';
 
 describe('Responsividade da Rota Pública e Isolamento de Iframe (CT-FE-07)', () => {
   describe('Layout Estrutural e Enquadramento em Iframe', () => {
@@ -12,7 +14,7 @@ describe('Responsividade da Rota Pública e Isolamento de Iframe (CT-FE-07)', ()
 
       expect(layoutElement.type).toBe('div');
       expect(layoutElement.props.id).toBe('mapa-publico-layout');
-      expect(layoutElement.props.className).toBe(styles.mapaLayout);
+      expect(layoutElement.props.className).toBe(layoutStyles.mapaLayout);
       expect(layoutElement.props.role).toBe('region');
       expect(layoutElement.props['aria-label']).toBe('Mapa Interativo das Nascentes do Cariri');
     });
@@ -21,7 +23,7 @@ describe('Responsividade da Rota Pública e Isolamento de Iframe (CT-FE-07)', ()
       const pageElement = MapaPage();
 
       expect(pageElement.type).toBe('main');
-      expect(pageElement.props.className).toBe(styles.mapaMain);
+      expect(pageElement.props.className).toBe(layoutStyles.mapaMain);
       expect(pageElement.props['aria-label']).toBe('Mapa Interativo');
 
       // Valida presença de heading semanticamente oculto para leitores de tela
@@ -31,15 +33,15 @@ describe('Responsividade da Rota Pública e Isolamento de Iframe (CT-FE-07)', ()
       ) as React.ReactElement<{ className?: string; children?: React.ReactNode }> | undefined;
 
       expect(srHeading).toBeDefined();
-      expect(srHeading?.props.className).toBe(styles.srOnly);
+      expect(srHeading?.props.className).toBe(layoutStyles.srOnly);
     });
 
     it('deve conter estilos que previnem o transbordamento horizontal (horizontal scroll) em telas móveis', () => {
-      // styles.mapaLayout e styles.mapaMain devem estar definidos no CSS Module
-      expect(styles.mapaLayout).toBeDefined();
-      expect(styles.mapaMain).toBeDefined();
-      expect(styles.mapContainer).toBeDefined();
-      expect(styles.srOnly).toBeDefined();
+      // Classes devem estar definidas em seus respectivos módulos CSS
+      expect(layoutStyles.mapaLayout).toBeDefined();
+      expect(layoutStyles.mapaMain).toBeDefined();
+      expect(mapStyles.mapContainer).toBeDefined();
+      expect(layoutStyles.srOnly).toBeDefined();
     });
   });
 
@@ -70,7 +72,7 @@ describe('Responsividade da Rota Pública e Isolamento de Iframe (CT-FE-07)', ()
       const children = React.Children.toArray(loadingElement.props.children);
 
       const centerBadge = children.find(
-        (child) => React.isValidElement(child) && (child.props as { className?: string }).className === styles.skeletonCenterBadge
+        (child) => React.isValidElement(child) && (child.props as { className?: string }).className === loadingStyles.skeletonCenterBadge
       ) as React.ReactElement<{ children?: React.ReactNode }> | undefined;
 
       expect(centerBadge).toBeDefined();

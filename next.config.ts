@@ -23,6 +23,7 @@ function getLocalDevOrigins(): string[] {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@prisma/adapter-mariadb", "mariadb"],
   poweredByHeader: false,
   allowedDevOrigins: getLocalDevOrigins(),
   async headers() {
