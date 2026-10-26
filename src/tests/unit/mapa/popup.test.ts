@@ -38,7 +38,7 @@ describe('CT-FE-03 — Suíte de Popup e Interações Acessíveis (src/component
     it('deve expor opções padrão ideais de popup garantindo acessibilidade e usabilidade móvel', () => {
       // Arrange & Act & Assert
       expect(DEFAULT_POPUP_OPTIONS).toEqual({
-        offset: [0, -36],
+        offset: [0, 0],
         closeButton: true,
         autoPan: true,
         autoPanPadding: [20, 20],
@@ -334,7 +334,7 @@ describe('CT-FE-03 — Suíte de Popup e Interações Acessíveis (src/component
       expect(popupEl).toBeDefined();
       expect(popupOpts).toEqual(
         expect.objectContaining({
-          offset: [0, -36],
+          offset: [0, 0],
           closeButton: true,
           autoPan: true,
           className: 'nascente-leaflet-popup',

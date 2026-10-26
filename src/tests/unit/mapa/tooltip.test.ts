@@ -38,7 +38,7 @@ describe('CT-FE-02 — Suíte de Tooltip no Mouseover (src/components/map/map-po
     it('deve expor opções padrão ideais para o Leaflet com classe e direção adequadas', () => {
       // Arrange & Act & Assert
       expect(DEFAULT_TOOLTIP_OPTIONS).toEqual({
-        offset: [14, -18],
+        offset: [0, 0],
         direction: 'right',
         sticky: false,
         opacity: 0.96,
@@ -336,7 +336,7 @@ describe('CT-FE-02 — Suíte de Tooltip no Mouseover (src/components/map/map-po
       expect(elementArg).toBeDefined();
       expect(optionsArg).toEqual(
         expect.objectContaining({
-          offset: [14, -18],
+          offset: [0, 0],
           direction: 'right',
           sticky: false,
           opacity: 0.96,

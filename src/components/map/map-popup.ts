@@ -96,7 +96,8 @@ export function formatCoordenadas(
 
 
 export const DEFAULT_POPUP_OPTIONS: L.PopupOptions = {
-  offset: NASCENTE_POPUP_ANCHOR,
+  // O Leaflet já soma popupAnchor do ícone à posição do popup.
+  offset: [0, 0],
   closeButton: true,
   autoPan: true,
   autoPanPadding: [20, 20],
@@ -106,7 +107,8 @@ export const DEFAULT_POPUP_OPTIONS: L.PopupOptions = {
 };
 
 export const DEFAULT_TOOLTIP_OPTIONS: L.TooltipOptions = {
-  offset: NASCENTE_TOOLTIP_ANCHOR,
+  // tooltipAnchor também é aplicado pelo Leaflet ao posicionar a tooltip.
+  offset: [0, 0],
   direction: 'right',
   sticky: false,
   opacity: 0.96,
