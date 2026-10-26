@@ -36,44 +36,20 @@ export const DEFAULT_NASCENTES_CACHE_MAX_ENTRIES = 500; // Máximo de combinaç�
  * Constrói uma chave determinística e normalizada para o cache de nascentes
  * a partir dos parâmetros de consulta informados.
  *
- * Normalizações aplicadas:
- * - `municipio`: trim e lowercasing; 'all' se ausente.
- * - `q`: trim e lowercasing; 'none' se ausente.
- * - `bbox`: arredondamento a 6 casas decimais nos limites (N,S,E,W); 'none' se ausente.
+ * Normaliza textos com trim e minúsculas, preservando a precisão dos limites.
+ * A serialização estruturada distingue campos ausentes de valores literais e
+ * impede colisões quando o texto contém separadores.
  *
  * @param filters Parâmetros validados da consulta pública.
  * @returns Chave canônica serializada em string.
  */
-export function buildNascentesCacheKey(filters?: NascentesQueryParams): string {
-  if (!filters) {
-    return 'nascentes:public:m=all:q=none:bbox=none';
-  }
+export function buildNascentesCacheKey(filters: NascentesQueryParams = {}): string {
+  const municipio = filters.municipio?.trim().toLowerCase() || null;
+  const query = filters.q?.trim().toLowerCase() || null;
+  const bounds = [filters.north, filters.south, filters.east, filters.west];
+  const hasBounds = bounds.every((value) => typeof value === 'number' && Number.isFinite(value));
 
-  const rawMunicipio = filters.municipio?.trim();
-  const municipioPart = rawMunicipio && rawMunicipio.length > 0
-    ? `m=${rawMunicipio.toLowerCase()}`
-    : 'm=all';
-
-  const rawQ = filters.q?.trim();
-  const qPart = rawQ && rawQ.length > 0
-    ? `q=${rawQ.toLowerCase()}`
-    : 'q=none';
-
-  let bboxPart = 'bbox=none';
-  if (
-    typeof filters.north === 'number' &&
-    typeof filters.south === 'number' &&
-    typeof filters.east === 'number' &&
-    typeof filters.west === 'number' &&
-    Number.isFinite(filters.north) &&
-    Number.isFinite(filters.south) &&
-    Number.isFinite(filters.east) &&
-    Number.isFinite(filters.west)
-  ) {
-    bboxPart = `bbox=${filters.north.toFixed(6)},${filters.south.toFixed(6)},${filters.east.toFixed(6)},${filters.west.toFixed(6)}`;
-  }
-
-  return `nascentes:public:${municipioPart}:${qPart}:${bboxPart}`;
+  return `nascentes:public:${JSON.stringify([municipio, query, hasBounds ? bounds : null])}`;
 }
 
 /**
@@ -106,7 +82,7 @@ export class NascentesMemoryCache {
       return undefined;
     }
 
-    if (Date.now() > entry.expiresAt) {
+    if (Date.now() >= entry.expiresAt) {
       this.store.delete(key);
       this.missesCount++;
       return undefined;

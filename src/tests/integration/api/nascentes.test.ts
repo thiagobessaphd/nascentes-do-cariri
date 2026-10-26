@@ -518,6 +518,26 @@ describe('API Pública de Nascentes (GET /api/public/nascentes) - Integração',
       resetNascentesCacheStats();
     });
 
+    it('deve manter a busca literal none isolada da listagem sem filtros', async () => {
+      const unfiltered = await GET(createRequest('/api/public/nascentes'));
+      expect((await unfiltered.json()).data.length).toBeGreaterThan(0);
+      const filtered = await GET(createRequest('/api/public/nascentes?q=none'));
+      expect(filtered.status).toBe(200);
+      expect((await filtered.json()).data).toEqual([]);
+    });
+
+    it('deve respeitar limites geográficos próximos mesmo após armazenar outra área em cache', async () => {
+      const common = '/api/public/nascentes?south=-7.3&east=-39.3&west=-39.4';
+      const included = await GET(createRequest(`${common}&north=-7.21345599`));
+      expect(included.status).toBe(200);
+      const includedData = (await included.json()).data;
+      expect(includedData.some((item: { id: number }) => item.id === createdNascenteIds[0])).toBe(true);
+      const excluded = await GET(createRequest(`${common}&north=-7.21345601`));
+      expect(excluded.status).toBe(200);
+      const excludedData = (await excluded.json()).data;
+      expect(excludedData.some((item: { id: number }) => item.id === createdNascenteIds[0])).toBe(false);
+    });
+
     it('deve incluir o cabeçalho Cache-Control com diretivas públicas corretas', async () => {
       const response = await GET(createRequest('/api/public/nascentes'));
       expect(response.status).toBe(200);

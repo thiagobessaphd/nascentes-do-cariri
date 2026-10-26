@@ -45,46 +45,63 @@ describe('Módulo de Cache de Nascentes (Unitário)', () => {
   });
 
   describe('buildNascentesCacheKey', () => {
+    it('deve separar filtros ausentes das buscas literais all e none', () => {
+      const unfiltered = buildNascentesCacheKey({});
+      expect(buildNascentesCacheKey({ municipio: 'all' })).not.toBe(unfiltered);
+      expect(buildNascentesCacheKey({ q: 'none' })).not.toBe(unfiltered);
+    });
+
+    it('deve separar valores que contêm os delimitadores usados na chave', () => {
+      expect(buildNascentesCacheKey({ municipio: 'Crato:q=fonte', q: 'teste' }))
+        .not.toBe(buildNascentesCacheKey({ municipio: 'Crato', q: 'fonte:q=teste' }));
+    });
+
+    it('deve distinguir limites geográficos com diferenças abaixo de seis casas decimais', () => {
+      const bounds = { south: -7.3, east: -39.3, west: -39.4 };
+      expect(buildNascentesCacheKey({ ...bounds, north: -7.21345599 }))
+        .not.toBe(buildNascentesCacheKey({ ...bounds, north: -7.21345601 }));
+    });
+
     it('deve gerar chave canônica padrão quando nenhum filtro for informado', () => {
       const key = buildNascentesCacheKey();
-      expect(key).toBe('nascentes:public:m=all:q=none:bbox=none');
+      expect(key).toBe('nascentes:public:[null,null,null]');
     });
 
     it('deve gerar chave canônica padrão quando filtros forem vazios', () => {
       const key = buildNascentesCacheKey({});
-      expect(key).toBe('nascentes:public:m=all:q=none:bbox=none');
+      expect(key).toBe('nascentes:public:[null,null,null]');
     });
 
     it('deve normalizar municipio com trim e minúsculas', () => {
       const key1 = buildNascentesCacheKey({ municipio: '  Crato  ' });
       const key2 = buildNascentesCacheKey({ municipio: 'crato' });
-      expect(key1).toBe('nascentes:public:m=crato:q=none:bbox=none');
+      expect(key1).toBe('nascentes:public:["crato",null,null]');
       expect(key1).toBe(key2);
     });
 
     it('deve normalizar busca textual "q" com trim e minúsculas', () => {
       const key1 = buildNascentesCacheKey({ q: '  Riacho Do Meio  ' });
       const key2 = buildNascentesCacheKey({ q: 'riacho do meio' });
-      expect(key1).toBe('nascentes:public:m=all:q=riacho do meio:bbox=none');
+      expect(key1).toBe('nascentes:public:[null,"riacho do meio",null]');
       expect(key1).toBe(key2);
     });
 
-    it('deve normalizar Bounding Box arredondando coordenadas para 6 casas decimais', () => {
+    it('deve preservar a precisão original do Bounding Box', () => {
       const key1 = buildNascentesCacheKey({
         north: -7.1234567,
         south: -7.9876543,
         east: -39.1111111,
         west: -39.9999999,
       });
-      expect(key1).toBe('nascentes:public:m=all:q=none:bbox=-7.123457,-7.987654,-39.111111,-40.000000');
+      expect(key1).toBe('nascentes:public:[null,null,[-7.1234567,-7.9876543,-39.1111111,-39.9999999]]');
     });
 
-    it('deve retornar bbox=none se algum dos quatro pontos do Bounding Box estiver ausente ou inválido', () => {
+    it('deve omitir o Bounding Box se algum limite estiver ausente ou inválido', () => {
       const keyIncomplete = buildNascentesCacheKey({
         north: -7.1,
         south: -7.9,
       });
-      expect(keyIncomplete).toBe('nascentes:public:m=all:q=none:bbox=none');
+      expect(keyIncomplete).toBe('nascentes:public:[null,null,null]');
 
       const keyNaN = buildNascentesCacheKey({
         north: NaN,
@@ -92,11 +109,19 @@ describe('Módulo de Cache de Nascentes (Unitário)', () => {
         east: -39.1,
         west: -39.9,
       });
-      expect(keyNaN).toBe('nascentes:public:m=all:q=none:bbox=none');
+      expect(keyNaN).toBe('nascentes:public:[null,null,null]');
     });
   });
 
   describe('NascentesMemoryCache (Classe Isolada)', () => {
+    it('deve expirar a entrada exatamente no limite do TTL', () => {
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+      const cache = new NascentesMemoryCache({ defaultTtlMs: 100 });
+      cache.set('limite', mockResponse);
+      clock.mockReturnValue(1100);
+      expect(cache.get('limite')).toBeUndefined();
+    });
+
     it('deve inicializar com configurações padrão de TTL e maxEntries', () => {
       const cache = new NascentesMemoryCache();
       const stats = cache.getStats();
