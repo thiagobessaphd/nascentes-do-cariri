@@ -175,7 +175,7 @@
   .feedbackLoading,
   .feedbackError,
   .feedbackEmpty {
-    top: 144px;
+    top: 112px;
     width: calc(100% - 32px);
     max-width: 360px;
     padding: 10px 14px;

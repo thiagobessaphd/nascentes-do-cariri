@@ -111,7 +111,7 @@
 /* Adaptações para Viewports Compactos / Mobile (<= 640px) */
 @media (max-width: 640px) {
   .tileErrorBanner {
-    top: 144px;
+    top: 112px;
     width: calc(100% - 32px);
     max-width: 360px;
     padding: 10px 14px;
