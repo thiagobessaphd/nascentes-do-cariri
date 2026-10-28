@@ -1,5 +1,5 @@
 /**
- * Nascentes do Cariri — Lógica Pura de Filtros, Normalização e Debounce do Mapa
+ * Nascentes do Cariri — Lógica de Filtros, Normalização e Debounce do Mapa
  * Implementa normalização previsível (acentos, caixa e espaços), construção de query params,
  * filtragem imutável e controle cancelável de debounce para a interface pública do mapa.
  */
@@ -10,10 +10,10 @@ import type {
 } from "@/modules/nascentes/nascentes.dto";
 
 /**
- * Tempo padrão de debounce (em milissegundos) para busca textual no mapa.
+ * Tempo padrão de debounce para busca textual no mapa.
  * Evita requisições excessivas e reajustes bruscos de enquadramento a cada tecla digitada.
  */
-export const DEFAULT_SEARCH_DEBOUNCE_MS = 300;
+export const DEFAULT_SEARCH_DEBOUNCE_MS = 500;
 
 /**
  * Limites máximos de caracteres alinhados ao contrato da API pública.
