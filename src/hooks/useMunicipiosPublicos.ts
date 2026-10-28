@@ -6,7 +6,7 @@
  * cancelamento simétrico via AbortController e função de retry para o filtro de municípios.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchMunicipiosPublicos, MunicipiosClientError } from '@/services/municipios.client';
 
 export type MunicipiosStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
@@ -33,11 +33,11 @@ export function useMunicipiosPublicos(): UseMunicipiosPublicosResult {
   // Armazena a referência do AbortController ativo para cancelamento simétrico
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const refetch = useCallback(async () => {
+  const refetch = async (): Promise<void> => {
     setStatus('loading');
     setError(null);
     setReloadToken((prev) => prev + 1);
-  }, []);
+  };
 
   useEffect(() => {
     // Cancela requisição anterior se ainda estiver em andamento
