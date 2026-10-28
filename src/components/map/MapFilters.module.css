@@ -1,7 +1,8 @@
 /**
  * Nascentes do Cariri — Estilos dos Controles Públicos de Filtro (MapFilters)
  * Barra flutuante translúcida com semântica acessível, foco visível (WCAG 2.1 AA),
- * alvos de toque ergonômicos e adaptação responsiva para desktop, tablet, mobile e iframe.
+ * menu de opções customizado no mesmo design system, alvos de toque ergonômicos
+ * e adaptação responsiva para desktop, tablet, mobile e iframe.
  */
 
 .filterBar {
@@ -48,7 +49,7 @@
 }
 
 .filterField {
-  width: 200px;
+  width: 210px;
   flex-shrink: 0;
 }
 
@@ -70,7 +71,7 @@
   text-overflow: ellipsis;
 }
 
-/* Container Relativo para Ícone + Input/Select */
+/* Container Relativo para Ícone + Controle + Menu Dropdown */
 .inputWrapper {
   position: relative;
   display: flex;
@@ -87,6 +88,7 @@
   color: #64748b;
   pointer-events: none;
   flex-shrink: 0;
+  z-index: 1;
 }
 
 .selectChevron {
@@ -98,9 +100,15 @@
   color: #64748b;
   pointer-events: none;
   flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.15s ease;
 }
 
-/* Controles Nativos Estilizados (<select> e <input type="search">) */
+.selectChevronOpen {
+  transform: rotate(180deg);
+  color: #0284c7;
+}
+
+/* Controles Estilizados (Trigger de Município e <input type="search">) */
 .selectControl,
 .searchControl {
   width: 100%;
@@ -122,13 +130,28 @@
 }
 
 .selectControl {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   padding: 6px 30px 6px 32px;
+  text-align: left;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+}
+
+.selectValueText {
+  display: block;
+  width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.selectControlOpen {
+  border-color: #0284c7;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
 .searchControl {
@@ -169,6 +192,110 @@
   background-color: #f0f9ff;
   color: #0369a1;
   font-weight: 600;
+}
+
+/* ==========================================================================
+   Aba / Menu de Opções de Município Customizado (Mesma Estilização da Barra)
+   ========================================================================== */
+
+@keyframes dropdownEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  max-height: 260px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 10px;
+  box-shadow:
+    0 14px 28px -6px rgba(15, 23, 42, 0.16),
+    0 6px 12px -4px rgba(15, 23, 42, 0.08);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 1020;
+  box-sizing: border-box;
+  animation: dropdownEnter 0.14s ease-out;
+}
+
+.dropdownMenu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdownMenu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdownMenu::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 999px;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 0.84375rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #1e293b;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.dropdownOption + .dropdownOption {
+  margin-top: 2px;
+}
+
+.dropdownOptionHighlighted {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.dropdownOptionSelected {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.dropdownOptionSelected.dropdownOptionHighlighted {
+  background-color: #bae6fd;
+  color: #075985;
+}
+
+.dropdownOptionLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdownOptionCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  flex-shrink: 0;
 }
 
 /* Botão de Ação Única "Limpar filtros" */
@@ -304,6 +431,15 @@
     min-height: 36px;
     font-size: 0.8125rem;
   }
+
+  .dropdownMenu {
+    max-height: 220px;
+  }
+
+  .dropdownOption {
+    padding: 7px 10px;
+    font-size: 0.8125rem;
+  }
 }
 
 /* ==========================================================================
@@ -337,9 +473,12 @@
 @media (prefers-reduced-motion: reduce) {
   .filterBar,
   .selectControl,
+  .selectChevron,
   .searchControl,
-  .clearButton {
+  .clearButton,
+  .dropdownMenu,
+  .dropdownOption {
     transition: none !important;
+    animation: none !important;
   }
 }
-
