@@ -230,8 +230,33 @@ export function createNascentePopupElement(nascente: NascentePublicDto): HTMLEle
 }
 
 /**
+ * Converte o atributo HTML `title` nativo do elemento DOM do marcador em `aria-label`,
+ * evitando que o navegador exiba uma segunda caixa nativa sobre o Tooltip customizado no hover,
+ * enquanto preserva a leitura acessível para leitores de tela.
+ */
+function suppressNativeBrowserTitleOnMarker(marker: L.Marker): void {
+  if (typeof marker.getElement !== 'function') {
+    return;
+  }
+
+  const markerElement = marker.getElement();
+  if (!markerElement) {
+    return;
+  }
+
+  const nativeTitle = markerElement.getAttribute('title');
+  if (nativeTitle) {
+    if (!markerElement.getAttribute('aria-label')) {
+      markerElement.setAttribute('aria-label', nativeTitle);
+    }
+    markerElement.removeAttribute('title');
+  }
+}
+
+/**
  * Vincula tooltip, popup e eventos acessíveis de teclado e foco a um marcador Leaflet.
- * - Atribui tooltip no hover/focus
+ * - Atribui tooltip no hover/focus (ocultando-o automaticamente quando o popup estiver aberto)
+ * - Remove o atributo `title` nativo do DOM ao montar para evitar tooltip duplicado do navegador
  * - Atribui popup no clique ou toque
  * - Habilita abertura de popup pelas teclas Enter e Espaço quando o marcador estiver em foco
  * - Configura `aria-label` e `title` descritivos no botão nativo de fechar do popup
@@ -268,6 +293,25 @@ export function bindNascenteInteractions(
   }
 
   if (typeof marker.on === 'function') {
+    marker.on('add', () => {
+      suppressNativeBrowserTitleOnMarker(marker);
+    });
+
+    marker.on('mouseover', () => {
+      suppressNativeBrowserTitleOnMarker(marker);
+    });
+
+    marker.on('tooltipopen', () => {
+      suppressNativeBrowserTitleOnMarker(marker);
+      if (
+        typeof marker.isPopupOpen === 'function' &&
+        marker.isPopupOpen() &&
+        typeof marker.closeTooltip === 'function'
+      ) {
+        marker.closeTooltip();
+      }
+    });
+
     marker.on('keydown', (event: L.LeafletKeyboardEvent) => {
       const key = event.originalEvent?.key;
       if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
@@ -279,6 +323,10 @@ export function bindNascenteInteractions(
     });
 
     marker.on('popupopen', (event: L.PopupEvent) => {
+      if (typeof marker.closeTooltip === 'function') {
+        marker.closeTooltip();
+      }
+
       const container = event.popup?.getElement();
       if (container) {
         const closeButton = container.querySelector<HTMLAnchorElement>('.leaflet-popup-close-button');

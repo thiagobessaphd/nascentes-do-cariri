@@ -313,6 +313,13 @@
   white-space: nowrap;
 }
 
+/* Em dispositivos puramente touch (mobile/tablet sem hover), o toque abre apenas o Popup */
+@media (hover: none), (pointer: coarse) {
+  :global(.nascente-leaflet-tooltip) {
+    display: none !important;
+  }
+}
+
 /* ==========================================================================
    4. Responsividade e Telas Compactas (<= 640px)
    ========================================================================== */
