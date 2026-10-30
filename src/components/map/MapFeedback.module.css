@@ -54,9 +54,13 @@
   border-left-color: #0284c7;
   color: #0369a1;
   width: fit-content;
-  max-width: min(520px, calc(100% - 32px));
-  padding: 8px 14px;
-  gap: 10px;
+  max-width: min(720px, calc(100% - 32px));
+  padding: 8px 16px;
+  gap: 12px;
+}
+
+.feedbackEmpty .feedbackMessage {
+  white-space: nowrap;
 }
 
 .feedbackEmptyFiltered {
@@ -227,22 +231,33 @@
 
   .feedbackEmpty {
     top: 108px;
-    width: fit-content;
-    max-width: calc(100% - 32px);
-    padding: 8px 12px;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    align-items: center;
+    gap: 8px 10px;
+    width: calc(100% - 32px);
+    max-width: 380px;
+    padding: 10px 14px;
     font-size: 0.8125rem;
     margin: 0 auto;
   }
 
-  .feedbackEmptyFiltered {
-    flex-wrap: wrap;
-    justify-content: center;
+  .feedbackEmpty .feedbackInfoIcon {
+    align-self: flex-start;
   }
 
-  .feedbackClearButton {
-    padding: 5px 10px;
-    font-size: 0.75rem;
+  .feedbackEmpty .feedbackMessage {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .feedbackEmpty .feedbackClearButton {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 32px;
+    margin-left: 0;
+    justify-content: center;
+    font-size: 0.8125rem;
   }
 }
 
@@ -256,16 +271,16 @@
   }
 
   .feedbackEmpty {
-    width: fit-content;
-    max-width: calc(100% - 20px);
-    padding: 6px 10px;
-    font-size: 0.75rem;
-    gap: 6px;
+    width: calc(100% - 24px);
+    max-width: 340px;
+    padding: 8px 10px;
+    font-size: 0.78125rem;
+    gap: 6px 8px;
   }
 
-  .feedbackClearButton {
-    padding: 4px 8px;
-    font-size: 0.71875rem;
+  .feedbackEmpty .feedbackClearButton {
+    height: 30px;
+    font-size: 0.75rem;
   }
 }
 
