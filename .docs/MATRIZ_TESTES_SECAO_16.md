@@ -38,10 +38,10 @@ A matriz estabelece para cada requisito:
 | **CT-BE-14** | Preservação dos registros de importações anteriores | Backend | Integração | Persistência / Integridade | `src/tests/integration/database/database.test.ts` | Ativo |
 | **CT-BE-15** | Preservação dos arquivos TXT originais | Backend | Unitário | Storage e Sanitização | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-16** | Resposta da API somente com registros ativos | Backend | Integração | API Pública | `src/tests/integration/api/nascentes.test.ts` | Ativo |
-| **CT-FE-01** | Criação correta dos marcadores | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/markers.test.ts` | Planejado |
+| **CT-FE-01** | Criação correta dos marcadores | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/map-markers.test.ts` | Ativo |
 | **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Ativo |
 | **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Ativo |
-| **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Planejado |
+| **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Ativo |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
 | **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Ativo |
@@ -126,6 +126,24 @@ A matriz estabelece para cada requisito:
     - Suporte integral a navegação por teclado: abertura via teclas `Enter` e `Espaço` com interceptação de `preventDefault`.
     - Acessibilidade do botão de fechar (`.leaflet-popup-close-button`) com injeção dinâmica de `aria-label` e `title` descritivos contextualizados ao nome da nascente.
     - Degradação graciosa em ambientes SSR sem DOM global.
+
+### 3.8. Marcadores, Clusterização e Filtros Combinados do Mapa (`CT-FE-01`, `CT-FE-04`)
+* **Arquivos:**
+  - `src/tests/unit/mapa/map-markers.test.ts`
+  - `src/tests/unit/mapa/leaflet-bounds.test.ts`
+  - `src/tests/unit/mapa/leaflet-lifecycle.test.ts`
+  - `src/tests/unit/mapa/filters.test.ts`
+  - `src/tests/unit/services/municipios-client.test.ts`
+* **Regras Verificadas:**
+  - **Criação de Marcadores e Clusterização (`CT-FE-01`):**
+    - Instanciação singleton (`L.divIcon`) com SVG semântico temático (`#0284c7`) e âncoras cartográficas precisas (`iconSize: [28, 36]`, `iconAnchor: [14, 36]`, `popupAnchor: [0, -36]`, `tooltipAnchor: [14, -18]`).
+    - Validação estrita de coordenadas geográficas $[-90, 90]$ e $[-180, 180]$, descartando registros malformados (`NaN`, `Infinity`) sem interromper o lote.
+    - Agrupamento por proximidade (`L.markerClusterGroup`) com inserção síncrona (`chunkedLoading: false`) e proteção contra condições de corrida na desmontagem.
+  - **Filtros de Município, Busca Textual, Debounce e Limpeza (`CT-FE-04`):**
+    - Normalização de entradas (remoção de caracteres de controle, colapso de espaços múltiplos, truncamento seguro nos limites da API e comparação NFD insensível a acentos e caixa).
+    - Filtragem isolada por município, isolada por busca textual `q` (em `fonte` ou `localidade`) e combinada (`municipio` + `q`), preservando a imutabilidade da coleção original.
+    - Controlador determinístico de debounce (`500ms`) consolidando digitações sucessivas e permitindo cancelamento imediato ao acionar "Limpar filtros".
+    - Controles acessíveis WAI-ARIA (`<form role="search">`, `role="combobox"`, `role="listbox"`, `<input type="search">` e botão de ação única "Limpar filtros").
 
 ---
 

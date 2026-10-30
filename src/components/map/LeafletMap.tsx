@@ -5,15 +5,26 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import L from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { mapConfig } from '@/config/map';
+import { useMunicipiosPublicos } from '@/hooks/useMunicipiosPublicos';
 import { useNascentesPublicas } from '@/hooks/useNascentesPublicas';
 import type { NascentesQueryParams } from '@/modules/nascentes/nascentes.dto';
 import { adjustMapBounds } from './map-bounds';
+import {
+  DEFAULT_SEARCH_DEBOUNCE_MS,
+  buildNascentesQueryParams,
+  clearMapFilterState,
+  createDebounceController,
+  createInitialMapFilterState,
+  hasActiveMapFilters,
+  type MapFilterState,
+} from './map-filters';
 import {
   createNascenteClusterGroup,
   createNascentesMarkers,
   initMarkerClusterPlugin,
 } from './map-markers';
 import MapFeedback from './MapFeedback';
+import MapFilters from './MapFilters';
 import styles from './LeafletMap.module.css';
 import './map-markers.module.css';
 import './map-popup.module.css';
@@ -29,7 +40,27 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
   const [hasTileError, setHasTileError] = useState<boolean>(false);
 
-  const { status, data, error, refetch } = useNascentesPublicas(params);
+  const [rawFilterState, setFilterState] = useState<MapFilterState>(() =>
+    createInitialMapFilterState(params)
+  );
+  const filterState: MapFilterState =
+    rawFilterState && typeof rawFilterState === 'object'
+      ? rawFilterState
+      : createInitialMapFilterState(params);
+
+  const debounceRef = useRef(
+    createDebounceController<string>(DEFAULT_SEARCH_DEBOUNCE_MS)
+  );
+
+  const effectiveParams = buildNascentesQueryParams(
+    {
+      municipio: filterState.municipio,
+      debouncedSearch: filterState.debouncedSearch,
+    },
+    params
+  );
+
+  const { status, data, error, refetch } = useNascentesPublicas(effectiveParams);
 
   // Armazena referências sincronizadas via effect para leitura segura em callbacks assíncronos
   const dataRef = useRef(data);
@@ -171,6 +202,83 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
     }
   }, [status, data]);
 
+  // Limpeza simétrica do timer de debounce ao desmontar o componente
+  useEffect(() => {
+    const controller = debounceRef.current;
+    return () => {
+      controller.cancel();
+    };
+  }, []);
+
+  const municipiosQuery = useMunicipiosPublicos();
+  const municipiosOptions = Array.isArray(municipiosQuery.data)
+    ? municipiosQuery.data
+    : [];
+
+  const handleMunicipioChange = (nextMunicipio: string): void => {
+    setFilterState((prev) => {
+      const current =
+        prev && typeof prev === 'object'
+          ? prev
+          : createInitialMapFilterState(params);
+      return {
+        ...current,
+        municipio: nextMunicipio,
+      };
+    });
+  };
+
+  const handleSearchInputChange = (nextSearchInput: string): void => {
+    const trimmed = nextSearchInput.trim();
+
+    if (trimmed.length === 0) {
+      debounceRef.current.cancel();
+      setFilterState((prev) => {
+        const current =
+          prev && typeof prev === 'object'
+            ? prev
+            : createInitialMapFilterState(params);
+        return {
+          ...current,
+          searchInput: nextSearchInput,
+          debouncedSearch: '',
+        };
+      });
+      return;
+    }
+
+    setFilterState((prev) => {
+      const current =
+        prev && typeof prev === 'object'
+          ? prev
+          : createInitialMapFilterState(params);
+      return {
+        ...current,
+        searchInput: nextSearchInput,
+      };
+    });
+
+    debounceRef.current.schedule(nextSearchInput, (debouncedValue) => {
+      setFilterState((prev) => {
+        const current =
+          prev && typeof prev === 'object'
+            ? prev
+            : createInitialMapFilterState(params);
+        return {
+          ...current,
+          debouncedSearch: debouncedValue,
+        };
+      });
+    });
+  };
+
+  const handleClearFilters = (): void => {
+    debounceRef.current.cancel();
+    setFilterState(clearMapFilterState());
+  };
+
+  const isFilterActive = hasActiveMapFilters(filterState);
+
   const containerClassName = className
     ? `${styles.mapContainer} ${className}`
     : styles.mapContainer;
@@ -184,6 +292,17 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
       aria-label="Mapa cartográfico das nascentes do Cariri"
       tabIndex={0}
     >
+      <MapFilters
+        municipio={filterState.municipio}
+        searchInput={filterState.searchInput}
+        municipios={municipiosOptions}
+        isLoadingMunicipios={Boolean(municipiosQuery.isLoading)}
+        municipiosError={municipiosQuery.error}
+        hasActiveFilters={isFilterActive}
+        onMunicipioChange={handleMunicipioChange}
+        onSearchInputChange={handleSearchInputChange}
+        onClearFilters={handleClearFilters}
+      />
       <MapFeedback status={status} error={error} onRetry={refetch} />
       {hasTileError && (
         <div

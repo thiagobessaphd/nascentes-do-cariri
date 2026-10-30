@@ -60,7 +60,7 @@
 /* Banner de Aviso de Falha de Carregamento de Tiles */
 .tileErrorBanner {
   position: absolute;
-  top: 16px;
+  top: 96px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
@@ -111,7 +111,7 @@
 /* Adaptações para Viewports Compactos / Mobile (<= 640px) */
 @media (max-width: 640px) {
   .tileErrorBanner {
-    top: 12px;
+    top: 112px;
     width: calc(100% - 32px);
     max-width: 360px;
     padding: 10px 14px;
