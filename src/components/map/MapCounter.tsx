@@ -2,7 +2,7 @@
 
 /**
  * Nascentes do Cariri — Componente Acessível de Contagem e Legenda do Mapa (MapCounter)
- * Exibe o total de nascentes visíveis e filtradas, com semântica WCAG 2.1 AA (role="status" e aria-live="polite"),
+ * Exibe o total de nascentes visíveis e filtradas com suporte semântico WAI-ARIA,
  * diferenciação entre total geral e filtrado e isolamento de eventos do Leaflet.
  */
 
@@ -31,8 +31,13 @@ function stopMapEventPropagation(event: SyntheticEvent): void {
 export function formatCounterAccessibleText(
   count: number,
   total?: number,
-  hasActiveFilters: boolean = false
+  hasActiveFilters: boolean = false,
+  isLoading: boolean = false
 ): string {
+  if (isLoading && count <= 0) {
+    return 'Carregando nascentes no mapa...';
+  }
+
   if (count <= 0) {
     return hasActiveFilters
       ? 'Nenhuma nascente encontrada para os filtros aplicados.'
@@ -45,10 +50,14 @@ export function formatCounterAccessibleText(
   }
 
   if (count === 1) {
-    return '1 nascente exibida no mapa do Cariri.';
+    return hasActiveFilters
+      ? '1 nascente exibida com filtros aplicados.'
+      : '1 nascente exibida no mapa do Cariri.';
   }
 
-  return `${count} nascentes exibidas no mapa do Cariri.`;
+  return hasActiveFilters
+    ? `${count} nascentes exibidas com filtros aplicados.`
+    : `${count} nascentes exibidas no mapa do Cariri.`;
 }
 
 export default function MapCounter({
@@ -60,12 +69,16 @@ export default function MapCounter({
 }: MapCounterProps) {
   const safeCount = Math.max(0, count);
   const isFilteredRatio =
-    hasActiveFilters && typeof total === 'number' && total > safeCount && safeCount > 0;
+    hasActiveFilters &&
+    typeof total === 'number' &&
+    total > safeCount &&
+    safeCount > 0;
 
   const accessibleText = formatCounterAccessibleText(
     safeCount,
     total,
-    hasActiveFilters
+    hasActiveFilters,
+    isLoading
   );
 
   const containerClasses = [
@@ -107,9 +120,13 @@ export default function MapCounter({
       </span>
 
       <span className={styles.counterBody} aria-hidden="true">
-        {safeCount === 0 ? (
+        {isLoading && safeCount === 0 ? (
+          <span className={styles.counterEmptyText}>Carregando...</span>
+        ) : safeCount === 0 ? (
           <span className={styles.counterEmptyText}>
-            {hasActiveFilters ? 'Nenhuma nascente encontrada' : 'Nenhuma nascente'}
+            {hasActiveFilters
+              ? 'Nenhuma nascente encontrada'
+              : 'Nenhuma nascente'}
           </span>
         ) : isFilteredRatio ? (
           <span className={styles.counterText}>
@@ -124,7 +141,13 @@ export default function MapCounter({
           <span className={styles.counterText}>
             <strong className={styles.countHighlight}>{safeCount}</strong>
             <span className={styles.nounText}>
-              {safeCount === 1 ? 'nascente no Cariri' : 'nascentes no Cariri'}
+              {hasActiveFilters
+                ? safeCount === 1
+                  ? 'nascente'
+                  : 'nascentes'
+                : safeCount === 1
+                  ? 'nascente no Cariri'
+                  : 'nascentes no Cariri'}
             </span>
           </span>
         )}
@@ -142,4 +165,3 @@ export default function MapCounter({
     </aside>
   );
 }
-
