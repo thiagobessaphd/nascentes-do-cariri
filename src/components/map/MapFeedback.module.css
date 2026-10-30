@@ -53,6 +53,10 @@
 .feedbackEmpty {
   border-left-color: #0284c7;
   color: #0369a1;
+  width: fit-content;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 8px 14px;
+  gap: 10px;
 }
 
 .feedbackEmptyFiltered {
@@ -211,8 +215,7 @@
 /* Adaptações para Viewports Compactos / Mobile (<= 640px) */
 @media (max-width: 640px) {
   .feedbackLoading,
-  .feedbackError,
-  .feedbackEmpty {
+  .feedbackError {
     top: 112px;
     width: calc(100% - 32px);
     max-width: 380px;
@@ -222,25 +225,42 @@
     margin: 0 16px;
   }
 
+  .feedbackEmpty {
+    top: 108px;
+    width: fit-content;
+    max-width: calc(100% - 32px);
+    padding: 8px 12px;
+    gap: 8px;
+    font-size: 0.8125rem;
+    margin: 0 auto;
+  }
+
   .feedbackEmptyFiltered {
     flex-wrap: wrap;
+    justify-content: center;
   }
 
   .feedbackClearButton {
     padding: 5px 10px;
     font-size: 0.75rem;
-    margin-left: auto;
   }
 }
 
 /* Telas Ultra-Compactas (<= 380px) */
 @media (max-width: 380px) {
   .feedbackLoading,
-  .feedbackError,
-  .feedbackEmpty {
+  .feedbackError {
     width: calc(100% - 24px);
     padding: 8px 10px;
     margin: 0 12px;
+  }
+
+  .feedbackEmpty {
+    width: fit-content;
+    max-width: calc(100% - 20px);
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    gap: 6px;
   }
 
   .feedbackClearButton {

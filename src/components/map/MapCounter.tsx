@@ -3,7 +3,7 @@
 /**
  * Nascentes do Cariri — Componente Acessível de Contagem e Legenda do Mapa (MapCounter)
  * Exibe o total de nascentes visíveis e filtradas com suporte semântico WAI-ARIA,
- * diferenciação entre total geral e filtrado e isolamento de eventos do Leaflet.
+ * exibição uniforme de contagem numérica em todos os estados e isolamento de eventos do Leaflet.
  */
 
 import type { SyntheticEvent } from 'react';
@@ -34,30 +34,25 @@ export function formatCounterAccessibleText(
   hasActiveFilters: boolean = false,
   isLoading: boolean = false
 ): string {
-  if (isLoading && count <= 0) {
+  if (isLoading && count <= 0 && total === undefined) {
     return 'Carregando nascentes no mapa...';
   }
 
-  if (count <= 0) {
-    return hasActiveFilters
-      ? 'Nenhuma nascente encontrada para os filtros aplicados.'
-      : 'Nenhuma nascente cadastrada nesta região.';
-  }
-
-  if (hasActiveFilters && typeof total === 'number' && total > count) {
-    const termNascente = count === 1 ? 'nascente' : 'nascentes';
+  if (hasActiveFilters && typeof total === 'number' && total > 0) {
+    const termNascente = total === 1 ? 'nascente' : 'nascentes';
     return `Exibindo ${count} de ${total} ${termNascente} com filtros aplicados.`;
   }
 
-  if (count === 1) {
-    return hasActiveFilters
-      ? '1 nascente exibida com filtros aplicados.'
-      : '1 nascente exibida no mapa do Cariri.';
+  if (hasActiveFilters) {
+    const termNascente = count === 1 ? 'nascente' : 'nascentes';
+    return `${count} ${termNascente} exibidas com filtros aplicados.`;
   }
 
-  return hasActiveFilters
-    ? `${count} nascentes exibidas com filtros aplicados.`
-    : `${count} nascentes exibidas no mapa do Cariri.`;
+  if (count === 1) {
+    return '1 nascente exibida no mapa do Cariri.';
+  }
+
+  return `${count} nascentes exibidas no mapa do Cariri.`;
 }
 
 export default function MapCounter({
@@ -71,8 +66,7 @@ export default function MapCounter({
   const isFilteredRatio =
     hasActiveFilters &&
     typeof total === 'number' &&
-    total > safeCount &&
-    safeCount > 0;
+    total > 0;
 
   const accessibleText = formatCounterAccessibleText(
     safeCount,
@@ -120,21 +114,15 @@ export default function MapCounter({
       </span>
 
       <span className={styles.counterBody} aria-hidden="true">
-        {isLoading && safeCount === 0 ? (
+        {isLoading && safeCount === 0 && total === undefined ? (
           <span className={styles.counterEmptyText}>Carregando...</span>
-        ) : safeCount === 0 ? (
-          <span className={styles.counterEmptyText}>
-            {hasActiveFilters
-              ? 'Nenhuma nascente encontrada'
-              : 'Nenhuma nascente'}
-          </span>
         ) : isFilteredRatio ? (
           <span className={styles.counterText}>
             <strong className={styles.countHighlight}>{safeCount}</strong>
             <span className={styles.ratioSeparator}>de</span>
             <span className={styles.totalNumber}>{total}</span>
             <span className={styles.nounText}>
-              {safeCount === 1 ? 'nascente' : 'nascentes'}
+              {total === 1 ? 'nascente' : 'nascentes'}
             </span>
           </span>
         ) : (
@@ -153,7 +141,7 @@ export default function MapCounter({
         )}
       </span>
 
-      {hasActiveFilters && safeCount > 0 && (
+      {hasActiveFilters && (
         <span
           className={styles.filteredBadge}
           title="Filtros de município ou busca ativos"
