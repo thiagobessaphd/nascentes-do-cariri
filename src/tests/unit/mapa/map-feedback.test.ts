@@ -92,7 +92,7 @@ describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.
   });
 
   describe('3. Estado Vazio (empty)', () => {
-    it('deve renderizar o aviso acessível de nenhum resultado com botão de fechar [×] e card unificado', () => {
+    it('deve renderizar o aviso acessível de nenhum resultado de forma persistente sem botão de fechar', () => {
       const html = renderToString(React.createElement(MapFeedback, { status: 'empty' }));
 
       expect(html).toContain('role="status"');
@@ -101,8 +101,24 @@ describe('Componente de Feedback Visual do Mapa (src/components/map/MapFeedback.
       expect(html).toContain(styles.feedbackCard);
       expect(html).toContain(styles.feedbackEmpty);
       expect(html).toContain(styles.feedbackInfoIcon);
-      expect(html).toContain(styles.feedbackDismissButton);
-      expect(html).toContain('aria-label="Fechar aviso de nenhuma nascente encontrada"');
+      expect(html).not.toContain(styles.feedbackDismissButton);
+      expect(html).not.toContain('aria-label="Fechar aviso de nenhuma nascente encontrada"');
+    });
+
+    it('deve renderizar botão de limpar filtros no card vazio quando filtros estão ativos', () => {
+      const onClear = vi.fn();
+      const html = renderToString(
+        React.createElement(MapFeedback, {
+          status: 'empty',
+          hasActiveFilters: true,
+          onClearFilters: onClear,
+        })
+      );
+
+      expect(html).toContain('Nenhuma nascente encontrada para os filtros aplicados.');
+      expect(html).toContain(styles.feedbackClearButton);
+      expect(html).toContain('Limpar filtros');
+      expect(html).not.toContain(styles.feedbackDismissButton);
     });
   });
 

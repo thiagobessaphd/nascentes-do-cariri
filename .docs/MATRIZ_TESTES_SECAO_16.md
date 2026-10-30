@@ -43,6 +43,7 @@ A matriz estabelece para cada requisito:
 | **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Ativo |
 | **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Ativo |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
+| **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Ativo |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
 | **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Ativo |
 
@@ -144,6 +145,21 @@ A matriz estabelece para cada requisito:
     - Filtragem isolada por município, isolada por busca textual `q` (em `fonte` ou `localidade`) e combinada (`municipio` + `q`), preservando a imutabilidade da coleção original.
     - Controlador determinístico de debounce (`500ms`) consolidando digitações sucessivas e permitindo cancelamento imediato ao acionar "Limpar filtros".
     - Controles acessíveis WAI-ARIA (`<form role="search">`, `role="combobox"`, `role="listbox"`, `<input type="search">` e botão de ação única "Limpar filtros").
+
+### 3.9. Estado sem Dados, Contador Acessível e Limpeza Contextual (`CT-FE-05`)
+* **Arquivos:**
+  - `src/tests/unit/mapa/empty-state.test.ts`
+  - `src/tests/unit/mapa/map-feedback.test.ts`
+* **Regras Verificadas:**
+  - **Contador de Nascentes (`MapCounter`):**
+    - Exibição numérica uniforme da contagem visível sem filtros (`"62 nascentes no Cariri"`), com filtros parciais (`"14 de 62 nascentes"` + badge `FILTRADO`) e com zero resultados filtrados (`"0 de 62 nascentes"` + badge `FILTRADO`).
+    - Região viva acessível (`role="status"`, `aria-live="polite"`, `aria-atomic="true"`) anunciando a contagem completa via leitor de tela (`srOnly`).
+    - Isolamento de eventos sobre o canvas Leaflet (`stopPropagation` em `onClick`, `onDoubleClick`, `onMouseDown`, `onTouchStart` e `onWheel`).
+  - **Estado Vazio e Limpeza Contextual (`MapFeedback` — `status === 'empty'`):**
+    - Mensagem explícita quando os filtros aplicados não retornam registros (`"Nenhuma nascente encontrada para os filtros aplicados."`) e mensagem diferenciada quando a base não possui registros ativos (`"Nenhuma nascente ativa disponível no momento."`).
+    - Persistência contínua do aviso enquanto não houver resultados.
+    - Botão de ação contextual `"Limpar filtros"` exibido exclusivamente quando há filtro ativo (`isFilterActive === true`), acionando `onClearFilters` em clique único e restaurando os marcadores do mapa.
+    - Distinção semântica rigorosa WAI-ARIA: `role="status"` + `aria-live="polite"` para carregamento e estado sem dados (`empty`), reservando `role="alert"` + `aria-live="assertive"` exclusivamente para falhas de comunicação com a API (`error`).
 
 ---
 

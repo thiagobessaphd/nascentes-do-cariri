@@ -1,0 +1,170 @@
+/**
+ * Nascentes do Cariri — Estilos do Componente Acessível de Contagem do Mapa (MapCounter)
+ * Pílula flutuante translúcida com glassmorphism, destaque tipográfico e adaptação responsiva.
+ */
+
+.counterContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 9999px;
+  box-shadow:
+    0 4px 12px -2px rgba(15, 23, 42, 0.08),
+    0 2px 6px -2px rgba(15, 23, 42, 0.04);
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  pointer-events: auto;
+  user-select: none;
+  box-sizing: border-box;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.counterContainer:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 6px 16px -2px rgba(15, 23, 42, 0.12),
+    0 2px 6px -2px rgba(15, 23, 42, 0.04);
+}
+
+/* Estado de Destaque quando há Filtros Ativos */
+.counterFiltered {
+  border-color: rgba(2, 132, 199, 0.45);
+  background: rgba(240, 249, 255, 0.96);
+  box-shadow:
+    0 4px 14px -2px rgba(2, 132, 199, 0.14),
+    0 2px 6px -2px rgba(15, 23, 42, 0.04);
+}
+
+.counterFiltered:hover {
+  background: rgba(240, 249, 255, 1);
+}
+
+/* Indicador de Carregamento sutil */
+.counterLoading {
+  opacity: 0.75;
+}
+
+/* Ícone de Gota D'água Temática */
+.counterIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.counterBody {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.counterText {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.countHighlight {
+  font-weight: 700;
+  color: #0284c7;
+  font-size: 0.875rem;
+}
+
+.ratioSeparator {
+  color: #64748b;
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.totalNumber {
+  font-weight: 600;
+  color: #475569;
+}
+
+.nounText {
+  color: #334155;
+}
+
+.counterEmptyText {
+  color: #64748b;
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* Badge Informativo de Filtro */
+.filteredBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-size: 0.65625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0369a1;
+  background-color: #e0f2fe;
+  border-radius: 9999px;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Responsividade — Telas Compactas e Mobile (<= 640px)
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .counterContainer {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+    gap: 6px;
+  }
+
+  .countHighlight {
+    font-size: 0.8125rem;
+  }
+
+  .filteredBadge {
+    padding: 1px 5px;
+    font-size: 0.625rem;
+  }
+}
+
+/* Telas Ultra-Compactas (<= 380px) */
+@media (max-width: 380px) {
+  .counterContainer {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 0.71875rem;
+  }
+
+  .nounText {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Acessibilidade — Redução de Movimento (prefers-reduced-motion)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .counterContainer {
+    transition: none !important;
+  }
+}
+
