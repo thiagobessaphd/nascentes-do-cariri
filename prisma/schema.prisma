@@ -25,7 +25,7 @@ model Importacao {
   id                    Int              @id @default(autoincrement())
   usuarioId             Int              @map("usuario_id")
   nomeArquivo           String           @map("nome_arquivo") @db.VarChar(255)
-  caminhoPrivadoArquivo String           @map("caminho_privado_arquivo") @db.VarChar(512)
+  caminhoPrivadoArquivo String           @unique @map("caminho_privado_arquivo") @db.VarChar(512)
   hashArquivo           String           @map("hash_arquivo") @db.VarChar(64)
   totalLinhas           Int              @default(0) @map("total_linhas")
   totalValidas          Int              @default(0) @map("total_validas")
@@ -40,6 +40,10 @@ model Importacao {
   usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
   nascentes Nascente[]
 
+  // Indices para filtros frequentes e auditoria
+  @@index([hashArquivo])
+  @@index([usuarioId])
+  @@index([status, createdAt])
   @@map("importacoes")
 }
 
