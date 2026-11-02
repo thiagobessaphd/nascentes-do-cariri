@@ -30,13 +30,14 @@ describe('Parser e Validador Linha a Linha de TXT (CT-BE-06)', () => {
     '-7.334700;-39.411900;Barbalha;Fonte Gruta do Farias;Arajara;2025-08-12;1.40';
 
   describe('1. Decodificação e Normalização UTF-8 (decodeTxtContent)', () => {
-    it('deve decodificar string padrão e Uint8Array UTF-8 corretamente', () => {
+    it('deve decodificar string padrão, Uint8Array e ArrayBuffer UTF-8 corretamente', () => {
       const texto = `${CABECALHO_VALIDO}\n${LINHA_VALIDA_CRATO}`;
       expect(decodeTxtContent(texto)).toBe(texto);
 
       const encoder = new TextEncoder();
       const buffer = encoder.encode(texto);
       expect(decodeTxtContent(buffer)).toBe(texto);
+      expect(decodeTxtContent(buffer.buffer)).toBe(texto);
     });
 
     it('deve remover Byte Order Mark (BOM) UTF-8 inicial sem corromper a primeira coluna', () => {
@@ -147,12 +148,14 @@ describe('Parser e Validador Linha a Linha de TXT (CT-BE-06)', () => {
   });
 
   describe('3. Normalização de Chave e Duplicidade (buildNascenteDuplicateKey)', () => {
-    it('deve gerar chave determinística com 8 casas decimais e fonte normalizada', () => {
+    it('deve gerar chave determinística com 8 casas decimais, sem acentos e fonte normalizada (compatível com utf8mb4_unicode_ci)', () => {
       const key1 = buildNascenteDuplicateKey(-7.234567, -39.345678, 'Nascente do Sítio Fundão');
       const key2 = buildNascenteDuplicateKey(-7.234567, -39.345678, '  NASCENTE   DO   SÍTIO   FUNDÃO  ');
+      const key3 = buildNascenteDuplicateKey(-7.234567, -39.345678, 'nascente do sitio fundao');
 
-      expect(key1).toBe('-7.23456700:-39.34567800:nascente do sítio fundão');
+      expect(key1).toBe('-7.23456700:-39.34567800:nascente do sitio fundao');
       expect(key1).toBe(key2);
+      expect(key1).toBe(key3);
     });
 
     it('deve identificar duplicidade interna no mesmo arquivo TXT', () => {
@@ -288,16 +291,36 @@ describe('Parser e Validador Linha a Linha de TXT (CT-BE-06)', () => {
         }
       });
 
-      it('deve rejeitar coordenadas fora da macrorregião do Cariri Cearense (CT-BE-07)', () => {
-        // Fortaleza: -3.7319, -38.5267 (fora do Cariri)
-        const fortaleza = '-3.731900;-38.526700;Fortaleza;Nascente Longe;Praia;2026-01-01;2.00';
-        const outcome = parseTxtLine(fortaleza, 2);
+      it('deve rejeitar coordenadas fora da macrorregião do Cariri Cearense em latitude e longitude (CT-BE-07)', () => {
+        // Latitude fora do Cariri (-3.731900 < -8.0 ou > -6.5) e longitude dentro (-39.400000)
+        const latFora = '-3.731900;-39.400000;Fortaleza;Nascente Longe;Praia;2026-01-01;2.00';
+        const outcomeLat = parseTxtLine(latFora, 2);
 
-        expect(outcome.valid).toBe(false);
-        if (!outcome.valid) {
-          expect(outcome.errors.some((e) => e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI)).toBe(true);
-          expect(outcome.errors.find((e) => e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI)?.message).toContain(
+        expect(outcomeLat.valid).toBe(false);
+        if (!outcomeLat.valid) {
+          expect(
+            outcomeLat.errors.some(
+              (e) => e.field === 'latitude' && e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI
+            )
+          ).toBe(true);
+          expect(outcomeLat.errors.find((e) => e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI)?.message).toContain(
             `[${CARIRI_BOUNDS.MIN_LAT}, ${CARIRI_BOUNDS.MAX_LAT}]`
+          );
+        }
+
+        // Longitude fora do Cariri (-35.000000 > -38.5) e latitude dentro (-7.228900)
+        const lngFora = '-7.228900;-35.000000;Paraíba;Nascente Leste;Leste;2026-01-01;2.00';
+        const outcomeLng = parseTxtLine(lngFora, 2);
+
+        expect(outcomeLng.valid).toBe(false);
+        if (!outcomeLng.valid) {
+          expect(
+            outcomeLng.errors.some(
+              (e) => e.field === 'longitude' && e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI
+            )
+          ).toBe(true);
+          expect(outcomeLng.errors.find((e) => e.code === IMPORT_ERROR_CODES.OUT_OF_BOUNDS_CARIRI)?.message).toContain(
+            `[${CARIRI_BOUNDS.MIN_LNG}, ${CARIRI_BOUNDS.MAX_LNG}]`
           );
         }
       });
@@ -446,6 +469,27 @@ describe('Parser e Validador Linha a Linha de TXT (CT-BE-06)', () => {
         }
       });
 
+      it('deve rejeitar vazão com sinal negativo mesmo sendo zero (-0 ou -0.00)', () => {
+        const vazaoZeroNegativo = '-7.234567;-39.345678;Crato;Nascente;Localidade;2026-01-01;-0.00';
+        const outcome = parseTxtLine(vazaoZeroNegativo, 2);
+
+        expect(outcome.valid).toBe(false);
+        if (!outcome.valid) {
+          expect(outcome.errors.some((e) => e.field === 'vazao_media' && e.code === IMPORT_ERROR_CODES.NEGATIVE_FLOW)).toBe(true);
+        }
+      });
+
+      it('deve rejeitar vazão que exceda o limite máximo de DECIMAL(10,3) do banco', () => {
+        const vazaoExcedente = '-7.234567;-39.345678;Crato;Nascente;Localidade;2026-01-01;10000000.00';
+        const outcome = parseTxtLine(vazaoExcedente, 2);
+
+        expect(outcome.valid).toBe(false);
+        if (!outcome.valid) {
+          expect(outcome.errors.some((e) => e.field === 'vazao_media' && e.code === IMPORT_ERROR_CODES.INVALID_DECIMAL_FORMAT)).toBe(true);
+          expect(outcome.errors.find((e) => e.field === 'vazao_media')?.message).toContain('9999999.999');
+        }
+      });
+
       it('deve rejeitar vazão com vírgula em vez de ponto', () => {
         const vazaoVirgula = '-7.234567;-39.345678;Crato;Nascente;Localidade;2026-01-01;2,75';
         const outcome = parseTxtLine(vazaoVirgula, 2);
@@ -539,6 +583,23 @@ describe('Parser e Validador Linha a Linha de TXT (CT-BE-06)', () => {
       expect(resultado.summary.totalValidas).toBe(0);
       expect(resultado.summary.totalInvalidas).toBe(1);
       expect(resultado.allErrors[0]?.code).toBe(IMPORT_ERROR_CODES.EMPTY_FILE);
+    });
+
+    it('deve bloquear confirmação (canConfirm: false) quando 100% das linhas forem duplicadas (totalValidas: 0)', () => {
+      const chaveExistente = buildNascenteDuplicateKey(-7.234567, -39.345678, 'Nascente do Sítio Fundão');
+      const conteudo = [CABECALHO_VALIDO, LINHA_VALIDA_CRATO].join('\n');
+
+      const resultado = parseNascentesTxt(conteudo, {
+        existingKeys: new Set([chaveExistente]),
+      });
+
+      expect(resultado.headerValid).toBe(true);
+      expect(resultado.canConfirm).toBe(false);
+      expect(resultado.summary.totalLinhas).toBe(1);
+      expect(resultado.summary.totalValidas).toBe(0);
+      expect(resultado.summary.totalDuplicadas).toBe(1);
+      expect(resultado.summary.totalInvalidas).toBe(0);
+      expect(resultado.duplicateRows[0]?.reason).toBe(DUPLICATE_REASONS.DATABASE);
     });
   });
 });
