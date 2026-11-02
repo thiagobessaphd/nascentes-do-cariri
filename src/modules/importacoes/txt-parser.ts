@@ -26,6 +26,15 @@ function stripControlCharacters(value: string): string {
 }
 
 /**
+ * Normaliza campos de texto: remove caracteres de controle ASCII,
+ * colapsa múltiplos espaços internos em um único espaço, aplica trim
+ * e normalização canônica Unicode NFC (precomposed).
+ */
+function normalizeTextField(value: string): string {
+  return stripControlCharacters(value).trim().replace(/\s+/g, ' ').normalize('NFC');
+}
+
+/**
  * Decodifica o conteúdo de entrada (string, Uint8Array ou ArrayBuffer) em string UTF-8 válida.
  * Remove Byte Order Mark (BOM) inicial se presente.
  *
@@ -51,7 +60,12 @@ export function decodeTxtContent(input: string | Uint8Array | ArrayBuffer): stri
 
 /**
  * Constrói a chave canônica e normalizada de duplicidade para uma nascente.
- * Combina latitude (8 casas), longitude (8 casas) e fonte (trim, colapso de espaços, NFC, lowercase).
+ * Combina latitude (8 casas), longitude (8 casas) e fonte normalizada.
+ *
+ * A normalização da fonte remove caracteres de controle, colapsa espaços,
+ * converte para minúsculas e remove diacríticos/acentos (NFD + strip diacritics),
+ * espelhando fielmente a collation 'utf8mb4_unicode_ci' (accent-insensitive e case-insensitive)
+ * do índice UNIQUE(latitude, longitude, fonte) no MySQL.
  *
  * Regra: Mesma latitude, longitude e fonte caracterizam duplicidade.
  */
@@ -65,7 +79,8 @@ export function buildNascenteDuplicateKey(
   const fontePart = stripControlCharacters(fonte)
     .trim()
     .replace(/\s+/g, ' ')
-    .normalize('NFC')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
   return `${latPart}:${lngPart}:${fontePart}`;
@@ -265,7 +280,7 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
         rawValue: rawLat,
       });
     } else {
-      parsedLat = num;
+      parsedLat = Number(num.toFixed(8));
     }
   }
 
@@ -324,12 +339,12 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
         rawValue: rawLng,
       });
     } else {
-      parsedLng = num;
+      parsedLng = Number(num.toFixed(8));
     }
   }
 
   // 4. Campo: municipio
-  const cleanedMunicipio = stripControlCharacters(rawMunicipio).trim();
+  const cleanedMunicipio = normalizeTextField(rawMunicipio);
   if (cleanedMunicipio.length === 0) {
     errors.push({
       line: lineNumber,
@@ -349,7 +364,7 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
   }
 
   // 5. Campo: fonte
-  const cleanedFonte = stripControlCharacters(rawFonte).trim();
+  const cleanedFonte = normalizeTextField(rawFonte);
   if (cleanedFonte.length === 0) {
     errors.push({
       line: lineNumber,
@@ -369,7 +384,7 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
   }
 
   // 6. Campo: localidade
-  const cleanedLocalidade = stripControlCharacters(rawLocalidade).trim();
+  const cleanedLocalidade = normalizeTextField(rawLocalidade);
   if (cleanedLocalidade.length === 0) {
     errors.push({
       line: lineNumber,
@@ -462,7 +477,7 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
         message: 'Vazão média não pode ser NaN ou infinita.',
         rawValue: rawVazao,
       });
-    } else if (num < 0) {
+    } else if (trimmedVazao.startsWith('-') || num < 0) {
       errors.push({
         line: lineNumber,
         field: 'vazao_media',
@@ -470,24 +485,39 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
         message: 'Vazão média deve ser maior ou igual a zero (m³/s).',
         rawValue: rawVazao,
       });
+    } else if (num > 9_999_999.999) {
+      errors.push({
+        line: lineNumber,
+        field: 'vazao_media',
+        code: IMPORT_ERROR_CODES.INVALID_DECIMAL_FORMAT,
+        message: 'Vazão média excede o valor máximo permitido de 9999999.999 m³/s.',
+        rawValue: rawVazao,
+      });
     } else {
-      parsedVazao = num;
+      parsedVazao = Number(num.toFixed(3));
     }
   }
 
-  if (errors.length > 0) {
+  if (
+    errors.length > 0 ||
+    parsedLat === undefined ||
+    parsedLng === undefined ||
+    parsedDateIso === undefined ||
+    parsedDateUtc === undefined ||
+    parsedVazao === undefined
+  ) {
     return { valid: false, errors };
   }
 
   const validData: NascenteParsedData = {
-    latitude: parsedLat!,
-    longitude: parsedLng!,
+    latitude: parsedLat,
+    longitude: parsedLng,
     municipio: cleanedMunicipio,
     fonte: cleanedFonte,
     localidade: cleanedLocalidade,
-    dataCriacaoIso: parsedDateIso!,
-    dataCriacao: parsedDateUtc!,
-    vazaoMedia: parsedVazao!,
+    dataCriacaoIso: parsedDateIso,
+    dataCriacao: parsedDateUtc,
+    vazaoMedia: parsedVazao,
     unidadeVazao: UNIDADE_VAZAO_PADRAO,
   };
 
@@ -536,7 +566,6 @@ export function parseNascentesTxt(
 
   let headerFound = false;
   let headerValid = false;
-  let headerError: ImportRowError | undefined;
 
   const validRows: ValidTxtRow[] = [];
   const duplicateRows: DuplicateTxtRow[] = [];
@@ -563,7 +592,7 @@ export function parseNascentesTxt(
 
       if (!headerOutcome.valid) {
         headerValid = false;
-        headerError = headerOutcome.error;
+        const headerError = headerOutcome.error;
         allErrors.push(headerError);
         invalidRows.push({
           line: physicalLineNumber,
