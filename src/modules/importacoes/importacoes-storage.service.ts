@@ -120,7 +120,7 @@ export class ImportacaoStorageService implements IImportacaoStorageService {
           usuarioId: input.usuarioId,
           nomeArquivo: input.filename.slice(0, 255),
           caminhoPrivadoArquivo: uploadResult.pathname,
-          hashArquivo: uploadResult.hashSha256,
+          hashArquivo: hashArquivoSha256,
           status: StatusImportacao.VALIDANDO,
           totalLinhas: 0,
           totalValidas: 0,
