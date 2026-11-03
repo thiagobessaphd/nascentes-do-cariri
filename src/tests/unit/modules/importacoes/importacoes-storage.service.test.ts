@@ -561,4 +561,69 @@ describe('QA Unitário — Serviço de Armazenamento de Importações', () => {
       expect(mockPrisma.importacao.update).not.toHaveBeenCalled();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // 8. Validação de Isolamento e Acesso Público Negado
+  // ---------------------------------------------------------------------------
+  describe('Validação de Isolamento e Acesso Público Negado', () => {
+    it('deve instruir o storage driver com permissão privada obrigatória (isPrivate: true)', async () => {
+      const service = new ImportacaoStorageService({
+        storageDriver: memoryDriver,
+        prismaClient: mockPrisma,
+      });
+
+      const uploadSpy = vi.spyOn(memoryDriver, 'upload');
+
+      vi.mocked(mockPrisma.importacao.create).mockImplementation((args) => {
+        const data = args.data as {
+          usuarioId: number;
+          nomeArquivo: string;
+          caminhoPrivadoArquivo: string;
+          hashArquivo: string;
+          status: StatusImportacao;
+        };
+        return Promise.resolve({
+          id: 201,
+          usuarioId: data.usuarioId,
+          nomeArquivo: data.nomeArquivo,
+          caminhoPrivadoArquivo: data.caminhoPrivadoArquivo,
+          hashArquivo: data.hashArquivo,
+          status: data.status,
+          totalLinhas: 0,
+          totalValidas: 0,
+          totalInvalidas: 0,
+          totalDuplicadas: 0,
+          mensagemErro: null,
+          createdAt: new Date(),
+          concluidaAt: null,
+        }) as unknown as ReturnType<typeof mockPrisma.importacao.create>;
+      });
+
+      await service.storeOriginalFile({
+        filename: 'documento_privado.txt',
+        content: DEFAULT_BUFFER,
+        usuarioId: DEFAULT_USER_ID,
+      });
+
+      expect(uploadSpy).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.objectContaining({
+          isPrivate: true,
+        })
+      );
+    });
+
+    it('deve garantir que o caminho do storage é virtualizado e não expõe diretórios físicos do servidor', () => {
+      const pathname = generateUniqueImportacaoPathname('dados_sigilosos.txt');
+
+      // Deve estar sob o namespace virtualizado de importações
+      expect(pathname.startsWith('importacoes/')).toBe(true);
+      // Não pode conter referências a drivers Windows
+      expect(pathname).not.toMatch(/^[a-zA-Z]:\\/);
+      // Não pode conter raiz absoluta de sistemas Unix
+      expect(pathname).not.toMatch(/^\//);
+      // Não pode conter quebras de hierarquia
+      expect(pathname).not.toContain('..');
+    });
+  });
 });
