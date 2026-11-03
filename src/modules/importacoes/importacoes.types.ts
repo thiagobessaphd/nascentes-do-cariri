@@ -184,3 +184,69 @@ export interface ParseNascentesTxtOptions {
   readonly existingKeys?: ReadonlySet<string> | undefined;
 }
 
+// ============================================================================
+// CONTRATOS E TIPOS DE ARMAZENAMENTO E AUDITORIA
+// ============================================================================
+
+import { StatusImportacao } from '@prisma/client';
+import type { FileIntegrityResult, StorageDriver, StoragePayload } from '@/lib/storage';
+
+export { StatusImportacao };
+
+/**
+ * Parâmetros de entrada para o armazenamento do arquivo TXT original.
+ */
+export interface StoreOriginalFileInput {
+  readonly filename: string;
+  readonly content: StoragePayload;
+  readonly usuarioId: number;
+}
+
+/**
+ * Opções de configuração para o armazenamento do arquivo original.
+ */
+export interface StoreOriginalFileOptions {
+  readonly maxSizeBytes?: number | undefined;
+  readonly storageDriver?: StorageDriver | undefined;
+}
+
+/**
+ * Metadados imutáveis consolidados do arquivo original armazenado e registrado no banco.
+ */
+export interface StoredImportacaoFile {
+  readonly importacaoId: number;
+  readonly usuarioId: number;
+  readonly nomeArquivoOriginal: string;
+  readonly caminhoPrivadoArquivo: string;
+  readonly hashArquivoSha256: string;
+  readonly tamanhoBytes: number;
+  readonly storageUrl: string;
+  readonly status: StatusImportacao;
+  readonly createdAt: Date;
+}
+
+/**
+ * Resultado da recuperação e conferência de integridade do arquivo original.
+ */
+export interface RetrieveOriginalFileResult {
+  readonly importacaoId: number;
+  readonly nomeArquivo: string;
+  readonly caminhoPrivadoArquivo: string;
+  readonly hashArquivo: string;
+  readonly buffer: Buffer;
+  readonly integrity: FileIntegrityResult;
+}
+
+/**
+ * Interface de contrato do serviço de armazenamento de importações.
+ */
+export interface IImportacaoStorageService {
+  storeOriginalFile(
+    input: StoreOriginalFileInput,
+    options?: StoreOriginalFileOptions
+  ): Promise<StoredImportacaoFile>;
+  retrieveOriginalFile(caminhoPrivadoArquivo: string): Promise<Buffer>;
+  verifyStoredFileIntegrity(importacaoId: number): Promise<FileIntegrityResult>;
+  rollbackStoredFile(caminhoPrivadoArquivo: string, importacaoId?: number): Promise<void>;
+}
+
