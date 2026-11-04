@@ -5,4 +5,5 @@
 export * from './importacoes.types';
 export * from './txt-parser';
 export * from './importacoes-storage.service';
+export * from './file-validator';
 
