@@ -250,3 +250,53 @@ export interface IImportacaoStorageService {
   rollbackStoredFile(caminhoPrivadoArquivo: string, importacaoId?: number): Promise<void>;
 }
 
+// CONTRATOS DO SERVIÇO DE VALIDAÇÃO E PRÉVIA
+import type { UploadedFileEntry } from './file-validator';
+
+/**
+ * Parâmetros de entrada para o serviço orquestrador de validação e prévia.
+ */
+export interface ValidateAndPreviewImportacaoInput {
+  readonly files: readonly UploadedFileEntry[];
+  readonly usuarioId: number;
+}
+
+/**
+ * Opções de configuração para validação e prévia.
+ */
+export interface ValidateAndPreviewOptions {
+  readonly maxSizeBytes?: number | undefined;
+  readonly storageDriver?: StorageDriver | undefined;
+}
+
+/**
+ * DTO seguro de resposta da validação de importação para consumo administrativo.
+ *
+ * Omitindo estritamente caminhoPrivadoArquivo e storageUrl por design de segurança.
+ */
+export interface ImportacaoValidationResponseDto {
+  readonly importacaoId: number;
+  readonly nomeArquivo: string;
+  readonly hashSha256: string;
+  readonly tamanhoBytes: number;
+  readonly status: StatusImportacao;
+  readonly canConfirm: boolean;
+  readonly summary: TxtParseSummary;
+  readonly validRows: readonly ValidTxtRow[];
+  readonly duplicateRows: readonly DuplicateTxtRow[];
+  readonly invalidRows: readonly InvalidTxtRow[];
+  readonly allErrors: readonly ImportRowError[];
+  readonly createdAt: string;
+}
+
+/**
+ * Interface de contrato do serviço orquestrador de validação.
+ */
+export interface IImportacaoValidationService {
+  validateAndPreview(
+    input: ValidateAndPreviewImportacaoInput,
+    options?: ValidateAndPreviewOptions
+  ): Promise<ImportacaoValidationResponseDto>;
+}
+
+
