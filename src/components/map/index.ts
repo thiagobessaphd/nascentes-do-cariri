@@ -6,6 +6,9 @@
 export { default as LeafletMap } from './LeafletMap';
 export type { LeafletMapProps } from './LeafletMap';
 
+export { default as MapCounter } from './MapCounter';
+export type { MapCounterProps } from './MapCounter';
+
 export { default as MapFeedback } from './MapFeedback';
 export type { MapFeedbackProps } from './MapFeedback';
 

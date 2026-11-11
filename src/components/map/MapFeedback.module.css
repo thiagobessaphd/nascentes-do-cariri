@@ -53,6 +53,19 @@
 .feedbackEmpty {
   border-left-color: #0284c7;
   color: #0369a1;
+  width: fit-content;
+  max-width: min(720px, calc(100% - 32px));
+  padding: 8px 16px;
+  gap: 12px;
+}
+
+.feedbackEmpty .feedbackMessage {
+  white-space: nowrap;
+}
+
+.feedbackEmptyFiltered {
+  border-left-color: #0284c7;
+  color: #0369a1;
 }
 
 .feedbackLoadingIcon {
@@ -143,6 +156,39 @@
   outline-offset: 2px;
 }
 
+.feedbackClearButton {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.feedbackClearButton:hover {
+  background: #0369a1;
+}
+
+.feedbackClearButton:active {
+  background: #075985;
+  transform: scale(0.98);
+}
+
+.feedbackClearButton:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
 .feedbackDismissButton {
   display: inline-flex;
   align-items: center;
@@ -173,26 +219,68 @@
 /* Adaptações para Viewports Compactos / Mobile (<= 640px) */
 @media (max-width: 640px) {
   .feedbackLoading,
-  .feedbackError,
-  .feedbackEmpty {
+  .feedbackError {
     top: 112px;
     width: calc(100% - 32px);
-    max-width: 360px;
+    max-width: 380px;
     padding: 10px 14px;
     gap: 10px;
     font-size: 0.8125rem;
     margin: 0 16px;
+  }
+
+  .feedbackEmpty {
+    top: 108px;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    align-items: center;
+    gap: 8px 10px;
+    width: calc(100% - 32px);
+    max-width: 380px;
+    padding: 10px 14px;
+    font-size: 0.8125rem;
+    margin: 0 auto;
+  }
+
+  .feedbackEmpty .feedbackInfoIcon {
+    align-self: flex-start;
+  }
+
+  .feedbackEmpty .feedbackMessage {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .feedbackEmpty .feedbackClearButton {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 32px;
+    margin-left: 0;
+    justify-content: center;
+    font-size: 0.8125rem;
   }
 }
 
 /* Telas Ultra-Compactas (<= 380px) */
 @media (max-width: 380px) {
   .feedbackLoading,
-  .feedbackError,
-  .feedbackEmpty {
+  .feedbackError {
     width: calc(100% - 24px);
     padding: 8px 10px;
     margin: 0 12px;
+  }
+
+  .feedbackEmpty {
+    width: calc(100% - 24px);
+    max-width: 340px;
+    padding: 8px 10px;
+    font-size: 0.78125rem;
+    gap: 6px 8px;
+  }
+
+  .feedbackEmpty .feedbackClearButton {
+    height: 30px;
+    font-size: 0.75rem;
   }
 }
 

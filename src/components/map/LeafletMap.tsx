@@ -23,6 +23,7 @@ import {
   createNascentesMarkers,
   initMarkerClusterPlugin,
 } from './map-markers';
+import MapCounter from './MapCounter';
 import MapFeedback from './MapFeedback';
 import MapFilters from './MapFilters';
 import styles from './LeafletMap.module.css';
@@ -39,6 +40,7 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
   const [hasTileError, setHasTileError] = useState<boolean>(false);
+  const [initialTotal, setInitialTotal] = useState<number | undefined>(undefined);
 
   const [rawFilterState, setFilterState] = useState<MapFilterState>(() =>
     createInitialMapFilterState(params)
@@ -60,7 +62,14 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
     params
   );
 
+  const isFilterActive = hasActiveMapFilters(filterState);
+
   const { status, data, error, refetch } = useNascentesPublicas(effectiveParams);
+
+  // Armazena o total geral inicial de nascentes sem filtros para cálculo de proporção nos filtros
+  if (!isFilterActive && status === 'success' && data.length > 0 && initialTotal === undefined) {
+    setInitialTotal(data.length);
+  }
 
   // Armazena referências sincronizadas via effect para leitura segura em callbacks assíncronos
   const dataRef = useRef(data);
@@ -277,8 +286,6 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
     setFilterState(clearMapFilterState());
   };
 
-  const isFilterActive = hasActiveMapFilters(filterState);
-
   const containerClassName = className
     ? `${styles.mapContainer} ${className}`
     : styles.mapContainer;
@@ -303,7 +310,21 @@ export default function LeafletMap({ className, params }: LeafletMapProps) {
         onSearchInputChange={handleSearchInputChange}
         onClearFilters={handleClearFilters}
       />
-      <MapFeedback status={status} error={error} onRetry={refetch} />
+      <div className={styles.counterOverlay}>
+        <MapCounter
+          count={data.length}
+          total={initialTotal}
+          hasActiveFilters={isFilterActive}
+          isLoading={status === 'loading'}
+        />
+      </div>
+      <MapFeedback
+        status={status}
+        error={error}
+        onRetry={refetch}
+        hasActiveFilters={isFilterActive}
+        onClearFilters={handleClearFilters}
+      />
       {hasTileError && (
         <div
           className={styles.tileErrorBanner}
