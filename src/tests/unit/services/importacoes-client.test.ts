@@ -160,6 +160,17 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
       expect(empty.hasPreviousPage).toBe(false);
       expect(empty.hasNextPage).toBe(false);
     });
+
+    it('deve proteger contra entradas não finitas (NaN, Infinity) em page e pageSize', () => {
+      const nanPage = paginateSlice(mockList, Number.NaN, 50);
+      expect(nanPage.currentPage).toBe(1);
+      expect(nanPage.pageSize).toBe(50);
+      expect(nanPage.items).toHaveLength(50);
+
+      const infSize = paginateSlice(mockList, 1, Number.POSITIVE_INFINITY);
+      expect(infSize.pageSize).toBe(50);
+      expect(infSize.items).toHaveLength(50);
+    });
   });
 
   describe('derivePreviewState e canConfirmImportacao', () => {
@@ -266,6 +277,27 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
     it('canConfirmImportacao deve retornar falso para DTO nulo ou indefinido', () => {
       expect(canConfirmImportacao(null)).toBe(false);
       expect(canConfirmImportacao(undefined)).toBe(false);
+    });
+
+    it('deve bloquear confirmação (kind="invalid") se o servidor indicar canConfirm=false mesmo sem erros listados', () => {
+      const dtoDivergent = {
+        canConfirm: false,
+        summary: {
+          totalLinhas: 3,
+          totalValidas: 3,
+          totalInvalidas: 0,
+          totalDuplicadas: 0,
+        },
+        allErrors: [],
+      };
+
+      const classification = derivePreviewState(dtoDivergent);
+      expect(classification.kind).toBe('invalid');
+      expect(classification.canConfirm).toBe(false);
+      expect(classification.blockingReason).toContain(
+        'A confirmação deste lote foi bloqueada pela validação do servidor.'
+      );
+      expect(canConfirmImportacao(dtoDivergent)).toBe(false);
     });
   });
 });
@@ -433,5 +465,51 @@ describe('Cliente HTTP uploadAndValidateTxt (src/services/importacoes.client.ts)
     globalThis.fetch = vi.fn().mockRejectedValue(abortError);
 
     await expect(uploadAndValidateTxt(file)).rejects.toThrow('The operation was aborted');
+  });
+
+  it('deve bloquear envio fail-fast no cliente quando o arquivo exceder 5 MB', async () => {
+    const oversizedFile = new File(['a'], 'grande.txt', { type: 'text/plain' });
+    Object.defineProperty(oversizedFile, 'size', { value: 5 * 1024 * 1024 + 1 });
+
+    await expect(uploadAndValidateTxt(oversizedFile)).rejects.toThrow(
+      'O arquivo selecionado excede o limite máximo permitido (5 MB).'
+    );
+  });
+
+  it('deve rejeitar payload malformado da API que viole o contrato Zod (INVALID_SERVER_RESPONSE)', async () => {
+    const file = new File(['conteudo'], 'nascentes.txt', { type: 'text/plain' });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        importacaoId: 'invalido',
+        canConfirm: 'sim',
+      }),
+    });
+
+    try {
+      await uploadAndValidateTxt(file);
+      expect.unreachable('Deveria ter rejeitado resposta fora do contrato');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ImportacaoClientError);
+      const clientErr = err as ImportacaoClientError;
+      expect(clientErr.code).toBe('INVALID_SERVER_RESPONSE');
+      expect(clientErr.statusCode).toBe(200);
+    }
+  });
+
+  it('deve usar mensagem amigável padronizada em erros 500 quando a resposta não for JSON estruturado', async () => {
+    const file = new File(['conteudo'], 'nascentes.txt', { type: 'text/plain' });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error('HTML 500 Gateway Error')),
+    });
+
+    await expect(uploadAndValidateTxt(file)).rejects.toThrow(
+      'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.'
+    );
   });
 });
