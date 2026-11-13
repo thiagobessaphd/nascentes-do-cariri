@@ -51,21 +51,41 @@ const PROHIBITED_MIME_TYPES = new Set([
   'text/xml',
 ]);
 
+export interface ExtractUploadedFilesOptions {
+  readonly maxSizeBytes?: number | undefined;
+}
+
 /**
- * Extrai entradas de arquivo de um objeto FormData da Web API de forma padronizada e imutável.
+ * Extrai entradas de arquivo de um objeto FormData da Web API de forma padronizada e imutável,
+ * aplicando proteção antecipada contra uploads que excedam maxSizeBytes antes de materializar o buffer.
  */
 export async function extractUploadedFilesFromFormData(
-  formData: FormData
+  formData: FormData,
+  options?: ExtractUploadedFilesOptions
 ): Promise<readonly UploadedFileEntry[]> {
+  const maxBytes = options?.maxSizeBytes ?? env.MAX_UPLOAD_SIZE_BYTES;
   const fileEntries: UploadedFileEntry[] = [];
 
   for (const [, value] of formData.entries()) {
-    if (typeof value === 'object' && value !== null && 'arrayBuffer' in value) {
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'arrayBuffer' in value &&
+      typeof (value as { arrayBuffer?: unknown }).arrayBuffer === 'function'
+    ) {
       const file = value as File;
+      if (typeof file.size === 'number' && Number.isFinite(file.size) && file.size > maxBytes) {
+        throw new FileTooLargeError(file.size, maxBytes);
+      }
+
       const arrayBuffer = await file.arrayBuffer();
+      if (arrayBuffer.byteLength > maxBytes) {
+        throw new FileTooLargeError(arrayBuffer.byteLength, maxBytes);
+      }
+
       fileEntries.push({
         filename: file.name,
-        sizeBytes: file.size,
+        sizeBytes: arrayBuffer.byteLength,
         mimeType: file.type || undefined,
         content: Buffer.from(arrayBuffer),
       });
