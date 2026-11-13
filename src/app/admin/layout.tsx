@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
         <div className={styles.topBarContainer}>
           <span className={styles.topBarInstitution}>
             Universidade Federal do Cariri — UFCA
-          </span>
+          </span>   
 
           <div className={styles.topBarMeta}>
             <span className={styles.restrictedBadge}>
@@ -40,6 +40,36 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
               </svg>
               Administrativo • Mapa das Nascentes do Cariri
             </span>
+
+            <span className={styles.topBarDivider} aria-hidden="true">
+              |
+            </span>
+
+            <Link
+              href="/mapa"
+              className={styles.topBarMapLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Abrir Mapa Público Interativo em nova aba"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+                <line x1="8" y1="2" x2="8" y2="18" />
+                <line x1="16" y1="6" x2="16" y2="22" />
+              </svg>
+              <span>Ver Mapa Público</span>
+              <span className={styles.externalArrow} aria-hidden="true">
+                ↗
+              </span>
+            </Link>
           </div>
         </div>
       </div>
@@ -109,31 +139,39 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
 
             <div className={styles.navDivider} aria-hidden="true" />
 
-            <Link
-              href="/mapa"
-              className={styles.mapHighlightButton}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Abrir Mapa Público Interativo em nova aba"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
+            {/* Placeholder de Perfil do Usuário Administrativo */}
+            <div className={styles.userProfileArea} aria-label="Perfil do usuário conectado">
+              <div className={styles.userAvatar} aria-hidden="true">
+                TB
+              </div>
+
+              <div className={styles.userInfo}>
+                <span className={styles.userName}>Thiago Bessa</span>
+                <span className={styles.userEmail}>thiago.bessa@ufca.edu.br</span>
+              </div>
+
+              <button
+                type="button"
+                className={styles.logoutButton}
+                title="Encerrar sessão"
+                aria-label="Sair da conta administrativa"
               >
-                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-                <line x1="8" y1="2" x2="8" y2="18" />
-                <line x1="16" y1="6" x2="16" y2="22" />
-              </svg>
-              <span>Ver Mapa Público</span>
-              <span className={styles.externalArrow} aria-hidden="true">
-                ↗
-              </span>
-            </Link>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span className={styles.logoutLabel}>Sair</span>
+              </button>
+            </div>
           </nav>
         </div>
       </header>
