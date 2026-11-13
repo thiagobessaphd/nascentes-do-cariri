@@ -99,10 +99,13 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
       expect(formatFieldLabel(undefined)).toBe('Geral');
     });
 
-    it('deve converter códigos de erro em textos amigáveis', () => {
+    it('deve converter códigos de erro em textos amigáveis e nunca vazar UPPER_SNAKE_CASE', () => {
       expect(formatErrorCodeLabel('REQUIRED_FIELD_EMPTY')).toBe('Campo obrigatório vazio');
       expect(formatErrorCodeLabel('OUT_OF_BOUNDS_CARIRI')).toBe('Coordenada fora da macrorregião do Cariri');
+      expect(formatErrorCodeLabel('NEGATIVE_FLOW')).toBe('Vazão média negativa não permitida');
+      expect(formatErrorCodeLabel('INVALID_TEXT_LENGTH')).toBe('Tamanho do texto fora do limite permitido');
       expect(formatErrorCodeLabel('FILE_TOO_LARGE')).toBe('Arquivo excede o limite máximo permitido (5 MB)');
+      expect(formatErrorCodeLabel('UNKNOWN_INTERNAL_ERROR_CODE')).toBe('Inconsistência nos dados informados');
       expect(formatErrorCodeLabel(undefined)).toBe('Inconsistência de dados');
     });
 
@@ -159,8 +162,8 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
   });
 
   describe('derivePreviewState e canConfirmImportacao', () => {
-    it('deve classificar como "valid" quando o lote for aprovado com registros novos', () => {
-      const dto = {
+    it('deve classificar como "valid" com pluralização correta no singular e no plural', () => {
+      const dtoPlural = {
         canConfirm: true,
         summary: {
           totalLinhas: 10,
@@ -171,15 +174,33 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
         allErrors: [],
       };
 
-      const classification = derivePreviewState(dto);
-      expect(classification.kind).toBe('valid');
-      expect(classification.canConfirm).toBe(true);
-      expect(classification.message).toContain('8 nova(s) nascente(s) pronta(s)');
-      expect(canConfirmImportacao(dto)).toBe(true);
+      const classificationPlural = derivePreviewState(dtoPlural);
+      expect(classificationPlural.kind).toBe('valid');
+      expect(classificationPlural.canConfirm).toBe(true);
+      expect(classificationPlural.message).toBe(
+        'Arquivo validado com sucesso! 8 novas nascentes prontas para confirmação.'
+      );
+      expect(canConfirmImportacao(dtoPlural)).toBe(true);
+
+      const dtoSingular = {
+        canConfirm: true,
+        summary: {
+          totalLinhas: 1,
+          totalValidas: 1,
+          totalInvalidas: 0,
+          totalDuplicadas: 0,
+        },
+        allErrors: [],
+      };
+
+      const classificationSingular = derivePreviewState(dtoSingular);
+      expect(classificationSingular.message).toBe(
+        'Arquivo validado com sucesso! 1 nova nascente pronta para confirmação.'
+      );
     });
 
-    it('deve classificar como "invalid" quando houver erros impeditivos', () => {
-      const dto = {
+    it('deve classificar como "invalid" quando houver erros impeditivos com singular e plural corretos', () => {
+      const dtoPlural = {
         canConfirm: false,
         summary: {
           totalLinhas: 5,
@@ -193,12 +214,32 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
         ],
       };
 
-      const classification = derivePreviewState(dto);
-      expect(classification.kind).toBe('invalid');
-      expect(classification.canConfirm).toBe(false);
-      expect(classification.message).toContain('Foram encontrados 2 erro(s)');
-      expect(classification.blockingReason).toContain('Corrija os erros apontados');
-      expect(canConfirmImportacao(dto)).toBe(false);
+      const classificationPlural = derivePreviewState(dtoPlural);
+      expect(classificationPlural.kind).toBe('invalid');
+      expect(classificationPlural.canConfirm).toBe(false);
+      expect(classificationPlural.message).toBe(
+        'Validação concluída com falhas. Foram encontrados 2 erros que impedem a importação.'
+      );
+      expect(classificationPlural.blockingReason).toContain('Corrija os erros apontados');
+      expect(canConfirmImportacao(dtoPlural)).toBe(false);
+
+      const dtoSingular = {
+        canConfirm: false,
+        summary: {
+          totalLinhas: 2,
+          totalValidas: 1,
+          totalInvalidas: 1,
+          totalDuplicadas: 0,
+        },
+        allErrors: [
+          { line: 2, field: 'vazao_media' as const, code: 'NEGATIVE_FLOW' as const, message: 'Vazão negativa' },
+        ],
+      };
+
+      const classificationSingular = derivePreviewState(dtoSingular);
+      expect(classificationSingular.message).toBe(
+        'Validação concluída com falhas. Foi encontrado 1 erro que impede a importação.'
+      );
     });
 
     it('deve classificar como "empty" quando não houver registros válidos novos para importar (todas duplicadas)', () => {
@@ -217,7 +258,7 @@ describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.clien
       expect(classification.kind).toBe('empty');
       expect(classification.canConfirm).toBe(false);
       expect(classification.message).toBe('Nenhum novo registro disponível para inserção.');
-      expect(classification.blockingReason).toContain('Todas as 4 linha(s) do arquivo já estão cadastradas');
+      expect(classification.blockingReason).toContain('Todas as 4 linhas do arquivo já estão cadastradas');
       expect(canConfirmImportacao(dto)).toBe(false);
     });
 

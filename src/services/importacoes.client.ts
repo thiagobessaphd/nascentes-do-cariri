@@ -130,9 +130,14 @@ export function derivePreviewState(
 
   // 1. Caso possua erros impeditivos
   if (totalErros > 0 || dto.summary.totalInvalidas > 0) {
+    const errorMessage =
+      totalErros === 1
+        ? 'Validação concluída com falhas. Foi encontrado 1 erro que impede a importação.'
+        : `Validação concluída com falhas. Foram encontrados ${totalErros} erros que impedem a importação.`;
+
     return {
       kind: 'invalid',
-      message: `Validação concluída com falhas. Foram encontrados ${totalErros} erro(s) que impedem a importação.`,
+      message: errorMessage,
       canConfirm: false,
       blockingReason: 'O arquivo contém linhas ou cabeçalho inválidos. Corrija os erros apontados para prosseguir.',
     };
@@ -142,9 +147,11 @@ export function derivePreviewState(
   if (dto.summary.totalValidas === 0) {
     const totalDuplicadas = dto.summary.totalDuplicadas;
     const blockingReason =
-      totalDuplicadas > 0
-        ? `Todas as ${totalDuplicadas} linha(s) do arquivo já estão cadastradas na base de dados ou duplicadas internamente.`
-        : 'Nenhum registro de nascente válido foi encontrado no arquivo para importação.';
+      totalDuplicadas === 1
+        ? 'A única linha do arquivo já está cadastrada na base de dados ou duplicada internamente.'
+        : totalDuplicadas > 1
+          ? `Todas as ${totalDuplicadas} linhas do arquivo já estão cadastradas na base de dados ou duplicadas internamente.`
+          : 'Nenhum registro de nascente válido foi encontrado no arquivo para importação.';
 
     return {
       kind: 'empty',
@@ -155,9 +162,14 @@ export function derivePreviewState(
   }
 
   // 3. Caso válido com novos registros prontos para confirmação
+  const validMessage =
+    dto.summary.totalValidas === 1
+      ? 'Arquivo validado com sucesso! 1 nova nascente pronta para confirmação.'
+      : `Arquivo validado com sucesso! ${dto.summary.totalValidas} novas nascentes prontas para confirmação.`;
+
   return {
     kind: 'valid',
-    message: `Arquivo validado com sucesso! ${dto.summary.totalValidas} nova(s) nascente(s) pronta(s) para confirmação.`,
+    message: validMessage,
     canConfirm: true,
   };
 }
@@ -275,25 +287,30 @@ export function formatDuplicateReason(reason?: DuplicateReason | string | undefi
 }
 
 /**
- * Mapeamento de códigos semânticos de erro para títulos amigáveis.
+ * Mapeamento de códigos semânticos de erro para títulos amigáveis em português.
  */
 const ERROR_CODE_MAP: Readonly<Record<string, string>> = {
   REQUIRED_FIELD_EMPTY: 'Campo obrigatório vazio',
   INVALID_COORDINATE: 'Coordenada geográfica inválida',
   OUT_OF_BOUNDS_CARIRI: 'Coordenada fora da macrorregião do Cariri',
-  OUT_OF_BOUNDS_GLOBAL: 'Coordenada fora dos limites mundiais',
+  OUT_OF_BOUNDS_GLOBAL: 'Coordenada fora dos limites geográficos mundiais',
   INVALID_DECIMAL_FORMAT: 'Formato decimal inválido (utilize ponto)',
+  INVALID_TEXT_LENGTH: 'Tamanho do texto fora do limite permitido',
   INVALID_DATE_FORMAT: 'Formato de data inválido (esperado AAAA-MM-DD)',
   INVALID_CALENDAR_DATE: 'Data inexistente no calendário',
   FUTURE_DATE: 'Data de criação futura não permitida',
   INVALID_FLOW_RATE: 'Vazão média numérica inválida',
+  NEGATIVE_FLOW: 'Vazão média negativa não permitida',
   NEGATIVE_FLOW_RATE: 'Vazão média negativa não permitida',
+  DUPLICATE_ROW_INTERNAL: 'Registro duplicado no próprio arquivo',
+  DUPLICATE_ROW_DATABASE: 'Registro já cadastrado na base de dados',
   INVALID_COLUMN_COUNT: 'Quantidade incorreta de colunas',
   INVALID_HEADER: 'Cabeçalho ausente ou incompatível',
   INVALID_ENCODING: 'Codificação de texto incompatível (exige UTF-8)',
   INVALID_FILENAME: 'Extensão de arquivo não permitida (exige .txt)',
   EMPTY_FILE: 'Arquivo vazio',
   FILE_TOO_LARGE: 'Arquivo excede o limite máximo permitido (5 MB)',
+  BINARY_FILE_NOT_ALLOWED: 'Arquivo binário ou corrompido não permitido',
 };
 
 export function formatErrorCodeLabel(code?: string | undefined): string {
@@ -301,7 +318,17 @@ export function formatErrorCodeLabel(code?: string | undefined): string {
     return 'Inconsistência de dados';
   }
 
-  return ERROR_CODE_MAP[code] ?? code;
+  const mapped = ERROR_CODE_MAP[code];
+  if (mapped) {
+    return mapped;
+  }
+
+  // Fallback protetor: impede que códigos em UPPER_SNAKE_CASE vazem diretamente para a UI
+  if (/^[A-Z0-9_]+$/.test(code.trim())) {
+    return 'Inconsistência nos dados informados';
+  }
+
+  return code;
 }
 
 // PAGINAÇÃO EM MEMÓRIA O(1) PARA GRANDES VOLUMES DE DADOS
