@@ -16,6 +16,14 @@
   color: #1e293b;
 }
 
+/* Envoltório Fixo de Todo o Conjunto Superior (Barra + Filete + Header) */
+.headerWrapper {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  width: 100%;
+}
+
 /* Barra Institucional Superior Resumida */
 .institutionalTopBar {
   background-color: #261006;
@@ -114,10 +122,7 @@
 .adminHeader {
   background-color: #ffffff;
   border-bottom: 1px solid #d8dee9;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-  position: sticky;
-  top: 0;
-  z-index: 30;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
 }
 
 .headerContainer {
@@ -301,10 +306,18 @@
 }
 
 .userAvatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background-color: #331509;
+  background:
+    linear-gradient(#331509, #331509) padding-box,
+    conic-gradient(
+      #f17d42 0% 25%,
+      #f9c23c 25% 50%,
+      #7bc142 50% 75%,
+      #52c3d0 75% 100%
+    ) border-box;
+  border: 2px solid transparent;
   color: #ffffff;
   font-size: 0.71875rem;
   font-weight: 700;
@@ -313,7 +326,7 @@
   justify-content: center;
   letter-spacing: 0.04em;
   flex-shrink: 0;
-  border: 1px solid #4a2010;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
 .userInfo {
