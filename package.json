@@ -17,6 +17,7 @@
     "test:unit": "vitest run src/tests/unit",
     "test:integration": "vitest run src/tests/integration",
     "db:seed": "tsx prisma/seed.ts",
+    "auth:dev": "tsx scripts/dev-session.ts",
     "postinstall": "prisma skills sync || exit 0"
   },
   "prisma": {

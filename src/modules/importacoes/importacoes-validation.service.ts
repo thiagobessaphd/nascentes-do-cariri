@@ -140,7 +140,23 @@ export class ImportacaoValidationService implements IImportacaoValidationService
         canConfirm: parseResult.canConfirm,
       });
 
-      // 6. Retorna o DTO seguro para o administrador
+      // 6. Retorna o DTO seguro para o administrador (serializando datas para JSON explícito)
+      const serializedValidRows = parseResult.validRows.map((row) => ({
+        ...row,
+        data: {
+          ...row.data,
+          dataCriacao: row.data.dataCriacao.toISOString(),
+        },
+      }));
+
+      const serializedDuplicateRows = parseResult.duplicateRows.map((row) => ({
+        ...row,
+        data: {
+          ...row.data,
+          dataCriacao: row.data.dataCriacao.toISOString(),
+        },
+      }));
+
       return {
         importacaoId: updatedImportacao.id,
         nomeArquivo: updatedImportacao.nomeArquivo,
@@ -149,8 +165,8 @@ export class ImportacaoValidationService implements IImportacaoValidationService
         status: updatedImportacao.status,
         canConfirm: parseResult.canConfirm,
         summary: parseResult.summary,
-        validRows: parseResult.validRows,
-        duplicateRows: parseResult.duplicateRows,
+        validRows: serializedValidRows,
+        duplicateRows: serializedDuplicateRows,
         invalidRows: parseResult.invalidRows,
         allErrors: parseResult.allErrors,
         createdAt: updatedImportacao.createdAt.toISOString(),

@@ -1,0 +1,93 @@
+/**
+ * Nascentes do Cariri — Estilos da Tela de Erro (error.tsx) de Importações
+ */
+
+.container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+.card {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #b91c1c;
+  border-radius: 6px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.retryButton {
+  background-color: #0b4f6c;
+  color: #ffffff;
+  border: 1px solid #0b4f6c;
+  border-radius: 4px;
+  padding: 0.625rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.retryButton:hover {
+  background-color: #083d54;
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+.secondaryLink {
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  background-color: #ffffff;
+}
+
+.secondaryLink:hover {
+  background-color: #f8fafc;
+}
+
+.secondaryLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retryButton {
+    transition: none;
+  }
+}

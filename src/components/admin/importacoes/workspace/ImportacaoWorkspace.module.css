@@ -1,0 +1,179 @@
+/**
+ * Nascentes do Cariri — Estilos do Workspace de Validação e
+ */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Barra de Progresso do Fluxo Transacional (Stepper) */
+.stepperBar {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.stepperList {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.stepActive {
+  background-color: #f0f7fa;
+  border-color: #bce3f0;
+}
+
+.stepCompleted {
+  background-color: #f4fbf7;
+  border-color: #c6f6d5;
+}
+
+.stepBlocked {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.stepPending {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  opacity: 0.75;
+}
+
+.stepBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepActive .stepBadge {
+  background-color: #0b4f6c;
+  color: #ffffff;
+}
+
+.stepCompleted .stepBadge {
+  background-color: #166534;
+  color: #ffffff;
+}
+
+.stepBlocked .stepBadge {
+  background-color: #b91c1c;
+  color: #ffffff;
+}
+
+.stepPending .stepBadge {
+  background-color: #cbd5e1;
+  color: #334155;
+}
+
+.stepTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.stepSubtitle {
+  font-size: 0.71875rem;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.previewLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.previewLayout:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.noticeBox {
+  background-color: #f4fbf7;
+  border: 1px solid #86efac;
+  border-left: 4px solid #166534;
+  color: #14532d;
+  border-radius: 6px;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.errorBox {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  color: #7f1d1d;
+  border-radius: 6px;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+@media (max-width: 860px) {
+  .stepperList {
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepItem {
+    transition: none;
+  }
+
+  .previewLayout {
+    animation: none;
+  }
+}
