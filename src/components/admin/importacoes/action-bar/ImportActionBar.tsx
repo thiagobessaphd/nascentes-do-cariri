@@ -10,6 +10,7 @@ import styles from './ImportActionBar.module.css';
 export interface ImportActionBarProps {
   readonly canConfirm: boolean;
   readonly totalValidas: number;
+  readonly totalInvalidas?: number | undefined;
   readonly blockingReason?: string | undefined;
   readonly isConfirming?: boolean | undefined;
   readonly onConfirm: () => void;
@@ -19,11 +20,13 @@ export interface ImportActionBarProps {
 export default function ImportActionBar({
   canConfirm,
   totalValidas,
+  totalInvalidas = 0,
   blockingReason,
   isConfirming = false,
   onConfirm,
   onCancel,
 }: ImportActionBarProps) {
+  const hasBlockingErrors = totalInvalidas > 0;
   const confirmButtonLabel =
     totalValidas > 0
       ? `Confirmar e Adicionar ${totalValidas} ${totalValidas === 1 ? 'Nascente' : 'Nascentes'}`
@@ -67,15 +70,31 @@ export default function ImportActionBar({
           type="button"
           onClick={onCancel}
           disabled={isConfirming}
-          className={styles.cancelButton}
-          aria-label="Cancelar prévia e enviar outro arquivo"
+          className={hasBlockingErrors ? styles.retryButton : styles.cancelButton}
+          aria-label={
+            hasBlockingErrors
+              ? 'Enviar arquivo corrigido para nova validação'
+              : 'Cancelar prévia e enviar outro arquivo'
+          }
           data-testid="import-cancel-button"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-          <span>Cancelar / Enviar outro</span>
+          {hasBlockingErrors ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>Enviar Arquivo Corrigido</span>
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              <span>Cancelar / Enviar outro</span>
+            </>
+          )}
         </button>
 
         <button

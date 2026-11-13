@@ -173,7 +173,22 @@
   color: #64748b;
 }
 
-/* Card Sucesso: Novas Válidas */
+/* Card Neutro Inativo (Quando valor = 0 em Novas, Duplicadas ou Erros) */
+.cardNeutral {
+  border-top: 3px solid #cbd5e1;
+  background-color: #f8fafc;
+}
+.cardNeutral .cardTitle {
+  color: #64748b;
+}
+.cardNeutral .cardValue {
+  color: #475569;
+}
+.cardNeutral .cardFooter {
+  color: #64748b;
+}
+
+/* Card Sucesso: Novas Válidas (> 0) */
 .cardValid {
   border-top: 3px solid #166534;
 }
@@ -184,7 +199,7 @@
   color: #15803d;
 }
 
-/* Card Alerta: Duplicadas */
+/* Card Alerta: Duplicadas (> 0) */
 .cardDuplicate {
   border-top: 3px solid #b45309;
 }
@@ -195,7 +210,7 @@
   color: #b45309;
 }
 
-/* Card Erro: Linhas Inválidas */
+/* Card Erro: Linhas Inválidas (> 0) */
 .cardInvalid {
   border-top: 3px solid #b91c1c;
 }

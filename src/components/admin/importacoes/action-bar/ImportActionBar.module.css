@@ -7,16 +7,13 @@
   border: 1px solid #d8dee9;
   border-top: 3px solid #331509;
   border-radius: 6px;
-  padding: 1.125rem 1.75rem;
+  padding: 1.25rem 1.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-  position: sticky;
-  bottom: 1rem;
-  z-index: 10;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .statusMessageArea {
@@ -87,6 +84,40 @@
 }
 
 .cancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.retryButton {
+  background-color: #0b4f6c;
+  border: 1px solid #083b52;
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 0.625rem 1.375rem;
+  font-size: 0.84375rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(11, 79, 108, 0.18);
+}
+
+.retryButton:hover:not(:disabled) {
+  background-color: #083b52;
+  border-color: #062c3e;
+  box-shadow: 0 2px 5px rgba(11, 79, 108, 0.28);
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+.retryButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

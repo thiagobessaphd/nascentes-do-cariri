@@ -35,6 +35,9 @@ export default function ImportErrorsList({
   }
 
   const pagination = paginateSlice(errors, currentPage, pageSize);
+  const startItem =
+    pagination.totalItems === 0 ? 0 : (pagination.currentPage - 1) * pagination.pageSize + 1;
+  const endItem = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems);
 
   return (
     <section
@@ -111,8 +114,11 @@ export default function ImportErrorsList({
       {pagination.totalPages > 1 && (
         <div className={styles.pagination} aria-label="Navegação da lista de erros">
           <span className={styles.paginationInfo}>
-            Exibindo página <strong>{pagination.currentPage}</strong> de{' '}
-            <strong>{pagination.totalPages}</strong> ({pagination.totalItems} erros no total)
+            Exibindo <strong>{startItem}–{endItem}</strong> de{' '}
+            <strong>{pagination.totalItems}</strong>{' '}
+            {pagination.totalItems === 1 ? 'erro' : 'erros'} (Página{' '}
+            <strong>{pagination.currentPage}</strong> de{' '}
+            <strong>{pagination.totalPages}</strong>)
           </span>
 
           <div className={styles.paginationButtons}>

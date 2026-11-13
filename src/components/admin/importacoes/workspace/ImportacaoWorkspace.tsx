@@ -43,6 +43,7 @@ export default function ImportacaoWorkspace({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewDto, setPreviewDto] = useState<ImportacaoValidationResponseDto | null>(null);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
 
   const errorsSectionRef = useRef<HTMLDivElement>(null);
@@ -65,6 +66,7 @@ export default function ImportacaoWorkspace({
   async function handleValidateFile(file: File) {
     setIsValidating(true);
     setValidationError(null);
+    setIsConfirmed(false);
     setConfirmationNotice(null);
     setCurrentFile(file);
 
@@ -85,6 +87,7 @@ export default function ImportacaoWorkspace({
     setPreviewDto(null);
     setCurrentFile(null);
     setValidationError(null);
+    setIsConfirmed(false);
     setConfirmationNotice(null);
   }
 
@@ -95,28 +98,44 @@ export default function ImportacaoWorkspace({
       setIsConfirming(true);
       try {
         await onConfirmImportacao(previewDto);
+        setIsConfirmed(true);
       } finally {
         setIsConfirming(false);
       }
     } else {
+      const totalValidas = previewDto.summary.totalValidas;
+      const validasLabel = totalValidas === 1 ? '1 nascente' : `${totalValidas} nascentes`;
+      setIsConfirmed(true);
       setConfirmationNotice(
-        `Lote de ${previewDto.summary.totalValidas} nascente(s) validado com sucesso! A confirmação transacional e gravação definitiva no banco será concluída na US-13.`
+        `Lote de ${validasLabel} validado com sucesso! A confirmação transacional e gravação definitiva no banco será concluída na US-13.`
       );
     }
   }
 
   const isPreviewStage = previewDto !== null;
+  const hasPreviewErrors =
+    isPreviewStage && (previewDto.allErrors.length > 0 || previewDto.summary.totalInvalidas > 0);
+  const hasHeaderError =
+    isPreviewStage &&
+    previewDto.allErrors.some(
+      (err) => err.field === 'cabecalho' || err.code === 'INVALID_HEADER'
+    );
+
   const step1Class = isPreviewStage ? styles.stepCompleted : styles.stepActive;
-  const step2Class = isPreviewStage
-    ? previewDto.allErrors.length > 0
+  const step2Class = !isPreviewStage
+    ? styles.stepPending
+    : hasPreviewErrors
       ? styles.stepBlocked
-      : styles.stepActive
-    : styles.stepPending;
+      : isConfirmed
+        ? styles.stepCompleted
+        : styles.stepActive;
   const step3Class = !isPreviewStage
     ? styles.stepPending
-    : canConfirm
+    : isConfirmed
       ? styles.stepCompleted
-      : styles.stepBlocked;
+      : hasPreviewErrors
+        ? styles.stepBlocked
+        : styles.stepPending;
 
   return (
     <div className={styles.workspace} data-testid="importacao-workspace">
@@ -140,35 +159,42 @@ export default function ImportacaoWorkspace({
 
           <li
             className={`${styles.stepItem} ${step2Class}`}
-            aria-current={isPreviewStage ? 'step' : undefined}
+            aria-current={isPreviewStage && !isConfirmed ? 'step' : undefined}
           >
             <span className={styles.stepBadge} aria-hidden="true">
-              2
+              {isConfirmed ? '✓' : '2'}
             </span>
             <div className={styles.stepTextGroup}>
               <span className={styles.stepTitle}>2. Auditoria de Prévia e Parecer</span>
               <span className={styles.stepSubtitle}>
                 {!isPreviewStage
                   ? 'Aguardando processamento do lote'
-                  : previewDto.allErrors.length > 0
-                    ? `${previewDto.allErrors.length} inconsistência(s) detectada(s)`
+                  : hasPreviewErrors
+                    ? previewDto.allErrors.length === 1
+                      ? '1 inconsistência detectada'
+                      : `${previewDto.allErrors.length} inconsistências detectadas`
                     : 'Diagnóstico estrutural concluído'}
               </span>
             </div>
           </li>
 
-          <li className={`${styles.stepItem} ${step3Class}`}>
+          <li
+            className={`${styles.stepItem} ${step3Class}`}
+            aria-current={isConfirmed ? 'step' : undefined}
+          >
             <span className={styles.stepBadge} aria-hidden="true">
-              3
+              {isConfirmed ? '✓' : '3'}
             </span>
             <div className={styles.stepTextGroup}>
               <span className={styles.stepTitle}>3. Homologação Transacional</span>
               <span className={styles.stepSubtitle}>
                 {!isPreviewStage
                   ? 'Requer 100% de conformidade'
-                  : canConfirm
-                    ? 'Habilitada para gravação atômica'
-                    : 'Bloqueada até correção do arquivo'}
+                  : isConfirmed
+                    ? 'Homologação concluída com sucesso'
+                    : canConfirm
+                      ? 'Aguardando sua confirmação final'
+                      : 'Bloqueada até correção do arquivo'}
               </span>
             </div>
           </li>
@@ -205,6 +231,7 @@ export default function ImportacaoWorkspace({
             fileSize={previewDto.tamanhoBytes || currentFile?.size}
             hashSha256={previewDto.hashSha256}
             classification={classification}
+            hasHeaderError={hasHeaderError}
           />
 
           {/* Tabela de Erros de Validação (em primeiro plano caso haja erros) */}
@@ -213,16 +240,19 @@ export default function ImportacaoWorkspace({
             containerRef={errorsSectionRef}
           />
 
-          {/* Tabela de Prévia dos Registros Válidos e Duplicados */}
-          <ImportPreviewTable
-            validRows={previewDto.validRows}
-            duplicateRows={previewDto.duplicateRows}
-          />
+          {/* Tabela de Prévia dos Registros Válidos e Duplicados (oculta em falhas totais) */}
+          {(previewDto.summary.totalValidas > 0 || previewDto.summary.totalDuplicadas > 0) && (
+            <ImportPreviewTable
+              validRows={previewDto.validRows}
+              duplicateRows={previewDto.duplicateRows}
+            />
+          )}
 
-          {/* Barra de Ações Fixa (Confirmar / Cancelar) */}
+          {/* Barra de Ações no Fluxo do Documento (Confirmar / Cancelar ou Enviar Corrigido) */}
           <ImportActionBar
             canConfirm={canConfirm}
             totalValidas={previewDto.summary.totalValidas}
+            totalInvalidas={previewDto.summary.totalInvalidas || previewDto.allErrors.length}
             blockingReason={classification.blockingReason}
             isConfirming={isConfirming}
             onConfirm={handleConfirm}

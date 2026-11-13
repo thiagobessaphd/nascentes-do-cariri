@@ -147,10 +147,11 @@
   border-radius: 3px;
   border: 1px solid #cbd5e1;
   display: inline-block;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 360px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .pagination {

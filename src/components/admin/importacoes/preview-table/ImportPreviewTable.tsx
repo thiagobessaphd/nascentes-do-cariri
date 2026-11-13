@@ -82,6 +82,9 @@ export default function ImportPreviewTable({
 
   // Paginação determinística O(1)
   const pagination = paginateSlice(filteredRows, currentPage, pageSize);
+  const startItem =
+    pagination.totalItems === 0 ? 0 : (pagination.currentPage - 1) * pagination.pageSize + 1;
+  const endItem = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems);
 
   function handleTabChange(tab: FilterTab) {
     setActiveTab(tab);
@@ -193,7 +196,7 @@ export default function ImportPreviewTable({
                     </td>
                     <td className={styles.fonteText}>{row.data.fonte}</td>
                     <td className={styles.locationText}>
-                      <strong>{row.data.municipio}</strong> — {row.data.localidade}
+                      <strong>{row.data.municipio}</strong> - {row.data.localidade}
                     </td>
                     <td className={styles.tabularNum}>
                       {formatCoordinates(row.data.latitude, row.data.longitude)}
@@ -213,33 +216,38 @@ export default function ImportPreviewTable({
       )}
 
       {/* Paginação */}
-      {pagination.totalPages > 1 && (
+      {filteredRows.length > 0 && (
         <div className={styles.pagination} aria-label="Navegação da tabela de prévia">
           <span className={styles.paginationInfo}>
-            Exibindo página <strong>{pagination.currentPage}</strong> de{' '}
-            <strong>{pagination.totalPages}</strong> ({pagination.totalItems} registros)
+            Exibindo <strong>{startItem}–{endItem}</strong> de{' '}
+            <strong>{pagination.totalItems}</strong>{' '}
+            {pagination.totalItems === 1 ? 'registro' : 'registros'} (Página{' '}
+            <strong>{pagination.currentPage}</strong> de{' '}
+            <strong>{pagination.totalPages}</strong>)
           </span>
 
-          <div className={styles.paginationButtons}>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={!pagination.hasPreviousPage}
-              className={styles.pageButton}
-              aria-label="Página anterior da prévia"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
-              disabled={!pagination.hasNextPage}
-              className={styles.pageButton}
-              aria-label="Próxima página da prévia"
-            >
-              Próxima
-            </button>
-          </div>
+          {pagination.totalPages > 1 && (
+            <div className={styles.paginationButtons}>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={!pagination.hasPreviousPage}
+                className={styles.pageButton}
+                aria-label="Página anterior da prévia"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+                disabled={!pagination.hasNextPage}
+                className={styles.pageButton}
+                aria-label="Próxima página da prévia"
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>
