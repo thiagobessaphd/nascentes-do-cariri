@@ -5,17 +5,20 @@
  * exclusivos de infraestrutura servidor (Prisma, drivers de storage e serviços).
  */
 
-import { StatusImportacao } from '@prisma/client';
+import { Prisma, StatusImportacao, type PrismaClient } from '@prisma/client';
+import { z } from 'zod';
 import type { FileIntegrityResult, StorageDriver, StoragePayload } from '@/lib/storage';
 import type { UploadedFileEntry } from './file-validator';
-import type { ImportacaoValidationResponseDto } from './importacoes.contracts';
+import type {
+  ImportacaoConfirmResponseDto,
+  ImportacaoValidationResponseDto,
+} from './importacoes.contracts';
 
 export * from './importacoes.contracts';
 export { StatusImportacao };
 
-// ============================================================================
+
 // CONTRATOS E TIPOS DE ARMAZENAMENTO, AUDITORIA E ORQUESTRAÇÃO (SERVER-ONLY)
-// ============================================================================
 
 /**
  * Parâmetros de entrada para o armazenamento do arquivo TXT original.
@@ -62,6 +65,13 @@ export interface RetrieveOriginalFileResult {
 }
 
 /**
+ * Opções de driver de storage para operações sobre arquivos já armazenados.
+ */
+export interface StorageDriverOperationOptions {
+  readonly storageDriver?: StorageDriver | undefined;
+}
+
+/**
  * Interface de contrato do serviço de armazenamento de importações.
  */
 export interface IImportacaoStorageService {
@@ -69,9 +79,19 @@ export interface IImportacaoStorageService {
     input: StoreOriginalFileInput,
     options?: StoreOriginalFileOptions
   ): Promise<StoredImportacaoFile>;
-  retrieveOriginalFile(caminhoPrivadoArquivo: string): Promise<Buffer>;
-  verifyStoredFileIntegrity(importacaoId: number): Promise<FileIntegrityResult>;
-  rollbackStoredFile(caminhoPrivadoArquivo: string, importacaoId?: number): Promise<void>;
+  retrieveOriginalFile(
+    caminhoPrivadoArquivo: string,
+    options?: StorageDriverOperationOptions
+  ): Promise<Buffer>;
+  verifyStoredFileIntegrity(
+    importacaoId: number,
+    options?: StorageDriverOperationOptions
+  ): Promise<FileIntegrityResult>;
+  rollbackStoredFile(
+    caminhoPrivadoArquivo: string,
+    importacaoId?: number,
+    options?: StorageDriverOperationOptions
+  ): Promise<void>;
 }
 
 /**

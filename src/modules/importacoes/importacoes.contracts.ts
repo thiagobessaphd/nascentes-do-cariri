@@ -105,10 +105,10 @@ export interface NascenteParsedData {
   readonly municipio: string;
   readonly fonte: string;
   readonly localidade: string;
-  readonly dataCriacaoIso: string; // Formato canônico AAAA-MM-DD
-  readonly dataCriacao: Date; // Instância UTC 00:00:00.000Z
-  readonly vazaoMedia: number; // Numérico >= 0
-  readonly unidadeVazao: UnidadeVazao; // Sempre 'm³/s'
+  readonly dataCriacaoIso: string;
+  readonly dataCriacao: Date;
+  readonly vazaoMedia: number;
+  readonly unidadeVazao: UnidadeVazao;
 }
 
 /**
@@ -245,4 +245,51 @@ export interface ImportacaoValidationResponseDto {
   readonly invalidRows: readonly InvalidTxtRow[];
   readonly allErrors: readonly ImportRowError[];
   readonly createdAt: string;
+}
+
+/**
+ * Status único elegível para disparar a confirmação transacional de uma importação.
+ */
+export const CONFIRMABLE_IMPORTACAO_STATUS =
+  'AGUARDANDO_CONFIRMACAO' satisfies ImportacaoStatus;
+
+/**
+ * Códigos de erro semânticos e rastreáveis da etapa de confirmação transacional.
+ */
+export const IMPORTACAO_COMMIT_ERROR_CODES = {
+  INVALID_IMPORTACAO_INPUT: 'INVALID_IMPORTACAO_INPUT',
+  IMPORTACAO_NOT_FOUND: 'IMPORTACAO_NOT_FOUND',
+  INVALID_IMPORTACAO_STATE: 'INVALID_IMPORTACAO_STATE',
+  IMPORTACAO_ALREADY_PROCESSED: 'IMPORTACAO_ALREADY_PROCESSED',
+  FILE_INTEGRITY_ERROR: 'FILE_INTEGRITY_ERROR',
+  INVALID_IMPORTACAO_CONTENT: 'INVALID_IMPORTACAO_CONTENT',
+  TRANSACTION_FAILED: 'TRANSACTION_FAILED',
+} as const;
+
+export type ImportacaoCommitErrorCode =
+  (typeof IMPORTACAO_COMMIT_ERROR_CODES)[keyof typeof IMPORTACAO_COMMIT_ERROR_CODES];
+
+/**
+ * Resumo quantitativo consolidado após a persistência transacional da importação.
+ */
+export interface ImportacaoCommitSummary {
+  readonly totalLinhas: number;
+  readonly totalInseridas: number;
+  readonly totalDuplicadas: number;
+  readonly totalInvalidas: number;
+}
+
+/**
+ * DTO seguro de resposta da confirmação atômica de importação para consumo administrativo.
+ *
+ * Omite estritamente caminhoPrivadoArquivo e storageUrl por design de segurança.
+ */
+export interface ImportacaoConfirmResponseDto {
+  readonly importacaoId: number;
+  readonly nomeArquivo: string;
+  readonly hashSha256: string;
+  readonly status: Extract<ImportacaoStatus, 'CONCLUIDA'>;
+  readonly summary: ImportacaoCommitSummary;
+  readonly cacheInvalidated: boolean;
+  readonly concluidaAt: string;
 }
