@@ -172,3 +172,15 @@
     transform: rotate(360deg);
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .cancelButton,
+  .retryButton,
+  .confirmButton {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}

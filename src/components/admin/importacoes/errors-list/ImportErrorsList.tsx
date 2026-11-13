@@ -9,7 +9,7 @@
  */
 
 import { useState, type RefObject } from 'react';
-import type { ImportRowError } from '@/modules/importacoes/importacoes.types';
+import type { ImportRowError } from '@/modules/importacoes/importacoes.contracts';
 import {
   formatErrorCodeLabel,
   formatFieldLabel,
@@ -19,7 +19,7 @@ import styles from './ImportErrorsList.module.css';
 
 export interface ImportErrorsListProps {
   readonly errors: readonly ImportRowError[];
-  readonly containerRef?: RefObject<HTMLDivElement | null> | undefined;
+  readonly containerRef?: RefObject<HTMLElement | null> | undefined;
   readonly pageSize?: number | undefined;
 }
 
@@ -28,7 +28,13 @@ export default function ImportErrorsList({
   containerRef,
   pageSize = 25,
 }: ImportErrorsListProps) {
+  const [prevErrors, setPrevErrors] = useState<readonly ImportRowError[]>(errors);
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  if (prevErrors !== errors) {
+    setPrevErrors(errors);
+    setCurrentPage(1);
+  }
 
   if (!errors || errors.length === 0) {
     return null;
@@ -43,19 +49,17 @@ export default function ImportErrorsList({
     <section
       ref={containerRef}
       className={styles.container}
-      role="alert"
-      aria-live="assertive"
       tabIndex={-1}
       aria-labelledby="errors-section-title"
       data-testid="import-errors-list"
     >
-      <div className={styles.header}>
+      <div className={styles.header} role="alert" aria-live="assertive">
         <div className={styles.titleArea}>
           <span className={styles.titleIcon} aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
+              <line x1="12" y1="16" x2="12.01" y2="16" strokeLinecap="round" />
             </svg>
           </span>
           <h2 id="errors-section-title" className={styles.title}>
@@ -73,6 +77,9 @@ export default function ImportErrorsList({
 
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
+          <caption className={styles.srOnly}>
+            Lista de inconsistências identificadas por linha e campo no arquivo enviado
+          </caption>
           <thead>
             <tr>
               <th scope="col">Linha</th>
@@ -101,7 +108,10 @@ export default function ImportErrorsList({
                         {err.rawValue}
                       </code>
                     ) : (
-                      <span style={{ color: '#94a3b8' }}>—</span>
+                      <span className={styles.emptyRawValue}>
+                        <span aria-hidden="true">—</span>
+                        <span className={styles.srOnly}>Não informado</span>
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -124,7 +134,7 @@ export default function ImportErrorsList({
           <div className={styles.paginationButtons}>
             <button
               type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage(Math.max(1, pagination.currentPage - 1))}
               disabled={!pagination.hasPreviousPage}
               className={styles.pageButton}
               aria-label="Página anterior de erros"
@@ -133,7 +143,9 @@ export default function ImportErrorsList({
             </button>
             <button
               type="button"
-              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(pagination.totalPages, pagination.currentPage + 1))
+              }
               disabled={!pagination.hasNextPage}
               className={styles.pageButton}
               aria-label="Próxima página de erros"

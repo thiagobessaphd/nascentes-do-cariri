@@ -359,20 +359,26 @@
   background: transparent;
   border: 1px solid #d8dee9;
   color: #64748b;
-  padding: 0.25rem 0.55rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 4px;
   font-size: 0.71875rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-height: 28px;
+  min-height: 44px;
+  min-width: 44px;
   margin-left: 0.25rem;
 }
 
-.logoutButton:hover {
+.logoutButton:not([aria-disabled='true']):hover {
   background-color: #fef2f2;
   border-color: #fca5a5;
   color: #b91c1c;
+}
+
+.logoutButton[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .logoutButton:focus-visible {
@@ -469,6 +475,25 @@
   line-height: 1.35;
 }
 
+@media (max-width: 1120px) {
+  .headerContainer {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .adminNav {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding-top: 0.625rem;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .navDivider {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   .topBarContainer {
     padding: 0.45rem 1rem;
@@ -485,8 +510,15 @@
   .adminNav {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
     padding-top: 0.5rem;
     border-top: 1px solid #f1f5f9;
+  }
+
+  .userProfileArea {
+    flex-wrap: wrap;
+    padding-left: 0;
   }
 
   .navDivider {
@@ -503,5 +535,15 @@
   .footerInfoArea {
     align-items: flex-start;
     text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topBarMapLink,
+  .systemTitleLink,
+  .navMenuLink,
+  .navMenuLinkActive,
+  .logoutButton {
+    transition: none;
   }
 }

@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import type { ImportacaoValidationResponseDto } from '@/modules/importacoes/importacoes.types';
+import type { ImportacaoValidationResponseDto } from '@/modules/importacoes/importacoes.contracts';
 import {
   canConfirmImportacao,
   derivePreviewState,
@@ -45,8 +45,14 @@ export default function ImportacaoWorkspace({
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
-  const errorsSectionRef = useRef<HTMLDivElement>(null);
+  const errorsSectionRef = useRef<HTMLElement>(null);
+  const previewLayoutRef = useRef<HTMLDivElement>(null);
+  const uploadSectionRef = useRef<HTMLElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isValidatingRef = useRef<boolean>(false);
+  const prevStageRef = useRef<'upload' | 'preview'>('upload');
 
   // Deriva o diagnóstico do DTO atual caso exista
   const classification: PreviewClassification | null = previewDto
@@ -55,50 +61,109 @@ export default function ImportacaoWorkspace({
 
   const canConfirm = previewDto ? canConfirmImportacao(previewDto) : false;
 
-  // Gerenciamento de foco programático para tecnologias assistivas ao detectar erros
+  // Cancela requisição em voo caso o componente seja desmontado
   useEffect(() => {
-    if (previewDto && previewDto.allErrors.length > 0) {
-      errorsSectionRef.current?.focus();
-      errorsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Gerenciamento de foco programático nas transições de etapa
+  useEffect(() => {
+    const currentStage = previewDto ? 'preview' : 'upload';
+    const prevStage = prevStageRef.current;
+    prevStageRef.current = currentStage;
+
+    if (previewDto) {
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (previewDto.allErrors.length > 0) {
+        errorsSectionRef.current?.focus();
+        errorsSectionRef.current?.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'start',
+        });
+      } else {
+        previewLayoutRef.current?.focus();
+      }
+      return;
+    }
+
+    if (prevStage === 'preview') {
+      uploadSectionRef.current?.focus();
     }
   }, [previewDto]);
 
   async function handleValidateFile(file: File) {
+    if (isValidatingRef.current) return;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    isValidatingRef.current = true;
+
     setIsValidating(true);
     setValidationError(null);
     setIsConfirmed(false);
     setConfirmationNotice(null);
+    setConfirmationError(null);
     setCurrentFile(file);
 
     try {
-      const dto = await uploadAndValidateTxt(file, { authToken });
+      const dto = await uploadAndValidateTxt(file, {
+        authToken,
+        signal: controller.signal,
+      });
       setPreviewDto(dto);
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
       setPreviewDto(null);
       const message =
         err instanceof Error ? err.message : 'Falha inesperada ao validar o arquivo no servidor.';
       setValidationError(message);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      isValidatingRef.current = false;
       setIsValidating(false);
     }
   }
 
   function handleCancelPreview() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    isValidatingRef.current = false;
+    setIsValidating(false);
     setPreviewDto(null);
     setCurrentFile(null);
     setValidationError(null);
     setIsConfirmed(false);
     setConfirmationNotice(null);
+    setConfirmationError(null);
   }
 
   async function handleConfirm() {
-    if (!previewDto || !canConfirm || isConfirming) return;
+    if (!previewDto || !canConfirm || isConfirming || isConfirmed) return;
+
+    setConfirmationError(null);
 
     if (onConfirmImportacao) {
       setIsConfirming(true);
       try {
         await onConfirmImportacao(previewDto);
         setIsConfirmed(true);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Falha inesperada ao confirmar a importação no banco de dados.';
+        setConfirmationError(message);
       } finally {
         setIsConfirming(false);
       }
@@ -107,7 +172,7 @@ export default function ImportacaoWorkspace({
       const validasLabel = totalValidas === 1 ? '1 nascente' : `${totalValidas} nascentes`;
       setIsConfirmed(true);
       setConfirmationNotice(
-        `Lote de ${validasLabel} validado com sucesso! A confirmação transacional e gravação definitiva no banco será concluída na US-13.`
+        `Lote de ${validasLabel} conferido com sucesso! Nenhuma alteração foi gravada no banco porque a etapa de persistência definitiva ainda será conectada.`
       );
     }
   }
@@ -194,7 +259,9 @@ export default function ImportacaoWorkspace({
                     ? 'Homologação concluída com sucesso'
                     : canConfirm
                       ? 'Aguardando sua confirmação final'
-                      : 'Bloqueada até correção do arquivo'}
+                      : hasPreviewErrors
+                        ? 'Bloqueada até correção do arquivo'
+                        : 'Sem novos registros para integrar'}
               </span>
             </div>
           </li>
@@ -207,12 +274,31 @@ export default function ImportacaoWorkspace({
           onValidate={handleValidateFile}
           isValidating={isValidating}
           error={validationError}
+          onClearError={() => setValidationError(null)}
+          containerRef={uploadSectionRef}
         />
       )}
 
       {/* 2. Visualização Completa da Prévia Diagnosticada */}
       {previewDto && classification && (
-        <div className={styles.previewLayout} data-testid="preview-layout">
+        <div
+          ref={previewLayoutRef}
+          tabIndex={-1}
+          className={styles.previewLayout}
+          data-testid="preview-layout"
+        >
+          {/* Feedback de Erro na Confirmação */}
+          {confirmationError && (
+            <div className={styles.errorBox} role="alert" aria-live="assertive">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" strokeLinecap="round" />
+              </svg>
+              <span>{confirmationError}</span>
+            </div>
+          )}
+
           {/* Feedback de Confirmação quando acionado */}
           {confirmationNotice && (
             <div className={styles.noticeBox} role="status" aria-live="polite">
@@ -252,9 +338,14 @@ export default function ImportacaoWorkspace({
           <ImportActionBar
             canConfirm={canConfirm}
             totalValidas={previewDto.summary.totalValidas}
-            totalInvalidas={previewDto.summary.totalInvalidas || previewDto.allErrors.length}
+            totalInvalidas={
+              previewDto.summary.totalInvalidas > 0
+                ? previewDto.summary.totalInvalidas
+                : previewDto.allErrors.length
+            }
             blockingReason={classification.blockingReason}
             isConfirming={isConfirming}
+            isConfirmed={isConfirmed}
             onConfirm={handleConfirm}
             onCancel={handleCancelPreview}
           />

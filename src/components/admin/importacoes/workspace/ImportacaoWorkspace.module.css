@@ -118,6 +118,10 @@
   animation: fadeIn 0.2s ease-out;
 }
 
+.previewLayout:focus:not(:focus-visible) {
+  outline: none;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -143,9 +147,33 @@
   gap: 0.625rem;
 }
 
+.errorBox {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  color: #7f1d1d;
+  border-radius: 6px;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
 @media (max-width: 860px) {
   .stepperList {
     grid-template-columns: 1fr;
     gap: 0.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepItem {
+    transition: none;
+  }
+
+  .previewLayout {
+    animation: none;
   }
 }

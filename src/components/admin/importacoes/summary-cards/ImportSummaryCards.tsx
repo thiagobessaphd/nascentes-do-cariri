@@ -5,7 +5,7 @@
  * 4 cards quantitativos com formatação tabular e semântica acessível.
  */
 
-import type { TxtParseSummary } from '@/modules/importacoes/importacoes.types';
+import type { TxtParseSummary } from '@/modules/importacoes/importacoes.contracts';
 import type { PreviewClassification } from '@/services/importacoes.client';
 import { formatFileSizeBytes } from '@/services/importacoes.client';
 import styles from './ImportSummaryCards.module.css';
@@ -17,6 +17,45 @@ export interface ImportSummaryCardsProps {
   readonly hashSha256?: string | undefined;
   readonly classification: PreviewClassification;
   readonly hasHeaderError?: boolean | undefined;
+}
+
+function getBannerStyleClass(kind: PreviewClassification['kind']): string {
+  switch (kind) {
+    case 'valid':
+      return styles.bannerValid ?? '';
+    case 'invalid':
+      return styles.bannerInvalid ?? '';
+    case 'empty':
+      return styles.bannerEmpty ?? '';
+  }
+}
+
+function renderBannerIcon(kind: PreviewClassification['kind']) {
+  switch (kind) {
+    case 'valid':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+    case 'invalid':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" strokeLinecap="round" />
+        </svg>
+      );
+    case 'empty':
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" strokeLinecap="round" />
+        </svg>
+      );
+  }
 }
 
 export default function ImportSummaryCards({
@@ -37,59 +76,41 @@ export default function ImportSummaryCards({
   const hasInvalidas = summary.totalInvalidas > 0;
 
   return (
-    <section className={styles.container} aria-label="Resumo e diagnóstico da prévia de importação">
+    <section className={styles.container} aria-labelledby="summary-section-heading">
+      <h2 id="summary-section-heading" className={styles.srOnly}>
+        Resumo e Diagnóstico do Lote
+      </h2>
+
       {/* 1. Barra de Metadados do Arquivo */}
       <div className={styles.metadataBar} data-testid="summary-metadata-bar">
         <div className={styles.metadataGroup}>
           <span className={styles.metadataLabel}>Arquivo:</span>
           <span className={styles.metadataValue}>{fileName}</span>
           {fileSize !== undefined && (
-            <span>({formatFileSizeBytes(fileSize)})</span>
+            <span className={styles.tabularNum}>({formatFileSizeBytes(fileSize)})</span>
           )}
         </div>
 
         {shortHash && (
-          <div className={styles.metadataGroup} title={`Hash SHA-256: ${hashSha256}`}>
+          <div className={styles.metadataGroup}>
             <span className={styles.metadataLabel}>SHA-256:</span>
-            <span className={styles.hashTag}>{shortHash}</span>
+            <span className={styles.hashTag} title={`Hash SHA-256: ${hashSha256}`}>
+              {shortHash}
+            </span>
+            <span className={styles.srOnly}> (hash completo: {hashSha256})</span>
           </div>
         )}
       </div>
 
       {/* 2. Banner de Diagnóstico Acessível */}
       <div
-        className={`${styles.banner} ${
-          classification.kind === 'valid'
-            ? styles.bannerValid
-            : classification.kind === 'invalid'
-            ? styles.bannerInvalid
-            : styles.bannerEmpty
-        }`}
+        className={`${styles.banner} ${getBannerStyleClass(classification.kind)}`}
         role="status"
         aria-live="polite"
         data-testid={`diagnostic-banner-${classification.kind}`}
       >
         <span className={styles.bannerIcon} aria-hidden="true">
-          {classification.kind === 'valid' && (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          )}
-          {classification.kind === 'invalid' && (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          )}
-          {classification.kind === 'empty' && (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          )}
+          {renderBannerIcon(classification.kind)}
         </span>
 
         <div className={styles.bannerContent}>

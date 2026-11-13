@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -5,6 +6,13 @@ import logoUfcaSymbol from '@/assets/images/logo_ufca.png';
 import logoUfcaFull from '@/assets/images/logo_ufca-full.png';
 import logoCnpq from '@/assets/images/logo_cnpq.png';
 import styles from './admin-layout.module.css';
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export interface AdminLayoutProps {
   readonly children: ReactNode;
@@ -23,8 +31,8 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
         >
           <div className={styles.topBarContainer}>
             <span className={styles.topBarInstitution}>
-              Universidade Federal do Cariri  (UFCA)
-            </span>   
+              Universidade Federal do Cariri (UFCA)
+            </span>
 
             <div className={styles.topBarMeta}>
               <span className={styles.restrictedBadge}>
@@ -114,14 +122,14 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
             <nav aria-label="Navegação Administrativa" className={styles.adminNav}>
               <ul className={styles.navMenuList}>
                 <li className={styles.navMenuItem}>
-                  <Link href="/admin" className={styles.navMenuLink}>
+                  <a href="#pagina-futura" className={styles.navMenuLink}>
                     Visão Geral
-                  </Link>
+                  </a>
                 </li>
                 <li className={styles.navMenuItem}>
-                  <Link href="/admin/nascentes" className={styles.navMenuLink}>
+                  <a href="#pagina-futura" className={styles.navMenuLink}>
                     Nascentes
-                  </Link>
+                  </a>
                 </li>
                 <li className={styles.navMenuItem}>
                   <Link
@@ -133,9 +141,9 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
                   </Link>
                 </li>
                 <li className={styles.navMenuItem}>
-                  <Link href="/admin/historico" className={styles.navMenuLink}>
+                  <a href="#pagina-futura" className={styles.navMenuLink}>
                     Histórico de Lotes
-                  </Link>
+                  </a>
                 </li>
               </ul>
 
@@ -155,8 +163,9 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
                 <button
                   type="button"
                   className={styles.logoutButton}
-                  title="Encerrar sessão"
-                  aria-label="Sair da conta administrativa"
+                  aria-disabled="true"
+                  title="Encerramento de sessão será habilitado na Sprint 4"
+                  aria-label="Sair da conta administrativa (disponível na Sprint 4)"
                 >
                   <svg
                     width="15"
@@ -191,16 +200,16 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
             <Image
               src={logoUfcaFull}
               alt="Logotipo da Universidade Federal do Cariri (UFCA)"
-              width={72}
-              height={72}
+              width={116}
+              height={116}
               className={styles.footerLogoImg}
             />
             <div className={styles.footerLogoDivider} aria-hidden="true" />
             <Image
               src={logoCnpq}
               alt="Logotipo do CNPq — Conselho Nacional de Desenvolvimento Científico e Tecnológico"
-              width={72}
-              height={72}
+              width={116}
+              height={116}
               className={styles.footerLogoImg}
             />
           </div>
