@@ -21,7 +21,7 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
       >
         <div className={styles.topBarContainer}>
           <span className={styles.topBarInstitution}>
-            Universidade Federal do Cariri — UFCA
+            Universidade Federal do Cariri  (UFCA)
           </span>   
 
           <div className={styles.topBarMeta}>
@@ -204,10 +204,10 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
 
           <div className={styles.footerInfoArea}>
             <p className={styles.footerUniversityName}>
-              UNIVERSIDADE FEDERAL DO CARIRI — UFCA
+              UNIVERSIDADE FEDERAL DO CARIRI (UFCA)
             </p>
             <p className={styles.footerProjectName}>
-              Sistema de Gestão e Catalogação das Nascentes do Cariri
+                Gestão e Catalogação das Nascentes do Cariri
             </p>
             <p className={styles.footerDepartment}>
               Pesquisa • Monitoramento • Gestão dos Recursos Hídricos
