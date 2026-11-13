@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import styles from './boundary.module.css';
+import styles from './error.module.css';
 
 export interface ImportacoesErrorProps {
   readonly error: Error & { readonly digest?: string | undefined };
@@ -16,7 +16,7 @@ export default function ImportacoesError({ error, reset }: ImportacoesErrorProps
 
   return (
     <div className={styles.container} role="alert" aria-live="assertive">
-      <div className={`${styles.card} ${styles.errorCard}`}>
+      <div className={styles.card}>
         <h2 className={styles.title}>
           Não foi possível carregar o módulo de importação
         </h2>

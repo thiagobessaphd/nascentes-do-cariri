@@ -1,5 +1,5 @@
 /**
- * Nascentes do Cariri — Estilos dos Boundaries (Loading / Error) de Importações
+ * Nascentes do Cariri — Estilos da Tela de Erro (error.tsx) de Importações
  */
 
 .container {
@@ -13,39 +13,13 @@
 .card {
   background-color: #ffffff;
   border: 1px solid #d8dee9;
-  border-top: 3px solid #331509;
+  border-top: 3px solid #b91c1c;
   border-radius: 6px;
   padding: 2rem;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.errorCard {
-  border-top-color: #b91c1c;
-}
-
-.loadingHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2.5px solid #cbd5e1;
-  border-top-color: #0b4f6c;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .title {
@@ -61,20 +35,6 @@
   color: #475569;
   line-height: 1.55;
   max-width: 68ch;
-}
-
-.skeletonBlock {
-  height: 16px;
-  border-radius: 4px;
-  background-color: #f1f5f9;
-}
-
-.skeletonWide {
-  width: 72%;
-}
-
-.skeletonMedium {
-  width: 48%;
 }
 
 .actions {
@@ -127,10 +87,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
-
   .retryButton {
     transition: none;
   }

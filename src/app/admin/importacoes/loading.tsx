@@ -1,4 +1,4 @@
-import styles from './boundary.module.css';
+import styles from './loading.module.css';
 
 export default function ImportacoesLoading() {
   return (

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ImportacaoWorkspace } from '@/components/admin/importacoes';
-import styles from './importacoes.module.css';
+import styles from './page.module.css';
 
 export const metadata: Metadata = {
   title: 'Importação e Validação de Nascentes | Painel Administrativo — UFCA',
