@@ -29,9 +29,10 @@ import type { ImportacaoValidationResponseDto } from '@/modules/importacoes/impo
 
 describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.client.ts)', () => {
   describe('formatVazaoMedia', () => {
-    it('deve formatar valores numéricos com 2 casas decimais e unidade obrigatória m³/s', () => {
+    it('deve formatar valores numéricos com 2 a 3 casas decimais e unidade obrigatória m³/s', () => {
       expect(formatVazaoMedia(12.5)).toBe('12,50 m³/s');
-      expect(formatVazaoMedia(0.876)).toBe('0,88 m³/s');
+      expect(formatVazaoMedia(0.876)).toBe('0,876 m³/s');
+      expect(formatVazaoMedia(0.1234)).toBe('0,123 m³/s');
       expect(formatVazaoMedia(0)).toBe('0,00 m³/s');
       expect(formatVazaoMedia(1500)).toBe('1.500,00 m³/s');
     });

@@ -6,13 +6,22 @@
  * de prévia para tecnologias assistivas e regras de confirmação.
  */
 
+import { z } from 'zod';
 import type {
   DuplicateReason,
+  ImportErrorCode,
   ImportRowField,
   ImportacaoValidationResponseDto,
   TxtParseSummary,
-} from '@/modules/importacoes/importacoes.types';
-import { DUPLICATE_REASONS } from '@/modules/importacoes/importacoes.types';
+} from '@/modules/importacoes/importacoes.contracts';
+import {
+  DUPLICATE_REASONS,
+  EXPECTED_TXT_HEADER_COLUMNS,
+  IMPORTACAO_STATUS_VALUES,
+  IMPORT_ERROR_CODES,
+  MAX_UPLOAD_SIZE_BYTES_CLIENT,
+  UNIDADE_VAZAO_PADRAO,
+} from '@/modules/importacoes/importacoes.contracts';
 
 
 // CONTRATOS E MODELOS DE ESTADO DO CLIENTE
@@ -55,21 +64,34 @@ export class ImportacaoClientError extends Error {
  */
 export type PreviewStateKind = 'valid' | 'invalid' | 'empty';
 
-export interface PreviewClassification {
-  readonly kind: PreviewStateKind;
-  /**
-   * Mensagem descritiva do diagnóstico para status visual e aria-live
-   */
-  readonly message: string;
-  /**
-   * Indicador booleano estrito se o lote está habilitado para confirmação
-   */
-  readonly canConfirm: boolean;
-  /**
-   * Motivo impeditivo caso a confirmação não seja permitida
-   */
-  readonly blockingReason?: string | undefined;
-}
+export type PreviewClassification =
+  | {
+      readonly kind: 'valid';
+      /**
+       * Mensagem descritiva do diagnóstico para status visual e aria-live
+       */
+      readonly message: string;
+      /**
+       * Indicador booleano estrito se o lote está habilitado para confirmação
+       */
+      readonly canConfirm: true;
+      readonly blockingReason?: undefined;
+    }
+  | {
+      readonly kind: 'invalid' | 'empty';
+      /**
+       * Mensagem descritiva do diagnóstico para status visual e aria-live
+       */
+      readonly message: string;
+      /**
+       * Indicador booleano estrito se o lote está habilitado para confirmação
+       */
+      readonly canConfirm: false;
+      /**
+       * Motivo impeditivo obrigatório quando a confirmação não é permitida
+       */
+      readonly blockingReason: string;
+    };
 
 /**
  * Estrutura tipada para resultados de paginação
@@ -161,7 +183,18 @@ export function derivePreviewState(
     };
   }
 
-  // 3. Caso válido com novos registros prontos para confirmação
+  // 3. Salvaguarda caso o servidor bloqueie confirmação sem listar erros explícitos
+  if (!dto.canConfirm) {
+    return {
+      kind: 'invalid',
+      message: 'A validação não foi aprovada para confirmação no banco de dados.',
+      canConfirm: false,
+      blockingReason:
+        'A confirmação deste lote foi bloqueada pela validação do servidor.',
+    };
+  }
+
+  // 4. Caso válido com novos registros prontos para confirmação
   const validMessage =
     dto.summary.totalValidas === 1
       ? 'Arquivo validado com sucesso! 1 nova nascente pronta para confirmação.'
@@ -188,7 +221,7 @@ export function formatVazaoMedia(vazaoMedia: number | null | undefined): string 
 
   const formattedNumber = vazaoMedia.toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 3,
   });
 
   return `${formattedNumber} m³/s`;
@@ -289,7 +322,10 @@ export function formatDuplicateReason(reason?: DuplicateReason | string | undefi
 /**
  * Mapeamento de códigos semânticos de erro para títulos amigáveis em português.
  */
-const ERROR_CODE_MAP: Readonly<Record<string, string>> = {
+/**
+ * Mapeamento exaustivo de códigos semânticos de domínio para títulos amigáveis em português.
+ */
+const DOMAIN_ERROR_CODE_MAP: Readonly<Record<ImportErrorCode, string>> = {
   REQUIRED_FIELD_EMPTY: 'Campo obrigatório vazio',
   INVALID_COORDINATE: 'Coordenada geográfica inválida',
   OUT_OF_BOUNDS_CARIRI: 'Coordenada fora da macrorregião do Cariri',
@@ -299,18 +335,26 @@ const ERROR_CODE_MAP: Readonly<Record<string, string>> = {
   INVALID_DATE_FORMAT: 'Formato de data inválido (esperado AAAA-MM-DD)',
   INVALID_CALENDAR_DATE: 'Data inexistente no calendário',
   FUTURE_DATE: 'Data de criação futura não permitida',
-  INVALID_FLOW_RATE: 'Vazão média numérica inválida',
   NEGATIVE_FLOW: 'Vazão média negativa não permitida',
-  NEGATIVE_FLOW_RATE: 'Vazão média negativa não permitida',
   DUPLICATE_ROW_INTERNAL: 'Registro duplicado no próprio arquivo',
   DUPLICATE_ROW_DATABASE: 'Registro já cadastrado na base de dados',
   INVALID_COLUMN_COUNT: 'Quantidade incorreta de colunas',
   INVALID_HEADER: 'Cabeçalho ausente ou incompatível',
   INVALID_ENCODING: 'Codificação de texto incompatível (exige UTF-8)',
-  INVALID_FILENAME: 'Extensão de arquivo não permitida (exige .txt)',
   EMPTY_FILE: 'Arquivo vazio',
+};
+
+const EXTRA_UPLOAD_ERROR_CODE_MAP: Readonly<Record<string, string>> = {
+  INVALID_FLOW_RATE: 'Vazão média numérica inválida',
+  NEGATIVE_FLOW_RATE: 'Vazão média negativa não permitida',
+  INVALID_FILENAME: 'Extensão de arquivo não permitida (exige .txt)',
   FILE_TOO_LARGE: 'Arquivo excede o limite máximo permitido (5 MB)',
   BINARY_FILE_NOT_ALLOWED: 'Arquivo binário ou corrompido não permitido',
+};
+
+const ERROR_CODE_MAP: Readonly<Record<string, string>> = {
+  ...DOMAIN_ERROR_CODE_MAP,
+  ...EXTRA_UPLOAD_ERROR_CODE_MAP,
 };
 
 export function formatErrorCodeLabel(code?: string | undefined): string {
@@ -341,10 +385,13 @@ export function paginateSlice<T>(
   page: number,
   pageSize = 50
 ): PaginationResult<T> {
-  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const safePageSize = Number.isFinite(pageSize)
+    ? Math.max(1, Math.floor(pageSize))
+    : 50;
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
-  const safePage = Math.min(Math.max(1, Math.floor(page)), totalPages);
+  const normalizedPage = Number.isFinite(page) ? Math.floor(page) : 1;
+  const safePage = Math.min(Math.max(1, normalizedPage), totalPages);
 
   const startIndex = (safePage - 1) * safePageSize;
   const endIndex = Math.min(startIndex + safePageSize, totalItems);
@@ -362,7 +409,125 @@ export function paginateSlice<T>(
 }
 
 
-// CLIENTE HTTP PARA ENVIO E VALIDAÇÃO PRELIMINAR
+// VALIDAÇÃO EM TEMPO DE EXECUÇÃO (ZOD) E CLIENTE HTTP
+
+const IMPORT_ROW_FIELD_VALUES = [
+  'arquivo',
+  'cabecalho',
+  'linha',
+  ...EXPECTED_TXT_HEADER_COLUMNS,
+] as const;
+
+const IMPORT_ERROR_CODE_VALUES = Object.values(IMPORT_ERROR_CODES) as [
+  ImportErrorCode,
+  ...ImportErrorCode[],
+];
+
+const nascenteSerializedSchema = z.object({
+  latitude: z.number().finite(),
+  longitude: z.number().finite(),
+  municipio: z.string(),
+  fonte: z.string(),
+  localidade: z.string(),
+  dataCriacaoIso: z.string(),
+  dataCriacao: z.string(),
+  vazaoMedia: z.number().finite(),
+  unidadeVazao: z.literal(UNIDADE_VAZAO_PADRAO),
+});
+
+const importRowErrorSchema = z.object({
+  line: z.number().int().nonnegative(),
+  field: z.enum(IMPORT_ROW_FIELD_VALUES),
+  code: z.enum(IMPORT_ERROR_CODE_VALUES),
+  message: z.string(),
+  rawValue: z.string().optional(),
+});
+
+const importacaoValidationResponseSchema = z.object({
+  importacaoId: z.number().finite().int(),
+  nomeArquivo: z.string(),
+  hashSha256: z.string(),
+  tamanhoBytes: z.number().finite().nonnegative(),
+  status: z.enum(IMPORTACAO_STATUS_VALUES),
+  canConfirm: z.boolean(),
+  summary: z.object({
+    totalLinhas: z.number().finite().int().nonnegative(),
+    totalValidas: z.number().finite().int().nonnegative(),
+    totalInvalidas: z.number().finite().int().nonnegative(),
+    totalDuplicadas: z.number().finite().int().nonnegative(),
+  }),
+  validRows: z.array(
+    z.object({
+      line: z.number().int().positive(),
+      data: nascenteSerializedSchema,
+      duplicateKey: z.string(),
+    })
+  ),
+  duplicateRows: z.array(
+    z.object({
+      line: z.number().int().positive(),
+      data: nascenteSerializedSchema,
+      duplicateKey: z.string(),
+      duplicateOfLine: z.number().int().positive().optional(),
+      reason: z.enum([DUPLICATE_REASONS.INTERNAL, DUPLICATE_REASONS.DATABASE]),
+    })
+  ),
+  invalidRows: z.array(
+    z.object({
+      line: z.number().int().nonnegative(),
+      rawContent: z.string(),
+      errors: z.array(importRowErrorSchema),
+    })
+  ),
+  allErrors: z.array(importRowErrorSchema),
+  createdAt: z.string(),
+});
+
+function resolveHttpStatusFallback(status: number): {
+  readonly message: string;
+  readonly code?: string | undefined;
+} {
+  if (status === 401) {
+    return {
+      message: 'Sessão expirada ou não autorizada. Faça login novamente para continuar.',
+      code: 'UNAUTHORIZED',
+    };
+  }
+  if (status === 403) {
+    return {
+      message: 'Acesso negado. Sua conta de administrador não possui permissão ativa.',
+      code: 'FORBIDDEN',
+    };
+  }
+  if (status === 413) {
+    return {
+      message: 'O arquivo enviado excede o limite máximo permitido (5 MB).',
+      code: 'FILE_TOO_LARGE',
+    };
+  }
+  if (status === 405) {
+    return {
+      message: 'Método HTTP não permitido.',
+      code: 'METHOD_NOT_ALLOWED',
+    };
+  }
+  if (status >= 500) {
+    return {
+      message: 'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.',
+      code: 'INTERNAL_SERVER_ERROR',
+    };
+  }
+
+  return {
+    message: 'Não foi possível validar o arquivo de importação.',
+  };
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
 
 /**
  * Dispara o upload de um arquivo TXT para o endpoint administrativo de validação.
@@ -399,6 +564,16 @@ export async function uploadAndValidateTxt(
     });
   }
 
+  if (file.size > MAX_UPLOAD_SIZE_BYTES_CLIENT) {
+    throw new ImportacaoClientError(
+      'O arquivo selecionado excede o limite máximo permitido (5 MB).',
+      {
+        statusCode: 413,
+        code: 'FILE_TOO_LARGE',
+      }
+    );
+  }
+
   // 2. Montagem do payload multipart/form-data
   const formData = new FormData();
   formData.append('arquivo', file, fileName);
@@ -415,6 +590,7 @@ export async function uploadAndValidateTxt(
     method: 'POST',
     body: formData,
     headers,
+    credentials: 'same-origin',
   };
 
   if (options?.signal) {
@@ -425,33 +601,34 @@ export async function uploadAndValidateTxt(
     const response = await fetch('/api/admin/importacoes/validar', requestInit);
 
     if (!response.ok) {
-      let errorMessage = 'Não foi possível validar o arquivo de importação.';
-      let errorCode: string | undefined;
+      const statusFallback = resolveHttpStatusFallback(response.status);
+      let errorMessage = statusFallback.message;
+      let errorCode = statusFallback.code;
       let errorDetails: unknown | undefined;
 
       try {
         const errorBody: unknown = await response.json();
         if (typeof errorBody === 'object' && errorBody !== null) {
           const record = errorBody as Record<string, unknown>;
+          const nestedError =
+            typeof record['error'] === 'object' && record['error'] !== null
+              ? (record['error'] as Record<string, unknown>)
+              : undefined;
 
-          if (typeof record['error'] === 'string') {
-            errorMessage = record['error'];
-          } else if (
-            typeof record['error'] === 'object' &&
-            record['error'] !== null &&
-            'message' in (record['error'] as Record<string, unknown>)
-          ) {
-            errorMessage = String((record['error'] as Record<string, unknown>)['message']);
+          const parsedMessage =
+            readNonEmptyString(record['error']) ??
+            readNonEmptyString(nestedError?.['message']);
+
+          if (parsedMessage) {
+            errorMessage = parsedMessage;
           }
 
-          if (typeof record['code'] === 'string') {
-            errorCode = record['code'];
-          } else if (
-            typeof record['error'] === 'object' &&
-            record['error'] !== null &&
-            'code' in (record['error'] as Record<string, unknown>)
-          ) {
-            errorCode = String((record['error'] as Record<string, unknown>)['code']);
+          const parsedCode =
+            readNonEmptyString(record['code']) ??
+            readNonEmptyString(nestedError?.['code']);
+
+          if (parsedCode) {
+            errorCode = parsedCode;
           }
 
           if ('details' in record) {
@@ -459,23 +636,7 @@ export async function uploadAndValidateTxt(
           }
         }
       } catch {
-        // Fallback para códigos HTTP padrão quando o corpo não for JSON
-        if (response.status === 401) {
-          errorMessage = 'Sessão expirada ou não autorizada. Faça login novamente para continuar.';
-          errorCode = 'UNAUTHORIZED';
-        } else if (response.status === 403) {
-          errorMessage = 'Acesso negado. Sua conta de administrador não possui permissão ativa.';
-          errorCode = 'FORBIDDEN';
-        } else if (response.status === 413) {
-          errorMessage = 'O arquivo enviado excede o limite máximo permitido (5 MB).';
-          errorCode = 'FILE_TOO_LARGE';
-        } else if (response.status === 405) {
-          errorMessage = 'Método HTTP não permitido.';
-          errorCode = 'METHOD_NOT_ALLOWED';
-        } else if (response.status >= 500) {
-          errorMessage = 'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.';
-          errorCode = 'INTERNAL_SERVER_ERROR';
-        }
+        // Fallback de status HTTP já aplicado acima em statusFallback
       }
 
       throw new ImportacaoClientError(errorMessage, {
@@ -485,8 +646,34 @@ export async function uploadAndValidateTxt(
       });
     }
 
-    const data = (await response.json()) as ImportacaoValidationResponseDto;
-    return data;
+    let rawPayload: unknown;
+    try {
+      rawPayload = await response.json();
+    } catch (parseError: unknown) {
+      throw new ImportacaoClientError(
+        'Resposta inválida recebida do servidor ao processar a importação.',
+        {
+          statusCode: response.status,
+          code: 'INVALID_SERVER_RESPONSE',
+          cause: parseError,
+        }
+      );
+    }
+
+    const parsed = importacaoValidationResponseSchema.safeParse(rawPayload);
+    if (!parsed.success) {
+      throw new ImportacaoClientError(
+        'Formato inesperado na resposta do servidor. Tente novamente ou contate o suporte.',
+        {
+          statusCode: response.status,
+          code: 'INVALID_SERVER_RESPONSE',
+          details: parsed.error.flatten(),
+        }
+      );
+    }
+
+    const validatedDto: ImportacaoValidationResponseDto = parsed.data;
+    return validatedDto;
   } catch (error: unknown) {
     if (error instanceof ImportacaoClientError) {
       throw error;
