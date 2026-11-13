@@ -1,0 +1,410 @@
+/**
+ * Nascentes do Cariri — Estilos do Layout Institucional Administrativo (UFCA)
+ *
+ * Identidade visual alinhada à Universidade Federal do Cariri (UFCA):
+ * - Marrom Institucional UFCA: #331509 / #261006
+ * - Azul Hidrológico (Nascentes): #0b4f6c / #083b52 / #52c3d0
+ * - Verde Chapada do Araripe: #166534 / #7bc142
+ * - Laranja/Ocre Cariri: #f17d42 / #f9c23c
+ */
+
+.adminShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f4f6f8;
+  color: #1e293b;
+}
+
+/* Barra Institucional Superior Resumida */
+.institutionalTopBar {
+  background-color: #261006;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  border-bottom: 1px solid #3b180b;
+}
+
+.topBarContainer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0.45rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.topBarInstitution {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #f1f5f9;
+  font-size: 0.71875rem;
+}
+
+.topBarMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.restrictedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+}
+
+/* Filete Cromático da Identidade UFCA */
+.ufcaAccentStrip {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    #331509 0%,
+    #331509 25%,
+    #f17d42 25%,
+    #f17d42 45%,
+    #f9c23c 45%,
+    #f9c23c 62%,
+    #7bc142 62%,
+    #7bc142 80%,
+    #52c3d0 80%,
+    #52c3d0 100%
+  );
+}
+
+/* Cabeçalho Principal Administrativo */
+.adminHeader {
+  background-color: #ffffff;
+  border-bottom: 1px solid #d8dee9;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.headerContainer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0.875rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  min-width: 0;
+}
+
+.logoLink {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  flex-shrink: 0;
+  padding: 0.125rem;
+  border-radius: 4px;
+}
+
+.logoLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 4px;
+}
+
+.headerLogoImg {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  mix-blend-mode: multiply;
+}
+
+.brandDivider {
+  width: 1px;
+  height: 38px;
+  background-color: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.systemIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.universityLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #331509;
+  line-height: 1.2;
+}
+
+.systemTitleLink {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-decoration: none;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  transition: color 0.15s ease;
+}
+
+.systemTitleLink:hover {
+  color: #0b4f6c;
+}
+
+.systemTitleLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.systemSubtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+/* Navegação Administrativa — Menu Limpo + CTA do Mapa em Destaque */
+.adminNav {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  flex-shrink: 0;
+}
+
+.navMenuList {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.navMenuItem {
+  display: flex;
+  align-items: center;
+}
+
+.navMenuLink {
+  position: relative;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.navMenuLink:hover {
+  color: #0f172a;
+}
+
+.navMenuLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.navMenuLinkActive {
+  position: relative;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.navMenuLinkActive::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: #804224;
+  border-radius: 2px;
+}
+
+.navMenuLinkActive:hover {
+  color: #331509;
+}
+
+.navMenuLinkActive:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.navDivider {
+  width: 1px;
+  height: 22px;
+  background-color: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.mapHighlightButton {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #0b4f6c;
+  border: 1px solid #083b52;
+  text-decoration: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.mapHighlightButton:hover {
+  background-color: #083b52;
+  box-shadow: 0 2px 4px rgba(11, 79, 108, 0.18);
+}
+
+.mapHighlightButton:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+.externalArrow {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+/* Conteúdo Principal */
+.adminMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.adminMain:focus {
+  outline: none;
+}
+
+/* Rodapé Institucional UFCA */
+.adminFooter {
+  background-color: #ffffff;
+  border-top: 1px solid #d8dee9;
+  margin-top: 2rem;
+}
+
+.footerContainer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.footerLogoWrapper {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
+.footerLogoDivider {
+  width: 1px;
+  height: 38px;
+  background-color: #cbd5e1;
+}
+
+.footerLogoImg {
+  width: 116px;
+  height: 116px;
+  object-fit: contain;
+  flex-shrink: 0;
+  mix-blend-mode: multiply;
+}
+
+.footerInfoArea {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 0.15rem;
+}
+
+.footerUniversityName {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #331509;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.footerProjectName {
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+.footerDepartment {
+  font-size: 0.71875rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+@media (max-width: 768px) {
+  .topBarContainer {
+    padding: 0.45rem 1rem;
+    justify-content: space-between;
+  }
+
+  .headerContainer {
+    padding: 0.875rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem;
+  }
+
+  .adminNav {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .navDivider {
+    display: none;
+  }
+
+  .footerContainer {
+    padding: 1.5rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+
+  .footerInfoArea {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
