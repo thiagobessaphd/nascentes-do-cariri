@@ -34,7 +34,7 @@ A matriz estabelece para cada requisito:
 | **CT-BE-10** | Campo obrigatório vazio | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-11** | Linha duplicada (Unique Constraint) | Backend | Integração | Persistência / Banco | `src/tests/integration/database/constraints.test.ts` | Ativo |
 | **CT-BE-12** | Rollback em caso de falha | Backend | Integração | Persistência / Transação | `src/tests/integration/database/transactions.test.ts` | Ativo |
-| **CT-BE-13** | Adição de novos registros à base após confirmação | Backend | Integração | Importação TXT | `src/tests/integration/import/import-commit.test.ts` | Planejado |
+| **CT-BE-13** | Adição de novos registros à base após confirmação | Backend | Integração | Importação TXT | `src/tests/integration/import/import-commit.test.ts` | Ativo |
 | **CT-BE-14** | Preservação dos registros de importações anteriores | Backend | Integração | Persistência / Integridade | `src/tests/integration/database/database.test.ts` | Ativo |
 | **CT-BE-15** | Preservação dos arquivos TXT originais | Backend | Unitário | Storage e Sanitização | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-16** | Resposta da API somente com registros ativos | Backend | Integração | API Pública | `src/tests/integration/api/nascentes.test.ts` | Ativo |
@@ -177,6 +177,20 @@ A matriz estabelece para cada requisito:
     - Botão de confirmação habilitado exclusivamente quando `canConfirm === true`, `totalInvalidas === 0`, `allErrors.length === 0` e `totalValidas > 0`.
   - **Validação de Contrato e Resiliência do Cliente HTTP (`uploadAndValidateTxt`):**
     - Validação de esquema Zod em tempo de execução (`INVALID_SERVER_PAYLOAD`), bloqueio fail-fast de arquivos vazios, acima de 5 MB ou fora da extensão `.txt`, e mascaramento seguro de erros HTTP 5xx.
+
+### 3.11. Persistência Transacional, Deduplicação, Rollback e Cache na Confirmação (`US-13` / `Task-26` / `CT-BE-13`)
+* **Arquivos:**
+  - `src/tests/unit/modules/importacoes/importacoes-commit.service.test.ts`
+  - `src/tests/integration/import/import-commit.test.ts`
+* **Regras Verificadas:**
+  - **Adição Cumulativa e Vínculo com `importacaoId` (`CT-BE-13` / `RF06`):**
+    - Inserção atômica apenas dos registros novos com `importacaoId` e `ativo: true`, transição da importação para `CONCLUIDA` com preenchimento de `concluidaAt` e preservação integral dos registros e arquivos `.txt` de importações anteriores (`CT-BE-14`, `CT-BE-15`).
+  - **Deduplicação Intratransacional (`CT-BE-11`):**
+    - Rechecagem das chaves existentes `[latitude, longitude, fonte]` dentro da transação ativa (case-insensitive e accent-insensitive), ignorando registros já cadastrados sem reinserção e contabilizando `totalDuplicadas`.
+  - **Rollback Tudo-ou-Nada (`CT-BE-12`):**
+    - Falha forçada no meio da operação (`onAfterRowInsert`) reverte 100% das inserções parciais no MySQL, restaura o status `AGUARDANDO_CONFIRMACAO` e preserva dados e arquivos prévios.
+  - **Invalidação de Cache Pós-Commit e Concorrência (`RNF04` / `RNF05`):**
+    - Invalidação do cache público (`onImportacaoConcluida`) disparada exclusivamente após o commit bem-sucedido no banco, e trava atômica compare-and-swap (`updateMany`) bloqueando confirmações simultâneas ou repetidas (`409 IMPORTACAO_ALREADY_PROCESSED`).
 
 ---
 
