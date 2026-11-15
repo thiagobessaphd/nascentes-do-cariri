@@ -217,6 +217,7 @@ export const IMPORTACAO_STATUS_VALUES = [
   'PROCESSANDO',
   'CONCLUIDA',
   'FALHOU',
+  'CANCELADA',
 ] as const;
 
 export type ImportacaoStatus = (typeof IMPORTACAO_STATUS_VALUES)[number];
@@ -254,11 +255,18 @@ export const CONFIRMABLE_IMPORTACAO_STATUS =
   'AGUARDANDO_CONFIRMACAO' satisfies ImportacaoStatus;
 
 /**
+ * Mensagem padrão registrada quando uma importação pendente é cancelada pelo administrador.
+ */
+export const CANCELLED_IMPORTACAO_DEFAULT_MESSAGE =
+  'Importação cancelada pelo administrador antes da confirmação.' as const;
+
+/**
  * Códigos de erro semânticos e rastreáveis da etapa de confirmação transacional.
  */
 export const IMPORTACAO_COMMIT_ERROR_CODES = {
   INVALID_IMPORTACAO_INPUT: 'INVALID_IMPORTACAO_INPUT',
   IMPORTACAO_NOT_FOUND: 'IMPORTACAO_NOT_FOUND',
+  IMPORTACAO_OWNERSHIP_FORBIDDEN: 'IMPORTACAO_OWNERSHIP_FORBIDDEN',
   INVALID_IMPORTACAO_STATE: 'INVALID_IMPORTACAO_STATE',
   IMPORTACAO_ALREADY_PROCESSED: 'IMPORTACAO_ALREADY_PROCESSED',
   FILE_INTEGRITY_ERROR: 'FILE_INTEGRITY_ERROR',
@@ -291,5 +299,19 @@ export interface ImportacaoConfirmResponseDto {
   readonly status: Extract<ImportacaoStatus, 'CONCLUIDA'>;
   readonly summary: ImportacaoCommitSummary;
   readonly cacheInvalidated: boolean;
+  readonly concluidaAt: string;
+}
+
+/**
+ * DTO seguro de resposta do cancelamento atômico de uma importação pendente.
+ *
+ * Omite estritamente caminhoPrivadoArquivo e storageUrl por design de segurança.
+ */
+export interface ImportacaoCancelResponseDto {
+  readonly importacaoId: number;
+  readonly nomeArquivo: string;
+  readonly hashSha256: string;
+  readonly status: Extract<ImportacaoStatus, 'CANCELADA'>;
+  readonly mensagemErro: string;
   readonly concluidaAt: string;
 }

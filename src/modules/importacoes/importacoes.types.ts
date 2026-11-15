@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { FileIntegrityResult, StorageDriver, StoragePayload } from '@/lib/storage';
 import type { UploadedFileEntry } from './file-validator';
 import type {
+  ImportacaoCancelResponseDto,
   ImportacaoConfirmResponseDto,
   ImportacaoValidationResponseDto,
 } from './importacoes.contracts';
@@ -143,6 +144,26 @@ export const confirmImportacaoInputSchema = z.object({
 export type ConfirmImportacaoInput = Readonly<z.infer<typeof confirmImportacaoInputSchema>>;
 
 /**
+ * Schema Zod para validação em runtime da entrada de cancelamento de importação pendente.
+ */
+export const cancelImportacaoInputSchema = z.object({
+  importacaoId: z
+    .number()
+    .int('O identificador da importação deve ser um número inteiro.')
+    .positive('O identificador da importação deve ser maior que zero.'),
+  usuarioId: z
+    .number()
+    .int('O identificador do usuário deve ser um número inteiro.')
+    .positive('O identificador do usuário deve ser maior que zero.')
+    .optional(),
+});
+
+/**
+ * Parâmetros de entrada validados para o fluxo de cancelamento de uma importação pendente.
+ */
+export type CancelImportacaoInput = Readonly<z.infer<typeof cancelImportacaoInputSchema>>;
+
+/**
  * Cliente transacional do Prisma utilizado dentro de prisma.$transaction.
  */
 export type PrismaTransactionClient = Prisma.TransactionClient;
@@ -196,4 +217,5 @@ export interface IImportacaoCommitService {
     input: ConfirmImportacaoInput,
     options?: ConfirmImportacaoOptions
   ): Promise<ImportacaoConfirmResponseDto>;
+  cancelImportacao?(input: CancelImportacaoInput): Promise<ImportacaoCancelResponseDto>;
 }
