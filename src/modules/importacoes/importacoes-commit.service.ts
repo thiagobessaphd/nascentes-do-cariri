@@ -50,6 +50,41 @@ const TRANSACTION_OPTIONS = {
   timeout: 30000,
 } as const;
 
+const STRICT_POSITIVE_INT_REGEX = /^[1-9]\d*$/;
+
+/**
+ * Extrai e valida estritamente o identificador numérico positivo de importação a partir do parâmetro de rota [id].
+ */
+export function parseImportacaoRouteId(rawId: unknown): number {
+  if (typeof rawId !== 'string') {
+    throw new AppError(
+      'O identificador da importação na URL é inválido.',
+      400,
+      IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT
+    );
+  }
+
+  const trimmed = rawId.trim();
+  if (!STRICT_POSITIVE_INT_REGEX.test(trimmed)) {
+    throw new AppError(
+      'O identificador da importação deve ser um número inteiro positivo.',
+      400,
+      IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT
+    );
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new AppError(
+      'O identificador da importação está fora do intervalo inteiro seguro.',
+      400,
+      IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT
+    );
+  }
+
+  return parsed;
+}
+
 interface TransactionCommitOutcome {
   readonly importacaoId: number;
   readonly nomeArquivo: string;

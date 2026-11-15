@@ -221,3 +221,12 @@ export interface IImportacaoCommitService {
     input: CancelImportacaoInput
   ): Promise<ImportacaoCancelResponseDto>;
 }
+
+/**
+ * Contexto de parâmetros dinâmicos de rota ([id]) no App Router do Next.js 16.
+ */
+export interface ImportacaoRouteContext {
+  readonly params: Promise<{
+    readonly id: string;
+  }>;
+}
