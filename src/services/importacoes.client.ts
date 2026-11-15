@@ -11,6 +11,8 @@ import type {
   DuplicateReason,
   ImportErrorCode,
   ImportRowField,
+  ImportacaoCancelResponseDto,
+  ImportacaoConfirmResponseDto,
   ImportacaoValidationResponseDto,
   TxtParseSummary,
 } from '@/modules/importacoes/importacoes.contracts';
@@ -30,6 +32,8 @@ export interface UploadAndValidateOptions {
   readonly signal?: AbortSignal | undefined;
   readonly authToken?: string | undefined;
 }
+
+export type ImportacaoRequestOptions = UploadAndValidateOptions;
 
 /**
  * Erro customizado com metadados para falhas de requisição e validação prévia de upload.
@@ -483,7 +487,56 @@ const importacaoValidationResponseSchema = z.object({
   createdAt: z.string(),
 });
 
-function resolveHttpStatusFallback(status: number): {
+const importacaoConfirmResponseSchema = z.object({
+  importacaoId: z.number().finite().int().positive(),
+  nomeArquivo: z.string(),
+  hashSha256: z.string(),
+  status: z.literal('CONCLUIDA'),
+  summary: z.object({
+    totalLinhas: z.number().finite().int().nonnegative(),
+    totalInseridas: z.number().finite().int().nonnegative(),
+    totalDuplicadas: z.number().finite().int().nonnegative(),
+    totalInvalidas: z.number().finite().int().nonnegative(),
+  }),
+  cacheInvalidated: z.boolean(),
+  concluidaAt: z.string(),
+});
+
+const importacaoCancelResponseSchema = z.object({
+  importacaoId: z.number().finite().int().positive(),
+  nomeArquivo: z.string(),
+  hashSha256: z.string(),
+  status: z.literal('CANCELADA'),
+  mensagemErro: z.string(),
+  concluidaAt: z.string(),
+});
+
+type ImportacaoHttpOperation = 'validate' | 'confirm' | 'cancel';
+
+function validateClientImportacaoId(importacaoId: number): number {
+  if (
+    typeof importacaoId !== 'number' ||
+    !Number.isFinite(importacaoId) ||
+    !Number.isInteger(importacaoId) ||
+    importacaoId <= 0 ||
+    !Number.isSafeInteger(importacaoId)
+  ) {
+    throw new ImportacaoClientError(
+      'Identificador da importação inválido. Informe um número inteiro positivo.',
+      {
+        statusCode: 400,
+        code: 'INVALID_IMPORTACAO_INPUT',
+      }
+    );
+  }
+
+  return importacaoId;
+}
+
+function resolveHttpStatusFallback(
+  status: number,
+  operation: ImportacaoHttpOperation = 'validate'
+): {
   readonly message: string;
   readonly code?: string | undefined;
 } {
@@ -499,10 +552,10 @@ function resolveHttpStatusFallback(status: number): {
       code: 'FORBIDDEN',
     };
   }
-  if (status === 413) {
+  if (status === 404) {
     return {
-      message: 'O arquivo enviado excede o limite máximo permitido (5 MB).',
-      code: 'FILE_TOO_LARGE',
+      message: 'Registro de importação não encontrado.',
+      code: 'IMPORTACAO_NOT_FOUND',
     };
   }
   if (status === 405) {
@@ -511,15 +564,46 @@ function resolveHttpStatusFallback(status: number): {
       code: 'METHOD_NOT_ALLOWED',
     };
   }
-  if (status >= 500) {
+  if (status === 409) {
     return {
-      message: 'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.',
+      message:
+        'Esta importação já foi processada ou não pode realizar esta operação no estado atual.',
+      code: 'IMPORTACAO_ALREADY_PROCESSED',
+    };
+  }
+  if (status === 413) {
+    return {
+      message: 'O arquivo enviado excede o limite máximo permitido (5 MB).',
+      code: 'FILE_TOO_LARGE',
+    };
+  }
+  if (status === 422) {
+    return {
+      message: 'O arquivo original da importação apresentou inconsistência de integridade.',
+      code: 'FILE_INTEGRITY_ERROR',
+    };
+  }
+  if (status >= 500) {
+    const serverMessages: Record<ImportacaoHttpOperation, string> = {
+      validate: 'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.',
+      confirm: 'Erro interno no servidor ao confirmar a importação. Tente novamente mais tarde.',
+      cancel: 'Erro interno no servidor ao cancelar a importação. Tente novamente mais tarde.',
+    };
+
+    return {
+      message: serverMessages[operation],
       code: 'INTERNAL_SERVER_ERROR',
     };
   }
 
+  const defaultMessages: Record<ImportacaoHttpOperation, string> = {
+    validate: 'Não foi possível validar o arquivo de importação.',
+    confirm: 'Não foi possível confirmar a importação no servidor.',
+    cancel: 'Não foi possível cancelar a importação no servidor.',
+  };
+
   return {
-    message: 'Não foi possível validar o arquivo de importação.',
+    message: defaultMessages[operation],
   };
 }
 
@@ -527,6 +611,151 @@ function readNonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+function buildImportacaoRequestHeaders(authToken?: string): Headers {
+  const headers = new Headers({
+    Accept: 'application/json',
+  });
+
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken.trim()}`);
+  }
+
+  return headers;
+}
+
+async function parseImportacaoErrorResponse(
+  response: Response,
+  operation: ImportacaoHttpOperation
+): Promise<ImportacaoClientError> {
+  const statusFallback = resolveHttpStatusFallback(response.status, operation);
+  let errorMessage = statusFallback.message;
+  let errorCode = statusFallback.code;
+  let errorDetails: unknown | undefined;
+
+  try {
+    const errorBody: unknown = await response.json();
+    if (typeof errorBody === 'object' && errorBody !== null) {
+      const record = errorBody as Record<string, unknown>;
+      const nestedError =
+        typeof record['error'] === 'object' && record['error'] !== null
+          ? (record['error'] as Record<string, unknown>)
+          : undefined;
+
+      const parsedMessage =
+        readNonEmptyString(record['error']) ??
+        readNonEmptyString(nestedError?.['message']);
+
+      if (parsedMessage) {
+        errorMessage = parsedMessage;
+      }
+
+      const parsedCode =
+        readNonEmptyString(record['code']) ??
+        readNonEmptyString(nestedError?.['code']);
+
+      if (parsedCode) {
+        errorCode = parsedCode;
+      }
+
+      if ('details' in record) {
+        errorDetails = record['details'];
+      }
+    }
+  } catch {
+    // Fallback de status HTTP já aplicado acima em statusFallback
+  }
+
+  return new ImportacaoClientError(errorMessage, {
+    statusCode: response.status,
+    code: errorCode,
+    details: errorDetails,
+  });
+}
+
+async function executeImportacaoRequest<T>(params: {
+  readonly url: string;
+  readonly method: 'POST' | 'DELETE';
+  readonly operation: ImportacaoHttpOperation;
+  readonly parsePayload: (rawPayload: unknown) =>
+    | { readonly success: true; readonly data: T }
+    | { readonly success: false; readonly details: unknown };
+  readonly body?: BodyInit | undefined;
+  readonly options?: ImportacaoRequestOptions | undefined;
+}): Promise<T> {
+  const headers = buildImportacaoRequestHeaders(params.options?.authToken);
+
+  const requestInit: RequestInit = {
+    method: params.method,
+    headers,
+    credentials: 'same-origin',
+  };
+
+  if (params.body !== undefined) {
+    requestInit.body = params.body;
+  }
+
+  if (params.options?.signal) {
+    requestInit.signal = params.options.signal;
+  }
+
+  try {
+    const response = await fetch(params.url, requestInit);
+
+    if (!response.ok) {
+      throw await parseImportacaoErrorResponse(response, params.operation);
+    }
+
+    let rawPayload: unknown;
+    try {
+      rawPayload = await response.json();
+    } catch (parseError: unknown) {
+      throw new ImportacaoClientError(
+        'Resposta inválida recebida do servidor ao processar a importação.',
+        {
+          statusCode: response.status,
+          code: 'INVALID_SERVER_RESPONSE',
+          cause: parseError,
+        }
+      );
+    }
+
+    const parsed = params.parsePayload(rawPayload);
+    if (!parsed.success) {
+      throw new ImportacaoClientError(
+        'Formato inesperado na resposta do servidor. Tente novamente ou contate o suporte.',
+        {
+          statusCode: response.status,
+          code: 'INVALID_SERVER_RESPONSE',
+          details: parsed.details,
+        }
+      );
+    }
+
+    return parsed.data;
+  } catch (error: unknown) {
+    if (error instanceof ImportacaoClientError) {
+      throw error;
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name: string }).name === 'AbortError'
+    ) {
+      throw error;
+    }
+
+    throw new ImportacaoClientError(
+      'Dificuldade de conexão com o servidor. Verifique sua conexão e tente novamente.',
+      {
+        isNetworkError: true,
+        cause: error,
+      }
+    );
+  }
 }
 
 /**
@@ -578,122 +807,82 @@ export async function uploadAndValidateTxt(
   const formData = new FormData();
   formData.append('arquivo', file, fileName);
 
-  const headers = new Headers({
-    Accept: 'application/json',
-  });
-
-  if (options?.authToken) {
-    headers.set('Authorization', `Bearer ${options.authToken.trim()}`);
-  }
-
-  const requestInit: RequestInit = {
+  return executeImportacaoRequest<ImportacaoValidationResponseDto>({
+    url: '/api/admin/importacoes/validar',
     method: 'POST',
+    operation: 'validate',
     body: formData,
-    headers,
-    credentials: 'same-origin',
-  };
-
-  if (options?.signal) {
-    requestInit.signal = options.signal;
-  }
-
-  try {
-    const response = await fetch('/api/admin/importacoes/validar', requestInit);
-
-    if (!response.ok) {
-      const statusFallback = resolveHttpStatusFallback(response.status);
-      let errorMessage = statusFallback.message;
-      let errorCode = statusFallback.code;
-      let errorDetails: unknown | undefined;
-
-      try {
-        const errorBody: unknown = await response.json();
-        if (typeof errorBody === 'object' && errorBody !== null) {
-          const record = errorBody as Record<string, unknown>;
-          const nestedError =
-            typeof record['error'] === 'object' && record['error'] !== null
-              ? (record['error'] as Record<string, unknown>)
-              : undefined;
-
-          const parsedMessage =
-            readNonEmptyString(record['error']) ??
-            readNonEmptyString(nestedError?.['message']);
-
-          if (parsedMessage) {
-            errorMessage = parsedMessage;
-          }
-
-          const parsedCode =
-            readNonEmptyString(record['code']) ??
-            readNonEmptyString(nestedError?.['code']);
-
-          if (parsedCode) {
-            errorCode = parsedCode;
-          }
-
-          if ('details' in record) {
-            errorDetails = record['details'];
-          }
-        }
-      } catch {
-        // Fallback de status HTTP já aplicado acima em statusFallback
+    options,
+    parsePayload: (rawPayload) => {
+      const parsed = importacaoValidationResponseSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        return { success: false, details: parsed.error.flatten() };
       }
+      const validatedDto: ImportacaoValidationResponseDto = parsed.data;
+      return { success: true, data: validatedDto };
+    },
+  });
+}
 
-      throw new ImportacaoClientError(errorMessage, {
-        statusCode: response.status,
-        code: errorCode,
-        details: errorDetails,
-      });
-    }
+/**
+ * Confirma atomicamente uma importação pendente (status AGUARDANDO_CONFIRMACAO)
+ * no endpoint administrativo POST /api/admin/importacoes/[id]/confirmar.
+ *
+ * @param importacaoId Identificador numérico inteiro positivo da importação
+ * @param options Opções com AbortSignal e token opcional de autenticação
+ * @returns Resumo quantitativo consolidado e confirmação da invalidação de cache
+ * @throws ImportacaoClientError com mensagens amigáveis e código de status
+ */
+export async function confirmImportacaoById(
+  importacaoId: number,
+  options?: ImportacaoRequestOptions
+): Promise<ImportacaoConfirmResponseDto> {
+  const safeId = validateClientImportacaoId(importacaoId);
 
-    let rawPayload: unknown;
-    try {
-      rawPayload = await response.json();
-    } catch (parseError: unknown) {
-      throw new ImportacaoClientError(
-        'Resposta inválida recebida do servidor ao processar a importação.',
-        {
-          statusCode: response.status,
-          code: 'INVALID_SERVER_RESPONSE',
-          cause: parseError,
-        }
-      );
-    }
-
-    const parsed = importacaoValidationResponseSchema.safeParse(rawPayload);
-    if (!parsed.success) {
-      throw new ImportacaoClientError(
-        'Formato inesperado na resposta do servidor. Tente novamente ou contate o suporte.',
-        {
-          statusCode: response.status,
-          code: 'INVALID_SERVER_RESPONSE',
-          details: parsed.error.flatten(),
-        }
-      );
-    }
-
-    const validatedDto: ImportacaoValidationResponseDto = parsed.data;
-    return validatedDto;
-  } catch (error: unknown) {
-    if (error instanceof ImportacaoClientError) {
-      throw error;
-    }
-
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      (error as { name: string }).name === 'AbortError'
-    ) {
-      throw error;
-    }
-
-    throw new ImportacaoClientError(
-      'Dificuldade de conexão com o servidor. Verifique sua conexão e tente novamente.',
-      {
-        isNetworkError: true,
-        cause: error,
+  return executeImportacaoRequest<ImportacaoConfirmResponseDto>({
+    url: `/api/admin/importacoes/${safeId}/confirmar`,
+    method: 'POST',
+    operation: 'confirm',
+    options,
+    parsePayload: (rawPayload) => {
+      const parsed = importacaoConfirmResponseSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        return { success: false, details: parsed.error.flatten() };
       }
-    );
-  }
+      const confirmedDto: ImportacaoConfirmResponseDto = parsed.data;
+      return { success: true, data: confirmedDto };
+    },
+  });
+}
+
+/**
+ * Cancela atomicamente uma importação pendente (status AGUARDANDO_CONFIRMACAO)
+ * no endpoint administrativo DELETE /api/admin/importacoes/[id], preservando o
+ * arquivo TXT original no storage privado para auditoria.
+ *
+ * @param importacaoId Identificador numérico inteiro positivo da importação
+ * @param options Opções com AbortSignal e token opcional de autenticação
+ * @returns Dados do cancelamento registrado no servidor
+ * @throws ImportacaoClientError com mensagens amigáveis e código de status
+ */
+export async function cancelImportacaoById(
+  importacaoId: number,
+  options?: ImportacaoRequestOptions
+): Promise<ImportacaoCancelResponseDto> {
+  const safeId = validateClientImportacaoId(importacaoId);
+
+  return executeImportacaoRequest<ImportacaoCancelResponseDto>({
+    url: `/api/admin/importacoes/${safeId}`,
+    method: 'DELETE',
+    operation: 'cancel',
+    options,
+    parsePayload: (rawPayload) => {
+      const parsed = importacaoCancelResponseSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        return { success: false, details: parsed.error.flatten() };
+      }
+      const cancelledDto: ImportacaoCancelResponseDto = parsed.data;
+      return { success: true, data: cancelledDto };
+    },
+  });
 }
