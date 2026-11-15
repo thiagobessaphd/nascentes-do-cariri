@@ -24,10 +24,10 @@ A matriz estabelece para cada requisito:
 |:---|:---|:---|:---|:---|:---|:---|
 | **CT-BE-01** | Login válido e inválido | Backend | Integração | Autenticação | `src/tests/integration/auth/login.test.ts` | Planejado |
 | **CT-BE-02** | Bloqueio de rota administrativa sem autenticação | Backend | Integração | Autenticação / Guarda | `src/tests/integration/auth/admin-guard.test.ts` | Planejado |
-| **CT-BE-03** | Arquivo vazio | Backend | Unitário | Importação TXT | `src/tests/unit/import/file-validator.test.ts` | Planejado |
+| **CT-BE-03** | Arquivo vazio | Backend | Unitário | Importação TXT | `src/tests/unit/import/file-validator.test.ts` | Ativo |
 | **CT-BE-04** | Extensão inválida (diferente de `.txt`) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-05** | Arquivo acima do limite (5 MB) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
-| **CT-BE-06** | Cabeçalho ausente ou incorreto | Backend | Unitário | Importação TXT | `src/tests/unit/import/txt-parser.test.ts` | Planejado |
+| **CT-BE-06** | Cabeçalho ausente ou incorreto | Backend | Unitário | Importação TXT | `src/tests/unit/import/txt-parser.test.ts` | Ativo |
 | **CT-BE-07** | Coordenada fora dos limites (Cariri) | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-08** | Data inválida | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-09** | Vazão negativa ou não numérica | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
@@ -42,7 +42,6 @@ A matriz estabelece para cada requisito:
 | **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Ativo |
 | **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Ativo |
 | **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Ativo |
-| **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Ativo |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
 | **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Ativo |
