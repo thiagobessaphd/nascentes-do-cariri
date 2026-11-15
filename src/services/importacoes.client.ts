@@ -886,3 +886,88 @@ export async function cancelImportacaoById(
     },
   });
 }
+
+// PERSISTÊNCIA TEMPORÁRIA DA PRÉVIA NA SESSÃO
+
+export const IMPORTACAO_PREVIEW_STORAGE_KEY =
+  'nascentes_cariri:admin_importacao_preview_v1';
+
+const RECOVERABLE_PREVIEW_STATUSES = new Set<string>([
+  'AGUARDANDO_CONFIRMACAO',
+  'FALHOU',
+]);
+
+function getBrowserSessionStorage(): Storage | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Salva o DTO da prévia atual em `sessionStorage` para recuperação,
+ * apenas enquanto o lote ainda puder ser inspecionado, corrigido ou cancelado.
+ */
+export function savePreviewSession(dto: ImportacaoValidationResponseDto): void {
+  const storage = getBrowserSessionStorage();
+  if (!storage || !RECOVERABLE_PREVIEW_STATUSES.has(dto.status)) {
+    return;
+  }
+
+  try {
+    storage.setItem(IMPORTACAO_PREVIEW_STORAGE_KEY, JSON.stringify(dto));
+  } catch {
+    // QuotaExceededError ou restrição de privacidade não devem interromper o fluxo principal
+  }
+}
+
+/**
+ * Remove a prévia salva da sessão do navegador.
+ */
+export function clearPreviewSession(): void {
+  const storage = getBrowserSessionStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.removeItem(IMPORTACAO_PREVIEW_STORAGE_KEY);
+  } catch {
+    // Ignora falhas de acesso ao storage em ambientes restritos
+  }
+}
+
+/**
+ * Recupera e valida com Zod a prévia salva na sessão atual.
+ * Limpa automaticamente o armazenamento se os dados estiverem corrompidos ou em estado final.
+ */
+export function loadPreviewSession(): ImportacaoValidationResponseDto | null {
+  const storage = getBrowserSessionStorage();
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const raw = storage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsedJson: unknown = JSON.parse(raw);
+    const validated = importacaoValidationResponseSchema.safeParse(parsedJson);
+    if (!validated.success || !RECOVERABLE_PREVIEW_STATUSES.has(validated.data.status)) {
+      clearPreviewSession();
+      return null;
+    }
+
+    const dto: ImportacaoValidationResponseDto = validated.data;
+    return dto;
+  } catch {
+    clearPreviewSession();
+    return null;
+  }
+}
