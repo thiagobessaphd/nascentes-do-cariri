@@ -214,6 +214,8 @@
 
 .emptyRawValue {
   color: #64748b;
+  font-style: italic;
+  font-size: 0.78125rem;
 }
 
 .srOnly {

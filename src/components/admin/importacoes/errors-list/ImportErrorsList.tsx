@@ -103,15 +103,12 @@ export default function ImportErrorsList({
                     <div className={styles.errorMessage}>{err.message}</div>
                   </td>
                   <td>
-                    {err.rawValue ? (
+                    {err.rawValue && err.rawValue.trim().length > 0 ? (
                       <code className={styles.rawCode} title={err.rawValue}>
                         {err.rawValue}
                       </code>
                     ) : (
-                      <span className={styles.emptyRawValue}>
-                        <span aria-hidden="true">—</span>
-                        <span className={styles.srOnly}>Não informado</span>
-                      </span>
+                      <span className={styles.emptyRawValue}>(Não informado)</span>
                     )}
                   </td>
                 </tr>
