@@ -13,6 +13,7 @@ export interface ImportActionBarProps {
   readonly totalInvalidas?: number | undefined;
   readonly blockingReason?: string | undefined;
   readonly isConfirming?: boolean | undefined;
+  readonly isCanceling?: boolean | undefined;
   readonly isConfirmed?: boolean | undefined;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
@@ -24,6 +25,7 @@ export default function ImportActionBar({
   totalInvalidas = 0,
   blockingReason,
   isConfirming = false,
+  isCanceling = false,
   isConfirmed = false,
   onConfirm,
   onCancel,
@@ -35,7 +37,8 @@ export default function ImportActionBar({
       ? `Confirmar e Adicionar ${totalValidas} ${totalValidas === 1 ? 'Nascente' : 'Nascentes'}`
       : 'Confirmar Importação';
 
-  const isConfirmDisabled = !canConfirm || isConfirming || isConfirmed;
+  const isConfirmDisabled = !canConfirm || isConfirming || isCanceling || isConfirmed;
+  const isCancelDisabled = isConfirming || isCanceling;
 
   return (
     <aside className={styles.actionBar} aria-label="Barra de ações para confirmação ou cancelamento da importação">
@@ -82,7 +85,8 @@ export default function ImportActionBar({
         <button
           type="button"
           onClick={onCancel}
-          disabled={isConfirming}
+          disabled={isCancelDisabled}
+          aria-disabled={isCancelDisabled}
           className={hasBlockingErrors ? styles.retryButton : styles.cancelButton}
           aria-label={
             hasBlockingErrors
@@ -91,7 +95,15 @@ export default function ImportActionBar({
           }
           data-testid="import-cancel-button"
         >
-          {hasBlockingErrors ? (
+          {isCanceling ? (
+            <>
+              <span
+                className={hasBlockingErrors ? styles.spinner : styles.spinnerDark}
+                aria-hidden="true"
+              />
+              <span>Cancelando...</span>
+            </>
+          ) : hasBlockingErrors ? (
             <>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
                 <polyline points="23 4 23 10 17 10" />

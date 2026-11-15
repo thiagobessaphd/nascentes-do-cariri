@@ -9,9 +9,15 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import type { ImportacaoValidationResponseDto } from '@/modules/importacoes/importacoes.contracts';
+import type {
+  ImportacaoCancelResponseDto,
+  ImportacaoConfirmResponseDto,
+  ImportacaoValidationResponseDto,
+} from '@/modules/importacoes/importacoes.contracts';
 import {
+  cancelImportacaoById,
   canConfirmImportacao,
+  confirmImportacaoById,
   derivePreviewState,
   uploadAndValidateTxt,
   type PreviewClassification,
@@ -25,9 +31,19 @@ import styles from './ImportacaoWorkspace.module.css';
 
 export interface ImportacaoWorkspaceProps {
   /**
-   * Callback opcional disparado ao confirmar o lote validado (conectado na US-13)
+   * Callback opcional disparado após confirmar o lote validado no servidor
    */
-  readonly onConfirmImportacao?: ((dto: ImportacaoValidationResponseDto) => Promise<void> | void) | undefined;
+  readonly onConfirmImportacao?: ((
+    dto: ImportacaoValidationResponseDto,
+    commitResult: ImportacaoConfirmResponseDto
+  ) => Promise<void> | void) | undefined;
+  /**
+   * Callback opcional disparado após cancelar a importação no servidor
+   */
+  readonly onCancelImportacao?: ((
+    dto: ImportacaoValidationResponseDto,
+    cancelResult: ImportacaoCancelResponseDto
+  ) => Promise<void> | void) | undefined;
   /**
    * Token opcional de autenticação administrativa para execução via API
    */
@@ -36,6 +52,7 @@ export interface ImportacaoWorkspaceProps {
 
 export default function ImportacaoWorkspace({
   onConfirmImportacao,
+  onCancelImportacao,
   authToken,
 }: ImportacaoWorkspaceProps) {
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -43,8 +60,10 @@ export default function ImportacaoWorkspace({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewDto, setPreviewDto] = useState<ImportacaoValidationResponseDto | null>(null);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [isCanceling, setIsCanceling] = useState<boolean>(false);
   const [isConfirmed, setIsConfirmed] = useState<boolean>(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
+  const [cancellationNotice, setCancellationNotice] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
 
   const errorsSectionRef = useRef<HTMLElement>(null);
@@ -52,6 +71,7 @@ export default function ImportacaoWorkspace({
   const uploadSectionRef = useRef<HTMLElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isValidatingRef = useRef<boolean>(false);
+  const isMutatingRef = useRef<boolean>(false);
   const prevStageRef = useRef<'upload' | 'preview'>('upload');
 
   // Deriva o diagnóstico do DTO atual caso exista
@@ -109,6 +129,7 @@ export default function ImportacaoWorkspace({
     setValidationError(null);
     setIsConfirmed(false);
     setConfirmationNotice(null);
+    setCancellationNotice(null);
     setConfirmationError(null);
     setCurrentFile(file);
 
@@ -135,7 +156,44 @@ export default function ImportacaoWorkspace({
     }
   }
 
-  function handleCancelPreview() {
+  async function handleCancelPreview() {
+    if (isConfirming || isCanceling || isMutatingRef.current) return;
+
+    if (previewDto && previewDto.status === 'AGUARDANDO_CONFIRMACAO' && !isConfirmed) {
+      isMutatingRef.current = true;
+      setIsCanceling(true);
+      setConfirmationError(null);
+
+      try {
+        const cancelResult = await cancelImportacaoById(previewDto.importacaoId, {
+          authToken,
+        });
+        if (onCancelImportacao) {
+          await onCancelImportacao(previewDto, cancelResult);
+        }
+        setPreviewDto(null);
+        setCurrentFile(null);
+        setValidationError(null);
+        setIsConfirmed(false);
+        setConfirmationNotice(null);
+        setConfirmationError(null);
+        setCancellationNotice(
+          cancelResult.mensagemErro ||
+            'Importação cancelada pelo administrador antes da confirmação.'
+        );
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Falha inesperada ao cancelar a importação no servidor.';
+        setConfirmationError(message);
+      } finally {
+        isMutatingRef.current = false;
+        setIsCanceling(false);
+      }
+      return;
+    }
+
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     isValidatingRef.current = false;
@@ -146,34 +204,63 @@ export default function ImportacaoWorkspace({
     setIsConfirmed(false);
     setConfirmationNotice(null);
     setConfirmationError(null);
+    setCancellationNotice(null);
   }
 
   async function handleConfirm() {
-    if (!previewDto || !canConfirm || isConfirming || isConfirmed) return;
+    if (
+      !previewDto ||
+      !canConfirm ||
+      isConfirming ||
+      isCanceling ||
+      isConfirmed ||
+      isMutatingRef.current
+    ) {
+      return;
+    }
 
+    isMutatingRef.current = true;
+    setIsConfirming(true);
     setConfirmationError(null);
+    setConfirmationNotice(null);
+    setCancellationNotice(null);
 
-    if (onConfirmImportacao) {
-      setIsConfirming(true);
-      try {
-        await onConfirmImportacao(previewDto);
-        setIsConfirmed(true);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Falha inesperada ao confirmar a importação no banco de dados.';
-        setConfirmationError(message);
-      } finally {
-        setIsConfirming(false);
+    try {
+      const commitResult = await confirmImportacaoById(previewDto.importacaoId, {
+        authToken,
+      });
+      if (onConfirmImportacao) {
+        await onConfirmImportacao(previewDto, commitResult);
       }
-    } else {
-      const totalValidas = previewDto.summary.totalValidas;
-      const validasLabel = totalValidas === 1 ? '1 nascente' : `${totalValidas} nascentes`;
-      setIsConfirmed(true);
-      setConfirmationNotice(
-        `Lote de ${validasLabel} conferido com sucesso! Nenhuma alteração foi gravada no banco porque a etapa de persistência definitiva ainda será conectada.`
+      setPreviewDto((prev) =>
+        prev ? { ...prev, status: commitResult.status, canConfirm: false } : prev
       );
+      setIsConfirmed(true);
+
+      const totalInseridas = commitResult.summary.totalInseridas;
+      const totalDuplicadas = commitResult.summary.totalDuplicadas;
+      const inseridasLabel =
+        totalInseridas === 1
+          ? '1 nova nascente adicionada'
+          : `${totalInseridas} novas nascentes adicionadas`;
+      const duplicadasInfo =
+        totalDuplicadas > 0
+          ? ` (${totalDuplicadas} ${
+              totalDuplicadas === 1 ? 'duplicada ignorada' : 'duplicadas ignoradas'
+            })`
+          : '';
+      setConfirmationNotice(
+        `Importação confirmada com sucesso! ${inseridasLabel} à base oficial do mapa${duplicadasInfo}.`
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Falha inesperada ao confirmar a importação no banco de dados.';
+      setConfirmationError(message);
+    } finally {
+      isMutatingRef.current = false;
+      setIsConfirming(false);
     }
   }
 
@@ -268,7 +355,22 @@ export default function ImportacaoWorkspace({
         </ol>
       </nav>
 
-      {/* 1. Formulário de Upload (exibido no estado inicial ou quando não há prévia ativa) */}
+      {/* 1. Feedback de cancelamento anterior e formulário de upload */}
+      {!previewDto && cancellationNotice && (
+        <div
+          className={styles.noticeBox}
+          role="status"
+          aria-live="polite"
+          data-testid="cancellation-notice"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <span>{cancellationNotice}</span>
+        </div>
+      )}
+
       {!previewDto && (
         <ImportUploadForm
           onValidate={handleValidateFile}
@@ -345,9 +447,14 @@ export default function ImportacaoWorkspace({
             }
             blockingReason={classification.blockingReason}
             isConfirming={isConfirming}
+            isCanceling={isCanceling}
             isConfirmed={isConfirmed}
-            onConfirm={handleConfirm}
-            onCancel={handleCancelPreview}
+            onConfirm={() => {
+              void handleConfirm();
+            }}
+            onCancel={() => {
+              void handleCancelPreview();
+            }}
           />
         </div>
       )}
