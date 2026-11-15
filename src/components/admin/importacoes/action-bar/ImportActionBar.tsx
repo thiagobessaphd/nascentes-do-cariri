@@ -44,7 +44,7 @@ export default function ImportActionBar({
     <aside className={styles.actionBar} aria-label="Barra de ações para confirmação ou cancelamento da importação">
       <div className={styles.statusMessageArea}>
         <span className={styles.statusIcon} aria-hidden="true">
-          {canConfirm ? (
+          {canConfirm || isConfirmed ? (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
@@ -66,17 +66,21 @@ export default function ImportActionBar({
 
         <div className={styles.statusText}>
           <p className={styles.statusTitle}>
-            {canConfirm
-              ? 'Lote aprovado para integração'
-              : hasBlockingErrors
-                ? 'Confirmação bloqueada por regras de integridade'
-                : 'Nenhum registro novo para confirmar'}
+            {isConfirmed
+              ? 'Importação concluída e publicada no mapa'
+              : canConfirm
+                ? 'Lote aprovado para integração'
+                : hasBlockingErrors
+                  ? 'Confirmação bloqueada por regras de integridade'
+                  : 'Nenhum registro novo para confirmar'}
           </p>
           <p id="action-bar-help-text" className={styles.statusHelp}>
-            {canConfirm
-              ? 'A importação é cumulativa e manterá os registros e arquivos de importações anteriores.'
-              : blockingReason ||
-                'A importação atômica requer que todos os erros sejam corrigidos antes da gravação.'}
+            {isConfirmed
+              ? 'Os novos registros foram gravados com sucesso e já estão disponíveis para consulta pública no mapa.'
+              : canConfirm
+                ? 'A importação é cumulativa e manterá os registros e arquivos de importações anteriores.'
+                : blockingReason ||
+                  'A importação atômica requer que todos os erros sejam corrigidos antes da gravação.'}
           </p>
         </div>
       </div>
@@ -89,9 +93,11 @@ export default function ImportActionBar({
           aria-disabled={isCancelDisabled}
           className={hasBlockingErrors ? styles.retryButton : styles.cancelButton}
           aria-label={
-            hasBlockingErrors
-              ? 'Enviar arquivo corrigido para nova validação'
-              : 'Cancelar prévia e enviar outro arquivo'
+            isConfirmed
+              ? 'Limpar resumo e enviar um novo arquivo para importação'
+              : hasBlockingErrors
+                ? 'Enviar arquivo corrigido para nova validação'
+                : 'Cancelar prévia e enviar outro arquivo'
           }
           data-testid="import-cancel-button"
         >
@@ -102,6 +108,14 @@ export default function ImportActionBar({
                 aria-hidden="true"
               />
               <span>Cancelando...</span>
+            </>
+          ) : isConfirmed ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>Enviar Novo Arquivo</span>
             </>
           ) : hasBlockingErrors ? (
             <>
@@ -127,7 +141,7 @@ export default function ImportActionBar({
           onClick={onConfirm}
           disabled={isConfirmDisabled}
           aria-disabled={isConfirmDisabled}
-          aria-describedby={!canConfirm ? 'action-bar-help-text' : undefined}
+          aria-describedby={!canConfirm && !isConfirmed ? 'action-bar-help-text' : undefined}
           className={styles.confirmButton}
           data-testid="import-confirm-button"
         >

@@ -17,8 +17,12 @@ import type {
 import {
   cancelImportacaoById,
   canConfirmImportacao,
+  clearPreviewSession,
   confirmImportacaoById,
   derivePreviewState,
+  ImportacaoClientError,
+  loadPreviewSession,
+  savePreviewSession,
   uploadAndValidateTxt,
   type PreviewClassification,
 } from '@/services/importacoes.client';
@@ -50,6 +54,19 @@ export interface ImportacaoWorkspaceProps {
   readonly authToken?: string | undefined;
 }
 
+function scrollToWorkspaceTop(): void {
+  if (typeof window === 'undefined') return;
+  const prefersReducedMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    });
+  }
+}
+
 export default function ImportacaoWorkspace({
   onConfirmImportacao,
   onCancelImportacao,
@@ -69,6 +86,8 @@ export default function ImportacaoWorkspace({
   const errorsSectionRef = useRef<HTMLElement>(null);
   const previewLayoutRef = useRef<HTMLDivElement>(null);
   const uploadSectionRef = useRef<HTMLElement>(null);
+  const cancellationNoticeRef = useRef<HTMLDivElement>(null);
+  const confirmationNoticeRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isValidatingRef = useRef<boolean>(false);
   const isMutatingRef = useRef<boolean>(false);
@@ -76,15 +95,37 @@ export default function ImportacaoWorkspace({
 
   // Deriva o diagnóstico do DTO atual caso exista
   const classification: PreviewClassification | null = previewDto
-    ? derivePreviewState(previewDto)
+    ? isConfirmed
+      ? {
+          kind: 'valid',
+          message:
+            confirmationNotice ??
+            'Homologação transacional concluída com sucesso. Os registros válidos já foram integrados ao mapa.',
+          canConfirm: true,
+        }
+      : derivePreviewState(previewDto)
     : null;
 
-  const canConfirm = previewDto ? canConfirmImportacao(previewDto) : false;
+  const canConfirm = previewDto && !isConfirmed ? canConfirmImportacao(previewDto) : false;
 
   // Cancela requisição em voo caso o componente seja desmontado
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Restaura prévia pendente da sessão atual
+  useEffect(() => {
+    const storedPreview = loadPreviewSession();
+    if (!storedPreview) return;
+
+    const timerId = window.setTimeout(() => {
+      setPreviewDto((current) => current ?? storedPreview);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
     };
   }, []);
 
@@ -113,9 +154,19 @@ export default function ImportacaoWorkspace({
     }
 
     if (prevStage === 'preview') {
-      uploadSectionRef.current?.focus();
+      scrollToWorkspaceTop();
+      (cancellationNoticeRef.current ?? uploadSectionRef.current)?.focus({
+        preventScroll: true,
+      });
     }
   }, [previewDto]);
+
+  // Rola para o topo e foca o banner de confirmação assim que a homologação conclui
+  useEffect(() => {
+    if (!isConfirmed) return;
+    scrollToWorkspaceTop();
+    confirmationNoticeRef.current?.focus({ preventScroll: true });
+  }, [isConfirmed]);
 
   async function handleValidateFile(file: File) {
     if (isValidatingRef.current) return;
@@ -138,11 +189,13 @@ export default function ImportacaoWorkspace({
         authToken,
         signal: controller.signal,
       });
+      savePreviewSession(dto);
       setPreviewDto(dto);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
+      clearPreviewSession();
       setPreviewDto(null);
       const message =
         err instanceof Error ? err.message : 'Falha inesperada ao validar o arquivo no servidor.';
@@ -154,6 +207,17 @@ export default function ImportacaoWorkspace({
       isValidatingRef.current = false;
       setIsValidating(false);
     }
+  }
+
+  function resetWorkspaceState(notice: string | null) {
+    clearPreviewSession();
+    setPreviewDto(null);
+    setCurrentFile(null);
+    setValidationError(null);
+    setIsConfirmed(false);
+    setConfirmationNotice(null);
+    setConfirmationError(null);
+    setCancellationNotice(notice);
   }
 
   async function handleCancelPreview() {
@@ -171,17 +235,15 @@ export default function ImportacaoWorkspace({
         if (onCancelImportacao) {
           await onCancelImportacao(previewDto, cancelResult);
         }
-        setPreviewDto(null);
-        setCurrentFile(null);
-        setValidationError(null);
-        setIsConfirmed(false);
-        setConfirmationNotice(null);
-        setConfirmationError(null);
-        setCancellationNotice(
+        resetWorkspaceState(
           cancelResult.mensagemErro ||
             'Importação cancelada pelo administrador antes da confirmação.'
         );
       } catch (err: unknown) {
+        if (err instanceof ImportacaoClientError && err.statusCode === 404) {
+          resetWorkspaceState(null);
+          return;
+        }
         const message =
           err instanceof Error
             ? err.message
@@ -198,13 +260,7 @@ export default function ImportacaoWorkspace({
     abortControllerRef.current = null;
     isValidatingRef.current = false;
     setIsValidating(false);
-    setPreviewDto(null);
-    setCurrentFile(null);
-    setValidationError(null);
-    setIsConfirmed(false);
-    setConfirmationNotice(null);
-    setConfirmationError(null);
-    setCancellationNotice(null);
+    resetWorkspaceState(null);
   }
 
   async function handleConfirm() {
@@ -232,8 +288,9 @@ export default function ImportacaoWorkspace({
       if (onConfirmImportacao) {
         await onConfirmImportacao(previewDto, commitResult);
       }
+      clearPreviewSession();
       setPreviewDto((prev) =>
-        prev ? { ...prev, status: commitResult.status, canConfirm: false } : prev
+        prev ? { ...prev, status: commitResult.status } : prev
       );
       setIsConfirmed(true);
 
@@ -358,16 +415,20 @@ export default function ImportacaoWorkspace({
       {/* 1. Feedback de cancelamento anterior e formulário de upload */}
       {!previewDto && cancellationNotice && (
         <div
+          ref={cancellationNoticeRef}
+          tabIndex={-1}
           className={styles.noticeBox}
           role="status"
           aria-live="polite"
           data-testid="cancellation-notice"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          <span>{cancellationNotice}</span>
+          <div className={styles.noticeContent}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{cancellationNotice}</span>
+          </div>
         </div>
       )}
 
@@ -403,12 +464,31 @@ export default function ImportacaoWorkspace({
 
           {/* Feedback de Confirmação quando acionado */}
           {confirmationNotice && (
-            <div className={styles.noticeBox} role="status" aria-live="polite">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <span>{confirmationNotice}</span>
+            <div
+              ref={confirmationNoticeRef}
+              tabIndex={-1}
+              className={styles.noticeBox}
+              role="status"
+              aria-live="polite"
+              data-testid="confirmation-notice"
+            >
+              <div className={styles.noticeContent}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <span>{confirmationNotice}</span>
+              </div>
+              <button
+                type="button"
+                className={styles.noticeActionBtn}
+                onClick={() => {
+                  void handleCancelPreview();
+                }}
+                data-testid="new-import-button"
+              >
+                Enviar Novo Arquivo
+              </button>
             </div>
           )}
 
@@ -420,6 +500,7 @@ export default function ImportacaoWorkspace({
             hashSha256={previewDto.hashSha256}
             classification={classification}
             hasHeaderError={hasHeaderError}
+            hideDiagnosticBanner={isConfirmed}
           />
 
           {/* Tabela de Erros de Validação (em primeiro plano caso haja erros) */}

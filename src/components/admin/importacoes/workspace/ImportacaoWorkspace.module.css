@@ -144,7 +144,53 @@
   font-weight: 600;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+}
+
+.noticeBox:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.noticeBox:focus-visible {
+  outline: 2px solid #166534;
+  outline-offset: 2px;
+}
+
+.noticeContent {
+  display: flex;
+  align-items: center;
   gap: 0.625rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.noticeActionBtn {
+  background-color: #ffffff;
+  border: 1px solid #166534;
+  color: #166534;
+  border-radius: 5px;
+  padding: 0.4375rem 0.9375rem;
+  min-height: 36px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.noticeActionBtn:hover {
+  background-color: #dcfce7;
+  color: #14532d;
+}
+
+.noticeActionBtn:focus-visible {
+  outline: 2px solid #166534;
+  outline-offset: 2px;
 }
 
 .errorBox {
@@ -169,7 +215,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stepItem {
+  .stepItem,
+  .noticeActionBtn {
     transition: none;
   }
 
