@@ -217,5 +217,7 @@ export interface IImportacaoCommitService {
     input: ConfirmImportacaoInput,
     options?: ConfirmImportacaoOptions
   ): Promise<ImportacaoConfirmResponseDto>;
-  cancelImportacao?(input: CancelImportacaoInput): Promise<ImportacaoCancelResponseDto>;
+  cancelImportacao(
+    input: CancelImportacaoInput
+  ): Promise<ImportacaoCancelResponseDto>;
 }

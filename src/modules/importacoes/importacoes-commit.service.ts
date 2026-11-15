@@ -26,13 +26,17 @@ import {
   parseNascentesTxt,
 } from './txt-parser';
 import {
+  CANCELLED_IMPORTACAO_DEFAULT_MESSAGE,
   CONFIRMABLE_IMPORTACAO_STATUS,
   IMPORTACAO_COMMIT_ERROR_CODES,
+  cancelImportacaoInputSchema,
   confirmImportacaoInputSchema,
+  type CancelImportacaoInput,
   type ConfirmImportacaoInput,
   type ConfirmImportacaoOptions,
   type IImportacaoCommitService,
   type IImportacaoStorageService,
+  type ImportacaoCancelResponseDto,
   type ImportacaoCommitServiceDeps,
   type ImportacaoConfirmResponseDto,
   type OnCommitCacheInvalidator,
@@ -85,7 +89,7 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
 
     const { importacaoId, usuarioId } = parsedInput.data;
 
-    // 1. Verificação inicial de existência e estado elegível
+    // 1. Verificação inicial de existência, ownership e estado elegível
     const importacao = await this.prisma.importacao.findUnique({
       where: { id: importacaoId },
     });
@@ -98,6 +102,7 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
       );
     }
 
+    this.assertOwnership(importacao.usuarioId, usuarioId, importacao.id);
     this.assertConfirmableState(importacao.status, importacao.totalInvalidas, importacao.id);
 
     // 2. Recuperação e validação criptográfica + sintática do TXT original no storage privado
@@ -114,6 +119,7 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
     const committed = await this.executeAtomicCommit(
       {
         importacaoId: importacao.id,
+        usuarioId,
         nomeArquivo: importacao.nomeArquivo,
         hashArquivo: importacao.hashArquivo,
         parseResult,
@@ -151,6 +157,99 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
   }
 
   /**
+   * Executa o cancelamento atômico de uma importação pendente (AGUARDANDO_CONFIRMACAO),
+   * preservando o arquivo TXT original no storage privado para auditoria (Seção 6.3 / US-14).
+   */
+  async cancelImportacao(
+    input: CancelImportacaoInput
+  ): Promise<ImportacaoCancelResponseDto> {
+    const parsedInput = cancelImportacaoInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new AppError(
+        parsedInput.error.issues[0]?.message ?? 'Parâmetros inválidos para cancelar importação.',
+        400,
+        IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT
+      );
+    }
+
+    const { importacaoId, usuarioId } = parsedInput.data;
+
+    // 1. Verificação de existência
+    const importacao = await this.prisma.importacao.findUnique({
+      where: { id: importacaoId },
+    });
+
+    if (!importacao) {
+      throw new AppError(
+        `Importação com ID ${importacaoId} não foi encontrada.`,
+        404,
+        IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_NOT_FOUND
+      );
+    }
+
+    // 2. Validação de ownership e de estado elegível (AGUARDANDO_CONFIRMACAO)
+    this.assertOwnership(importacao.usuarioId, usuarioId, importacao.id);
+    this.assertCancelableState(importacao.status, importacao.id);
+
+    // 3. Transição atômica compare-and-swap (preservando arquivo original no storage privado)
+    const concluidaAt = new Date();
+    const mensagemErro = CANCELLED_IMPORTACAO_DEFAULT_MESSAGE;
+
+    const cancelled = await this.prisma.importacao.updateMany({
+      where: {
+        id: importacao.id,
+        status: StatusImportacao.AGUARDANDO_CONFIRMACAO,
+        ...(usuarioId !== undefined ? { usuarioId } : {}),
+      },
+      data: {
+        status: StatusImportacao.CANCELADA,
+        concluidaAt,
+        mensagemErro,
+      },
+    });
+
+    if (cancelled.count === 0) {
+      throw new AppError(
+        `A importação ${importacao.id} já foi processada ou cancelada concorrentemente.`,
+        409,
+        IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_ALREADY_PROCESSED
+      );
+    }
+
+    logger.info('Importação pendente cancelada administrativamente.', {
+      importacaoId: importacao.id,
+      usuarioId: usuarioId ?? importacao.usuarioId,
+      status: StatusImportacao.CANCELADA,
+    });
+
+    return {
+      importacaoId: importacao.id,
+      nomeArquivo: importacao.nomeArquivo,
+      hashSha256: importacao.hashArquivo,
+      status: StatusImportacao.CANCELADA,
+      mensagemErro,
+      concluidaAt: concluidaAt.toISOString(),
+    };
+  }
+
+  /**
+   * Garante que a operação pertence ao administrador solicitante quando usuarioId é informado.
+   */
+  private assertOwnership(
+    ownerUsuarioId: number,
+    requestUsuarioId: number | undefined,
+    importacaoId: number
+  ): void {
+    if (requestUsuarioId !== undefined && ownerUsuarioId !== requestUsuarioId) {
+      throw new AppError(
+        `Acesso negado: a importação ${importacaoId} pertence a outro administrador.`,
+        403,
+        IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_OWNERSHIP_FORBIDDEN
+      );
+    }
+  }
+
+  /**
    * Garante que a importação esteja estritamente elegível para confirmação.
    */
   private assertConfirmableState(
@@ -160,7 +259,8 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
   ): void {
     if (
       status === StatusImportacao.CONCLUIDA ||
-      status === StatusImportacao.PROCESSANDO
+      status === StatusImportacao.PROCESSANDO ||
+      status === StatusImportacao.CANCELADA
     ) {
       throw new AppError(
         `A importação ${importacaoId} já está em estado '${status}' e não pode ser confirmada novamente.`,
@@ -172,6 +272,34 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
     if (status !== CONFIRMABLE_IMPORTACAO_STATUS || totalInvalidas > 0) {
       throw new AppError(
         `A importação ${importacaoId} não está apta para confirmação (status: ${status}, inválidas: ${totalInvalidas}).`,
+        409,
+        IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_STATE
+      );
+    }
+  }
+
+  /**
+   * Garante que a importação esteja estritamente pendente (AGUARDANDO_CONFIRMACAO) para cancelamento.
+   */
+  private assertCancelableState(
+    status: StatusImportacao,
+    importacaoId: number
+  ): void {
+    if (
+      status === StatusImportacao.CONCLUIDA ||
+      status === StatusImportacao.PROCESSANDO ||
+      status === StatusImportacao.CANCELADA
+    ) {
+      throw new AppError(
+        `A importação ${importacaoId} já está em estado '${status}' e não pode ser cancelada.`,
+        409,
+        IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_ALREADY_PROCESSED
+      );
+    }
+
+    if (status !== CONFIRMABLE_IMPORTACAO_STATUS) {
+      throw new AppError(
+        `A importação ${importacaoId} não está pendente de confirmação (status: ${status}) e não pode ser cancelada.`,
         409,
         IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_STATE
       );
@@ -246,6 +374,7 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
   private async executeAtomicCommit(
     params: {
       readonly importacaoId: number;
+      readonly usuarioId?: number | undefined;
       readonly nomeArquivo: string;
       readonly hashArquivo: string;
       readonly parseResult: TxtParseResult;
@@ -259,6 +388,7 @@ export class ImportacaoCommitService implements IImportacaoCommitService {
           where: {
             id: params.importacaoId,
             status: StatusImportacao.AGUARDANDO_CONFIRMACAO,
+            ...(params.usuarioId !== undefined ? { usuarioId: params.usuarioId } : {}),
           },
           data: {
             status: StatusImportacao.PROCESSANDO,
