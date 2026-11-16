@@ -9,7 +9,13 @@
  * e garantia estrita de que não existe confirmação direta nem exposição de caminhos internos.
  */
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import Link from 'next/link';
 import {
   DEFAULT_HISTORY_PAGE,
@@ -26,8 +32,8 @@ import {
   clearPreviewSessionIfId,
   fetchImportacoesHistory,
   formatDateTimePtBr,
-  formatHashSha256Short,
   formatImportacaoStatusLabel,
+  getImportacaoStatusMeta,
 } from '@/services/importacoes.client';
 import ImportStatusBadge from '../status-badge/ImportStatusBadge';
 import ImportCancelModal from '../cancel-modal/ImportCancelModal';
@@ -41,6 +47,35 @@ export interface ImportacaoHistoryViewProps {
   readonly initialData?: ImportacaoHistoryListResponseDto | undefined;
   readonly initialError?: string | undefined;
 }
+
+type ImportacaoStatusTone = ReturnType<typeof getImportacaoStatusMeta>['tone'];
+
+interface StatusFilterOption {
+  readonly value: ImportacaoStatus | '';
+  readonly label: string;
+  readonly tone: ImportacaoStatusTone | null;
+}
+
+const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = [
+  { value: '', label: 'Todos os status', tone: null },
+  ...IMPORTACAO_STATUS_VALUES.map((statusValue) => {
+    const meta = getImportacaoStatusMeta(statusValue);
+    return {
+      value: statusValue,
+      label: meta.label,
+      tone: meta.tone,
+    };
+  }),
+];
+
+const STATUS_DOT_CLASS_MAP: Record<ImportacaoStatus, string | undefined> = {
+  VALIDANDO: styles.toneDotValidating,
+  AGUARDANDO_CONFIRMACAO: styles.toneDotWarning,
+  PROCESSANDO: styles.toneDotProcessing,
+  CONCLUIDA: styles.toneDotSuccess,
+  FALHOU: styles.toneDotDanger,
+  CANCELADA: styles.toneDotNeutral,
+};
 
 type HistoryAsyncState =
   | { readonly kind: 'loading' }
@@ -122,6 +157,8 @@ export default function ImportacaoHistoryView({
   const [cancelTarget, setCancelTarget] = useState<CancelTargetState | null>(null);
   const [isCanceling, setIsCanceling] = useState<boolean>(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
 
   const shouldSkipInitialFetchRef = useRef<boolean>(
     initialData !== undefined || initialError !== undefined
@@ -129,6 +166,9 @@ export default function ImportacaoHistoryView({
   const abortControllerRef = useRef<AbortController | null>(null);
   const cancelTriggerRef = useRef<HTMLButtonElement | null>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const listboxRef = useRef<HTMLUListElement | null>(null);
 
   const loadHistory = useCallback(
     async (targetPage: number, targetStatus?: ImportacaoStatus) => {
@@ -182,22 +222,136 @@ export default function ImportacaoHistoryView({
     };
   }, [loadHistory, page, statusFilter]);
 
-  function handleStatusFilterChange(event: ChangeEvent<HTMLSelectElement>) {
-    const rawValue = event.target.value;
-    const nextStatus = (IMPORTACAO_STATUS_VALUES as readonly string[]).includes(rawValue)
-      ? (rawValue as ImportacaoStatus)
-      : undefined;
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    function handleOutsidePointer(event: MouseEvent | TouchEvent) {
+      if (
+        dropdownContainerRef.current &&
+        !dropdownContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsidePointer);
+    document.addEventListener('touchstart', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsidePointer);
+      document.removeEventListener('touchstart', handleOutsidePointer);
+    };
+  }, [isDropdownOpen]);
+
+  useEffect(() => {
+    if (!isDropdownOpen || !listboxRef.current) return;
+    const optionEl = listboxRef.current.children[highlightedIndex];
+    if (optionEl instanceof HTMLElement && typeof optionEl.scrollIntoView === 'function') {
+      optionEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isDropdownOpen, highlightedIndex]);
+
+  const currentOptionIndex = STATUS_FILTER_OPTIONS.findIndex(
+    (option) => option.value === (statusFilter ?? '')
+  );
+  const selectedOption =
+    STATUS_FILTER_OPTIONS[currentOptionIndex >= 0 ? currentOptionIndex : 0] ??
+    STATUS_FILTER_OPTIONS[0];
+
+  function handleSelectStatusOption(rawValue: ImportacaoStatus | '') {
+    const nextStatus = rawValue === '' ? undefined : rawValue;
 
     setActionNotice(null);
     setPage(1);
     setStatusFilter(nextStatus);
     syncHistoryQueryParams(1, nextStatus);
+    setIsDropdownOpen(false);
+    triggerButtonRef.current?.focus();
+  }
+
+  function handleToggleDropdown() {
+    setIsDropdownOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setHighlightedIndex(currentOptionIndex >= 0 ? currentOptionIndex : 0);
+      }
+      return next;
+    });
+  }
+
+  function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const total = STATUS_FILTER_OPTIONS.length;
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault();
+        if (!isDropdownOpen) {
+          setIsDropdownOpen(true);
+          setHighlightedIndex(currentOptionIndex >= 0 ? currentOptionIndex : 0);
+        } else {
+          setHighlightedIndex((prev) => (prev + 1) % total);
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        event.preventDefault();
+        if (!isDropdownOpen) {
+          setIsDropdownOpen(true);
+          setHighlightedIndex(currentOptionIndex >= 0 ? currentOptionIndex : 0);
+        } else {
+          setHighlightedIndex((prev) => (prev - 1 + total) % total);
+        }
+        break;
+      }
+      case 'Home': {
+        if (isDropdownOpen) {
+          event.preventDefault();
+          setHighlightedIndex(0);
+        }
+        break;
+      }
+      case 'End': {
+        if (isDropdownOpen) {
+          event.preventDefault();
+          setHighlightedIndex(total - 1);
+        }
+        break;
+      }
+      case 'Enter':
+      case ' ': {
+        event.preventDefault();
+        if (isDropdownOpen) {
+          const chosen = STATUS_FILTER_OPTIONS[highlightedIndex];
+          if (chosen) {
+            handleSelectStatusOption(chosen.value);
+          }
+        } else {
+          setIsDropdownOpen(true);
+          setHighlightedIndex(currentOptionIndex >= 0 ? currentOptionIndex : 0);
+        }
+        break;
+      }
+      case 'Escape': {
+        if (isDropdownOpen) {
+          event.preventDefault();
+          setIsDropdownOpen(false);
+        }
+        break;
+      }
+      case 'Tab': {
+        if (isDropdownOpen) {
+          setIsDropdownOpen(false);
+        }
+        break;
+      }
+    }
   }
 
   function handleClearFilter() {
     setActionNotice(null);
     setPage(1);
     setStatusFilter(undefined);
+    setIsDropdownOpen(false);
     syncHistoryQueryParams(1, undefined);
   }
 
@@ -264,30 +418,172 @@ export default function ImportacaoHistoryView({
   }
 
   const countText = buildResultCountText(state, statusFilter);
+  const selectedDisplayLabel = selectedOption?.label ?? 'Todos os status';
+  const selectedToneClass =
+    selectedOption !== undefined && selectedOption.value !== ''
+      ? STATUS_DOT_CLASS_MAP[selectedOption.value]
+      : undefined;
+
+  const selectControlClassNames = [
+    styles.selectControl,
+    isDropdownOpen ? styles.selectControlOpen : '',
+    statusFilter !== undefined ? styles.selectControlActive : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const chevronClassNames = [
+    styles.selectChevron,
+    isDropdownOpen ? styles.selectChevronOpen : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={styles.wrapper} data-testid="importacao-history-view">
       {/* Barra de Filtros e Anúncio de Resultados */}
       <section className={styles.filterBar} aria-label="Filtros do histórico de importações">
         <div className={styles.filterControls}>
-          <div className={styles.fieldGroup}>
-            <label htmlFor="history-status-filter" className={styles.filterLabel}>
+          <div className={styles.fieldGroup} ref={dropdownContainerRef}>
+            <label
+              id="history-status-filter-label"
+              htmlFor="history-status-filter"
+              className={styles.filterLabel}
+            >
               Filtrar por status
             </label>
-            <select
-              id="history-status-filter"
-              className={styles.filterSelect}
-              value={statusFilter ?? ''}
-              onChange={handleStatusFilterChange}
-              data-testid="history-status-filter"
-            >
-              <option value="">Todos os status</option>
-              {IMPORTACAO_STATUS_VALUES.map((statusValue) => (
-                <option key={statusValue} value={statusValue}>
-                  {formatImportacaoStatusLabel(statusValue)}
-                </option>
-              ))}
-            </select>
+            <div className={styles.inputWrapper}>
+              <span className={styles.fieldIcon} aria-hidden="true">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+              </span>
+
+              <button
+                ref={triggerButtonRef}
+                id="history-status-filter"
+                type="button"
+                role="combobox"
+                aria-autocomplete="none"
+                aria-haspopup="listbox"
+                aria-expanded={isDropdownOpen}
+                aria-controls="history-status-filter-listbox"
+                aria-labelledby="history-status-filter-label history-status-filter"
+                aria-activedescendant={
+                  isDropdownOpen
+                    ? `history-status-opt-${highlightedIndex}`
+                    : undefined
+                }
+                onClick={handleToggleDropdown}
+                onKeyDown={handleTriggerKeyDown}
+                className={selectControlClassNames}
+                data-testid="history-status-filter"
+              >
+                {selectedToneClass && (
+                  <span
+                    className={`${styles.toneDot} ${selectedToneClass}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className={styles.selectValueText}>
+                  {selectedDisplayLabel}
+                </span>
+              </button>
+
+              <span className={chevronClassNames} aria-hidden="true">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
+
+              {isDropdownOpen && (
+                <ul
+                  ref={listboxRef}
+                  id="history-status-filter-listbox"
+                  role="listbox"
+                  aria-labelledby="history-status-filter-label"
+                  className={styles.dropdownMenu}
+                  data-testid="history-status-filter-listbox"
+                >
+                  {STATUS_FILTER_OPTIONS.map((option, index) => {
+                    const isSelected = option.value === (statusFilter ?? '');
+                    const isHighlighted = index === highlightedIndex;
+                    const optionToneClass =
+                      option.value !== ''
+                        ? STATUS_DOT_CLASS_MAP[option.value]
+                        : styles.toneDotAll;
+
+                    const optionClassNames = [
+                      styles.dropdownOption,
+                      isSelected ? styles.dropdownOptionSelected : '',
+                      isHighlighted ? styles.dropdownOptionHighlighted : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+
+                    return (
+                      <li
+                        key={option.value || '__all__'}
+                        id={`history-status-opt-${index}`}
+                        role="option"
+                        aria-selected={isSelected}
+                        className={optionClassNames}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleSelectStatusOption(option.value)}
+                        data-testid={
+                          option.value
+                            ? `history-status-option-${option.value}`
+                            : 'history-status-option-all'
+                        }
+                      >
+                        <span
+                          className={`${styles.toneDot} ${optionToneClass ?? ''}`}
+                          aria-hidden="true"
+                        />
+                        <span className={styles.dropdownOptionLabel}>
+                          {option.label}
+                        </span>
+                        {isSelected && (
+                          <svg
+                            className={styles.dropdownOptionCheck}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
 
           {statusFilter !== undefined && (
@@ -491,15 +787,6 @@ export default function ImportacaoHistoryView({
                             <span className={styles.fileName}>{item.nomeArquivo}</span>
                             <div className={styles.fileSubMeta}>
                               <span className={styles.lotIdTag}>Lote #{item.id}</span>
-                              <span
-                                className={styles.hashTag}
-                                title={`Hash SHA-256: ${item.hashSha256}`}
-                              >
-                                {formatHashSha256Short(item.hashSha256)}
-                              </span>
-                              <span className={styles.srOnly}>
-                                Hash completo: {item.hashSha256}
-                              </span>
                             </div>
                           </div>
                         </td>
@@ -637,12 +924,6 @@ export default function ImportacaoHistoryView({
                         <span className={styles.mobileMetaLabel}>Conclusão:</span>
                         <span className={`${styles.mobileMetaValue} ${styles.tabularNum}`}>
                           {formatDateTimePtBr(item.concluidaAt, 'Em aberto')}
-                        </span>
-                      </div>
-                      <div className={styles.mobileMetaRow}>
-                        <span className={styles.mobileMetaLabel}>SHA-256:</span>
-                        <span className={styles.hashTag}>
-                          {formatHashSha256Short(item.hashSha256)}
                         </span>
                       </div>
                     </div>
