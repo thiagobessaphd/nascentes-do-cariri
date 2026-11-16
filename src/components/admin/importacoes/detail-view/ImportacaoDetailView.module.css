@@ -268,6 +268,72 @@
   width: 78%;
 }
 
+.notFoundCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #331509;
+  border-radius: 6px;
+  padding: 3.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.notFoundIconBadge {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background-color: #f0f7fa;
+  border: 1px solid #bae6fd;
+  color: #0b4f6c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.notFoundBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.notFoundTitle {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.015em;
+}
+
+.notFoundMessage {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.6;
+  max-width: 520px;
+}
+
+.notFoundActions {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .errorStateCard {
   background-color: #ffffff;
   border: 1px solid #d8dee9;

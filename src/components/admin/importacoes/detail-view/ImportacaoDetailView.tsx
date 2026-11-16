@@ -303,6 +303,53 @@ export default function ImportacaoDetailView({
   if (state.kind === 'error') {
     const isNotFound = state.statusCode === 404;
 
+    if (isNotFound) {
+      return (
+        <div className={styles.container} data-testid="importacao-detail-error">
+          {backBreadcrumb}
+          <section
+            className={styles.notFoundCard}
+            role="status"
+            aria-live="polite"
+            data-testid="importacao-detail-not-found-state"
+          >
+            <div className={styles.notFoundIconBadge} aria-hidden="true">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <circle cx="11.5" cy="14.5" r="2.5" />
+                <line x1="13.3" y1="16.3" x2="15.5" y2="18.5" />
+              </svg>
+            </div>
+
+            <span className={styles.notFoundBadge}>Erro 404</span>
+
+            <h1 className={styles.notFoundTitle}>Importação não encontrada</h1>
+
+            <p className={styles.notFoundMessage}>
+              O lote solicitado não foi localizado ou não está disponível no sistema.
+              Consulte o histórico de importações para selecionar um registro válido ou inicie um novo envio.
+            </p>
+
+            <div className={styles.notFoundActions}>
+              <Link href="/admin/importacoes/historico" className={styles.primaryLink}>
+                Voltar ao Histórico
+              </Link>
+            </div>
+          </section>
+        </div>
+      );
+    }
+
     return (
       <div className={styles.container} data-testid="importacao-detail-error">
         {backBreadcrumb}
@@ -326,9 +373,7 @@ export default function ImportacaoDetailView({
               <line x1="12" y1="16" x2="12.01" y2="16" strokeLinecap="round" />
             </svg>
             <h1 className={styles.errorStateTitle}>
-              {isNotFound
-                ? `Importação #${importacaoId} não encontrada`
-                : 'Não foi possível carregar os detalhes da importação'}
+              Não foi possível carregar os detalhes da importação
             </h1>
           </div>
           <p className={styles.errorStateMessage}>{state.message}</p>
@@ -336,18 +381,16 @@ export default function ImportacaoDetailView({
             <Link href="/admin/importacoes/historico" className={styles.primaryLink}>
               Voltar ao Histórico
             </Link>
-            {!isNotFound && (
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() => {
-                  void loadDetail();
-                }}
-                data-testid="detail-retry-button"
-              >
-                Tentar novamente
-              </button>
-            )}
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => {
+                void loadDetail();
+              }}
+              data-testid="detail-retry-button"
+            >
+              Tentar novamente
+            </button>
           </div>
         </section>
       </div>
