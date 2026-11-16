@@ -1,0 +1,130 @@
+/**
+ * Nascentes do Cariri — Página Global 404 (Página Não Encontrada)
+ */
+
+.pageWrapper {
+  min-height: 100vh;
+  background-color: #f4f6f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.card {
+  max-width: 600px;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 4px solid #331509;
+  border-radius: 6px;
+  padding: 3.5rem 2.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.iconBadge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: #f0f7fa;
+  border: 1px solid #bae6fd;
+  color: #0b4f6c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.codeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.65;
+  max-width: 480px;
+}
+
+.actions {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.primaryLink,
+.secondaryLink {
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  border-radius: 5px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.primaryLink {
+  background-color: #0b4f6c;
+  border: 1px solid #083b52;
+  color: #ffffff;
+}
+
+.primaryLink:hover {
+  background-color: #083b52;
+}
+
+.secondaryLink {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+}
+
+.secondaryLink:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.primaryLink:focus-visible,
+.secondaryLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryLink,
+  .secondaryLink {
+    transition: none;
+  }
+}
