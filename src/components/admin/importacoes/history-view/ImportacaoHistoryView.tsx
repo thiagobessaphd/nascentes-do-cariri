@@ -19,8 +19,8 @@ import {
 import Link from 'next/link';
 import {
   DEFAULT_HISTORY_PAGE,
-  DEFAULT_HISTORY_PAGE_SIZE,
   IMPORTACAO_STATUS_VALUES,
+  MAX_HISTORY_PAGE_SIZE,
   type ImportacaoHistoryItemDto,
   type ImportacaoHistoryListResponseDto,
   type ImportacaoStatus,
@@ -43,9 +43,25 @@ export interface ImportacaoHistoryViewProps {
   readonly currentUserId?: number | null | undefined;
   readonly authToken?: string | undefined;
   readonly initialPage?: number | undefined;
+  readonly initialPageSize?: number | undefined;
   readonly initialStatus?: ImportacaoStatus | undefined;
   readonly initialData?: ImportacaoHistoryListResponseDto | undefined;
   readonly initialError?: string | undefined;
+}
+
+const DEFAULT_HISTORY_UI_PAGE_SIZE = 5 as const;
+const ALLOWED_HISTORY_PAGE_SIZES = [5, 10, 20, 50, 100] as const;
+
+function sanitizeHistoryPageSize(raw?: number): number {
+  if (
+    typeof raw === 'number' &&
+    Number.isSafeInteger(raw) &&
+    raw >= 1 &&
+    raw <= MAX_HISTORY_PAGE_SIZE
+  ) {
+    return raw;
+  }
+  return DEFAULT_HISTORY_UI_PAGE_SIZE;
 }
 
 type ImportacaoStatusTone = ReturnType<typeof getImportacaoStatusMeta>['tone'];
@@ -86,13 +102,23 @@ interface CancelTargetState {
   readonly item: ImportacaoHistoryItemDto;
 }
 
-function syncHistoryQueryParams(page: number, status?: ImportacaoStatus): void {
+function syncHistoryQueryParams(
+  page: number,
+  status: ImportacaoStatus | undefined,
+  pageSize: number
+): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   if (page > 1) {
     url.searchParams.set('page', String(page));
   } else {
     url.searchParams.delete('page');
+  }
+
+  if (pageSize !== DEFAULT_HISTORY_UI_PAGE_SIZE) {
+    url.searchParams.set('pageSize', String(pageSize));
+  } else {
+    url.searchParams.delete('pageSize');
   }
 
   if (status) {
@@ -103,6 +129,43 @@ function syncHistoryQueryParams(page: number, status?: ImportacaoStatus): void {
 
   const nextUrl = `${url.pathname}${url.search ? url.search : ''}`;
   window.history.replaceState(null, '', nextUrl);
+}
+
+type PaginationItem = number | 'ellipsis-left' | 'ellipsis-right';
+
+function buildPaginationItems(
+  currentPage: number,
+  totalPages: number
+): readonly PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis-right', totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      'ellipsis-left',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    'ellipsis-left',
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    'ellipsis-right',
+    totalPages,
+  ];
 }
 
 function buildResultCountText(
@@ -135,11 +198,15 @@ export default function ImportacaoHistoryView({
   currentUserId = null,
   authToken,
   initialPage = DEFAULT_HISTORY_PAGE,
+  initialPageSize = DEFAULT_HISTORY_UI_PAGE_SIZE,
   initialStatus,
   initialData,
   initialError,
 }: ImportacaoHistoryViewProps) {
   const [page, setPage] = useState<number>(initialPage >= 1 ? initialPage : 1);
+  const [pageSize, setPageSize] = useState<number>(() =>
+    sanitizeHistoryPageSize(initialPageSize)
+  );
   const [statusFilter, setStatusFilter] = useState<ImportacaoStatus | undefined>(
     initialStatus
   );
@@ -159,6 +226,8 @@ export default function ImportacaoHistoryView({
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
+  const [isPageSizeOpen, setIsPageSizeOpen] = useState<boolean>(false);
+  const [highlightedPageSizeIndex, setHighlightedPageSizeIndex] = useState<number>(1);
 
   const shouldSkipInitialFetchRef = useRef<boolean>(
     initialData !== undefined || initialError !== undefined
@@ -169,9 +238,16 @@ export default function ImportacaoHistoryView({
   const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const listboxRef = useRef<HTMLUListElement | null>(null);
+  const pageSizeContainerRef = useRef<HTMLDivElement | null>(null);
+  const pageSizeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const pageSizeListboxRef = useRef<HTMLUListElement | null>(null);
 
   const loadHistory = useCallback(
-    async (targetPage: number, targetStatus?: ImportacaoStatus) => {
+    async (
+      targetPage: number,
+      targetStatus: ImportacaoStatus | undefined,
+      targetPageSize: number
+    ) => {
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -182,7 +258,7 @@ export default function ImportacaoHistoryView({
         const response = await fetchImportacoesHistory(
           {
             page: targetPage,
-            pageSize: DEFAULT_HISTORY_PAGE_SIZE,
+            pageSize: targetPageSize,
             ...(targetStatus !== undefined ? { status: targetStatus } : {}),
           },
           {
@@ -215,22 +291,31 @@ export default function ImportacaoHistoryView({
       return;
     }
 
-    void loadHistory(page, statusFilter);
+    void loadHistory(page, statusFilter, pageSize);
 
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [loadHistory, page, statusFilter]);
+  }, [loadHistory, page, statusFilter, pageSize]);
 
   useEffect(() => {
-    if (!isDropdownOpen) return;
+    if (!isDropdownOpen && !isPageSizeOpen) return;
 
     function handleOutsidePointer(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node;
       if (
+        isDropdownOpen &&
         dropdownContainerRef.current &&
-        !dropdownContainerRef.current.contains(event.target as Node)
+        !dropdownContainerRef.current.contains(target)
       ) {
         setIsDropdownOpen(false);
+      }
+      if (
+        isPageSizeOpen &&
+        pageSizeContainerRef.current &&
+        !pageSizeContainerRef.current.contains(target)
+      ) {
+        setIsPageSizeOpen(false);
       }
     }
 
@@ -241,7 +326,7 @@ export default function ImportacaoHistoryView({
       document.removeEventListener('mousedown', handleOutsidePointer);
       document.removeEventListener('touchstart', handleOutsidePointer);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, isPageSizeOpen]);
 
   useEffect(() => {
     if (!isDropdownOpen || !listboxRef.current) return;
@@ -250,6 +335,14 @@ export default function ImportacaoHistoryView({
       optionEl.scrollIntoView({ block: 'nearest' });
     }
   }, [isDropdownOpen, highlightedIndex]);
+
+  useEffect(() => {
+    if (!isPageSizeOpen || !pageSizeListboxRef.current) return;
+    const optionEl = pageSizeListboxRef.current.children[highlightedPageSizeIndex];
+    if (optionEl instanceof HTMLElement && typeof optionEl.scrollIntoView === 'function') {
+      optionEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isPageSizeOpen, highlightedPageSizeIndex]);
 
   const currentOptionIndex = STATUS_FILTER_OPTIONS.findIndex(
     (option) => option.value === (statusFilter ?? '')
@@ -264,12 +357,13 @@ export default function ImportacaoHistoryView({
     setActionNotice(null);
     setPage(1);
     setStatusFilter(nextStatus);
-    syncHistoryQueryParams(1, nextStatus);
+    syncHistoryQueryParams(1, nextStatus, pageSize);
     setIsDropdownOpen(false);
     triggerButtonRef.current?.focus();
   }
 
   function handleToggleDropdown() {
+    setIsPageSizeOpen(false);
     setIsDropdownOpen((prev) => {
       const next = !prev;
       if (next) {
@@ -277,6 +371,104 @@ export default function ImportacaoHistoryView({
       }
       return next;
     });
+  }
+
+  const currentPageSizeIndex = ALLOWED_HISTORY_PAGE_SIZES.indexOf(
+    pageSize as (typeof ALLOWED_HISTORY_PAGE_SIZES)[number]
+  );
+
+  function handleSelectPageSizeOption(nextSize: number) {
+    setActionNotice(null);
+    setPage(1);
+    setPageSize(nextSize);
+    syncHistoryQueryParams(1, statusFilter, nextSize);
+    setIsPageSizeOpen(false);
+    pageSizeTriggerRef.current?.focus();
+  }
+
+  function handleTogglePageSize() {
+    setIsDropdownOpen(false);
+    setIsPageSizeOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setHighlightedPageSizeIndex(currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1);
+      }
+      return next;
+    });
+  }
+
+  function handlePageSizeKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const total = ALLOWED_HISTORY_PAGE_SIZES.length;
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault();
+        if (!isPageSizeOpen) {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        } else {
+          setHighlightedPageSizeIndex((prev) => (prev + 1) % total);
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        event.preventDefault();
+        if (!isPageSizeOpen) {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        } else {
+          setHighlightedPageSizeIndex((prev) => (prev - 1 + total) % total);
+        }
+        break;
+      }
+      case 'Home': {
+        if (isPageSizeOpen) {
+          event.preventDefault();
+          setHighlightedPageSizeIndex(0);
+        }
+        break;
+      }
+      case 'End': {
+        if (isPageSizeOpen) {
+          event.preventDefault();
+          setHighlightedPageSizeIndex(total - 1);
+        }
+        break;
+      }
+      case 'Enter':
+      case ' ': {
+        event.preventDefault();
+        if (isPageSizeOpen) {
+          const chosen = ALLOWED_HISTORY_PAGE_SIZES[highlightedPageSizeIndex];
+          if (chosen !== undefined) {
+            handleSelectPageSizeOption(chosen);
+          }
+        } else {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        }
+        break;
+      }
+      case 'Escape': {
+        if (isPageSizeOpen) {
+          event.preventDefault();
+          setIsPageSizeOpen(false);
+        }
+        break;
+      }
+      case 'Tab': {
+        if (isPageSizeOpen) {
+          setIsPageSizeOpen(false);
+        }
+        break;
+      }
+    }
   }
 
   function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -352,13 +544,13 @@ export default function ImportacaoHistoryView({
     setPage(1);
     setStatusFilter(undefined);
     setIsDropdownOpen(false);
-    syncHistoryQueryParams(1, undefined);
+    syncHistoryQueryParams(1, undefined, pageSize);
   }
 
   function handlePageChange(nextPage: number) {
     setActionNotice(null);
     setPage(nextPage);
-    syncHistoryQueryParams(nextPage, statusFilter);
+    syncHistoryQueryParams(nextPage, statusFilter, pageSize);
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       const prefersReducedMotion =
         typeof window.matchMedia === 'function' &&
@@ -402,7 +594,7 @@ export default function ImportacaoHistoryView({
       setActionNotice(
         `Lote #${targetId} (${targetName}) cancelado com sucesso. O arquivo original permanece preservado para auditoria.`
       );
-      await loadHistory(page, statusFilter);
+      await loadHistory(page, statusFilter, pageSize);
       window.setTimeout(() => {
         noticeRef.current?.focus({ preventScroll: true });
       }, 0);
@@ -586,6 +778,146 @@ export default function ImportacaoHistoryView({
             </div>
           </div>
 
+          <div className={styles.fieldGroup} ref={pageSizeContainerRef}>
+            <label
+              id="history-page-size-label"
+              htmlFor="history-page-size-filter"
+              className={styles.filterLabel}
+            >
+              Exibir por página
+            </label>
+            <div className={`${styles.inputWrapper} ${styles.pageSizeInputWrapper}`}>
+              <span className={styles.fieldIcon} aria-hidden="true">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </span>
+              <button
+                ref={pageSizeTriggerRef}
+                id="history-page-size-filter"
+                type="button"
+                role="combobox"
+                aria-autocomplete="none"
+                aria-haspopup="listbox"
+                aria-expanded={isPageSizeOpen}
+                aria-controls="history-page-size-listbox"
+                aria-labelledby="history-page-size-label history-page-size-filter"
+                aria-activedescendant={
+                  isPageSizeOpen
+                    ? `history-page-size-opt-${highlightedPageSizeIndex}`
+                    : undefined
+                }
+                onClick={handleTogglePageSize}
+                onKeyDown={handlePageSizeKeyDown}
+                className={[
+                  styles.selectControl,
+                  isPageSizeOpen ? styles.selectControlOpen : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-testid="history-page-size-filter"
+              >
+                <span className={styles.selectValueText}>
+                  {pageSize} importações
+                </span>
+              </button>
+
+              <span
+                className={[
+                  styles.selectChevron,
+                  isPageSizeOpen ? styles.selectChevronOpen : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-hidden="true"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
+
+              {isPageSizeOpen && (
+                <ul
+                  ref={pageSizeListboxRef}
+                  id="history-page-size-listbox"
+                  role="listbox"
+                  aria-labelledby="history-page-size-label"
+                  className={styles.dropdownMenu}
+                  data-testid="history-page-size-listbox"
+                >
+                  {ALLOWED_HISTORY_PAGE_SIZES.map((sizeOption, index) => {
+                    const isSelected = sizeOption === pageSize;
+                    const isHighlighted = index === highlightedPageSizeIndex;
+                    const optionClassNames = [
+                      styles.dropdownOption,
+                      isSelected ? styles.dropdownOptionSelected : '',
+                      isHighlighted ? styles.dropdownOptionHighlighted : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+
+                    return (
+                      <li
+                        key={sizeOption}
+                        id={`history-page-size-opt-${index}`}
+                        role="option"
+                        aria-selected={isSelected}
+                        className={optionClassNames}
+                        onMouseEnter={() => setHighlightedPageSizeIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleSelectPageSizeOption(sizeOption)}
+                        data-testid={`history-page-size-option-${sizeOption}`}
+                      >
+                        <span className={styles.dropdownOptionLabel}>
+                          {sizeOption} importações
+                        </span>
+                        {isSelected && (
+                          <svg
+                            className={styles.dropdownOptionCheck}
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+
           {statusFilter !== undefined && (
             <button
               type="button"
@@ -634,7 +966,7 @@ export default function ImportacaoHistoryView({
         </div>
       )}
 
-      {/* Estado de Carregamento (Skeleton) */}
+      {/* Estado de Carregamento (Skeleton da Tabela) */}
       {state.kind === 'loading' && (
         <section
           className={styles.loadingCard}
@@ -643,15 +975,43 @@ export default function ImportacaoHistoryView({
           aria-busy="true"
           data-testid="history-loading-state"
         >
-          <div className={styles.loadingHeader}>
-            <span className={styles.spinner} aria-hidden="true" />
-            <span>Carregando histórico de importações...</span>
+          <span className={styles.srOnly}>Carregando histórico de importações...</span>
+          <div className={styles.skeletonTableHeader} aria-hidden="true">
+            <span className={`${styles.skeletonLine} ${styles.skeletonColFile}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonColAuthor}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonColDates}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonColTotals}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonColStatus}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonColActions}`} />
           </div>
-          <div className={styles.skeletonList} aria-hidden="true">
-            <div className={styles.skeletonRow} />
-            <div className={styles.skeletonRow} />
-            <div className={styles.skeletonRow} />
-            <div className={styles.skeletonRow} />
+          <div className={styles.skeletonRows} aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((rowIndex) => (
+              <div key={rowIndex} className={styles.skeletonTableRow}>
+                <div className={styles.skeletonStack}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonTitleBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonTagBar}`} />
+                </div>
+                <div className={styles.skeletonStack}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonAuthorBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonSubBar}`} />
+                </div>
+                <div className={styles.skeletonStack}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonDateBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonSubBar}`} />
+                </div>
+                <div className={styles.skeletonTotalsPair}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetricBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetricBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetricBar}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetricBar}`} />
+                </div>
+                <span className={`${styles.skeletonLine} ${styles.skeletonPill}`} />
+                <div className={styles.skeletonActionPair}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonActionBtn}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonActionBtn}`} />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -686,7 +1046,7 @@ export default function ImportacaoHistoryView({
               type="button"
               className={styles.primaryButton}
               onClick={() => {
-                void loadHistory(page, statusFilter);
+                void loadHistory(page, statusFilter, pageSize);
               }}
               data-testid="history-retry-button"
             >
@@ -759,7 +1119,7 @@ export default function ImportacaoHistoryView({
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Arquivo e Assinatura</th>
+                    <th scope="col">Arquivo e Lote</th>
                     <th scope="col">Administrador</th>
                     <th scope="col">Datas</th>
                     <th scope="col">Resumo de Linhas</th>
@@ -793,7 +1153,12 @@ export default function ImportacaoHistoryView({
                         <td>
                           <div className={styles.authorCell}>
                             <span className={styles.authorName}>{item.usuario.nome}</span>
-                            <span className={styles.authorEmail}>{item.usuario.email}</span>
+                            <span
+                              className={styles.authorEmail}
+                              title={item.usuario.email}
+                            >
+                              {item.usuario.email}
+                            </span>
                           </div>
                         </td>
                         <td>
@@ -803,7 +1168,7 @@ export default function ImportacaoHistoryView({
                             </span>
                             <span className={styles.dateSecondary}>
                               {item.concluidaAt
-                                ? `Finalizada em ${formatDateTimePtBr(item.concluidaAt)}`
+                                ? `Finalizada: ${formatDateTimePtBr(item.concluidaAt)}`
                                 : 'Sem conclusão'}
                             </span>
                           </div>
@@ -849,7 +1214,7 @@ export default function ImportacaoHistoryView({
                                 className={styles.analyzeLinkButton}
                                 data-testid={`history-analyze-link-${item.id}`}
                               >
-                                Voltar para analisar
+                                Reanalisar
                               </Link>
                             )}
 
@@ -874,6 +1239,86 @@ export default function ImportacaoHistoryView({
                 </tbody>
               </table>
             </div>
+
+            {state.response.meta.totalPages >= 1 && (
+              <nav
+                className={styles.paginationFooter}
+                aria-label="Paginação do histórico de importações"
+                data-testid="history-pagination"
+              >
+                <span className={styles.paginationInfo}>
+                  Página <strong>{state.response.meta.page}</strong> de{' '}
+                  <strong>{state.response.meta.totalPages}</strong> —{' '}
+                  {state.response.meta.totalItems}{' '}
+                  {state.response.meta.totalItems === 1 ? 'registro' : 'registros'}
+                </span>
+
+                <div className={styles.paginationButtons}>
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    disabled={!state.response.meta.hasPreviousPage}
+                    onClick={() => handlePageChange(state.response.meta.page - 1)}
+                    aria-label="Página anterior"
+                    data-testid="history-prev-page"
+                  >
+                    Anterior
+                  </button>
+
+                  {buildPaginationItems(
+                    state.response.meta.page,
+                    state.response.meta.totalPages
+                  ).map((item) => {
+                    if (item === 'ellipsis-left' || item === 'ellipsis-right') {
+                      return (
+                        <span
+                          key={item}
+                          className={styles.pageEllipsis}
+                          aria-hidden="true"
+                        >
+                          …
+                        </span>
+                      );
+                    }
+
+                    const isCurrent = item === state.response.meta.page;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        className={[
+                          styles.pageNumberButton,
+                          isCurrent ? styles.pageNumberButtonActive : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        aria-current={isCurrent ? 'page' : undefined}
+                        aria-label={`Página ${item}`}
+                        onClick={() => {
+                          if (!isCurrent) {
+                            handlePageChange(item);
+                          }
+                        }}
+                        data-testid={`history-page-${item}`}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    disabled={!state.response.meta.hasNextPage}
+                    onClick={() => handlePageChange(state.response.meta.page + 1)}
+                    aria-label="Próxima página"
+                    data-testid="history-next-page"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </nav>
+            )}
           </div>
 
           {/* Lista em Cards para Dispositivos Móveis (<= 768px) */}
@@ -972,7 +1417,7 @@ export default function ImportacaoHistoryView({
                           href={`/admin/importacoes?importacaoId=${item.id}`}
                           className={styles.analyzeLinkButton}
                         >
-                          Voltar para analisar
+                          Reanalisar
                         </Link>
                       )}
 
@@ -992,42 +1437,6 @@ export default function ImportacaoHistoryView({
               );
             })}
           </ul>
-
-          {/* Controles de Paginação */}
-          {state.response.meta.totalPages > 1 && (
-            <nav
-              className={styles.pagination}
-              aria-label="Paginação do histórico de importações"
-              data-testid="history-pagination"
-            >
-              <span className={styles.paginationInfo}>
-                Página {state.response.meta.page} de {state.response.meta.totalPages} (
-                {state.response.meta.totalItems} registros)
-              </span>
-
-              <div className={styles.paginationButtons}>
-                <button
-                  type="button"
-                  className={styles.pageButton}
-                  disabled={!state.response.meta.hasPreviousPage}
-                  onClick={() => handlePageChange(state.response.meta.page - 1)}
-                  data-testid="history-prev-page"
-                >
-                  Anterior
-                </button>
-
-                <button
-                  type="button"
-                  className={styles.pageButton}
-                  disabled={!state.response.meta.hasNextPage}
-                  onClick={() => handlePageChange(state.response.meta.page + 1)}
-                  data-testid="history-next-page"
-                >
-                  Próxima
-                </button>
-              </div>
-            </nav>
-          )}
         </>
       )}
 

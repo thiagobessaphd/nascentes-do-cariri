@@ -6,6 +6,7 @@ import { getOptionalAdminSession } from '@/lib/security/admin-guard';
 import {
   DEFAULT_HISTORY_PAGE,
   IMPORTACAO_STATUS_VALUES,
+  MAX_HISTORY_PAGE_SIZE,
   type ImportacaoStatus,
 } from '@/modules/importacoes/importacoes.contracts';
 import { ImportacaoHistoryView } from '@/components/admin/importacoes';
@@ -27,6 +28,8 @@ export interface ImportacoesHistoryPageProps {
   readonly searchParams?:
     | Promise<{
         readonly page?: string | string[];
+        readonly pageSize?: string | string[];
+        readonly limit?: string | string[];
         readonly status?: string | string[];
       }>
     | undefined;
@@ -39,6 +42,25 @@ function parseOptionalPageParam(rawPage: string | string[] | undefined): number 
   }
   const parsed = Number(candidate.trim());
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : DEFAULT_HISTORY_PAGE;
+}
+
+const DEFAULT_HISTORY_UI_PAGE_SIZE = 5 as const;
+
+function parseOptionalPageSizeParam(
+  rawPageSize: string | string[] | undefined,
+  rawLimit: string | string[] | undefined
+): number {
+  const candidate = Array.isArray(rawPageSize)
+    ? rawPageSize[0]
+    : rawPageSize ?? (Array.isArray(rawLimit) ? rawLimit[0] : rawLimit);
+  if (!candidate || !/^[1-9]\d*$/.test(candidate.trim())) {
+    return DEFAULT_HISTORY_UI_PAGE_SIZE;
+  }
+  const parsed = Number(candidate.trim());
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > MAX_HISTORY_PAGE_SIZE) {
+    return DEFAULT_HISTORY_UI_PAGE_SIZE;
+  }
+  return parsed;
 }
 
 function parseOptionalStatusParam(
@@ -71,6 +93,10 @@ export default async function ImportacoesHistoryPage({
 }: ImportacoesHistoryPageProps) {
   const resolvedParams = searchParams ? await searchParams : undefined;
   const initialPage = parseOptionalPageParam(resolvedParams?.page);
+  const initialPageSize = parseOptionalPageSizeParam(
+    resolvedParams?.pageSize,
+    resolvedParams?.limit
+  );
   const initialStatus = parseOptionalStatusParam(resolvedParams?.status);
   const currentUserId = await resolveOptionalCurrentUserId();
 
@@ -130,6 +156,7 @@ export default async function ImportacoesHistoryPage({
         <ImportacaoHistoryView
           currentUserId={currentUserId}
           initialPage={initialPage}
+          initialPageSize={initialPageSize}
           initialStatus={initialStatus}
         />
       </section>

@@ -97,6 +97,17 @@
   width: 100%;
 }
 
+@media (max-width: 1200px) {
+  .pageContainer {
+    padding: 1.5rem 1.25rem 2.25rem;
+    gap: 1.25rem;
+  }
+
+  .pageHeader {
+    padding: 1.5rem 1.5rem;
+  }
+}
+
 @media (max-width: 640px) {
   .pageContainer {
     padding: 1rem 1rem 2rem;
