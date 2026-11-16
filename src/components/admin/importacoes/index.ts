@@ -31,3 +31,9 @@ export {
   shouldCloseCancelModalOnKeyDown,
 } from './cancel-modal/ImportCancelModal';
 export type { ImportCancelModalProps } from './cancel-modal/ImportCancelModal';
+
+export { default as ImportacaoHistoryView } from './history-view/ImportacaoHistoryView';
+export type { ImportacaoHistoryViewProps } from './history-view/ImportacaoHistoryView';
+
+export { default as ImportacaoDetailView } from './detail-view/ImportacaoDetailView';
+export type { ImportacaoDetailViewProps } from './detail-view/ImportacaoDetailView';
