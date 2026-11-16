@@ -315,3 +315,74 @@ export interface ImportacaoCancelResponseDto {
   readonly mensagemErro: string;
   readonly concluidaAt: string;
 }
+
+/**
+ * Constantes canônicas de paginação para a listagem do histórico administrativo de importações.
+ */
+export const DEFAULT_HISTORY_PAGE = 1 as const;
+export const DEFAULT_HISTORY_PAGE_SIZE = 20 as const;
+export const MAX_HISTORY_PAGE_SIZE = 100 as const;
+
+/**
+ * Projeção pública/administrativa segura do autor de uma importação.
+ *
+ * Omite estritamente passwordHash, ativo, lastLoginAt e metadados internos.
+ */
+export interface ImportacaoHistoryUserDto {
+  readonly id: number;
+  readonly nome: string;
+  readonly email: string;
+}
+
+/**
+ * Item resumido e auditável de uma importação na listagem de histórico administrativo.
+ *
+ * Omite estritamente caminhoPrivadoArquivo e storageUrl por design de segurança.
+ */
+export interface ImportacaoHistoryItemDto {
+  readonly id: number;
+  readonly nomeArquivo: string;
+  readonly hashSha256: string;
+  readonly status: ImportacaoStatus;
+  readonly totalLinhas: number;
+  readonly totalValidas: number;
+  readonly totalInvalidas: number;
+  readonly totalDuplicadas: number;
+  readonly mensagemErro: string | null;
+  readonly createdAt: string;
+  readonly concluidaAt: string | null;
+  readonly usuario: ImportacaoHistoryUserDto;
+}
+
+/**
+ * Metadados de paginação determinística da listagem de histórico de importações.
+ */
+export interface ImportacaoHistoryPaginationMeta {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalItems: number;
+  readonly totalPages: number;
+  readonly hasPreviousPage: boolean;
+  readonly hasNextPage: boolean;
+}
+
+/**
+ * Envelope paginado de resposta de GET /api/admin/importacoes.
+ */
+export interface ImportacaoHistoryListResponseDto {
+  readonly data: readonly ImportacaoHistoryItemDto[];
+  readonly meta: ImportacaoHistoryPaginationMeta;
+}
+
+/**
+ * DTO completo de detalhe de uma importação retornado por GET /api/admin/importacoes/[id].
+ *
+ * Inclui contagem de nascentes efetivamente vinculadas, flag de propriedade da sessão (isOwner)
+ * e, para importações pendentes (AGUARDANDO_CONFIRMACAO), o payload reconstruído de prévia
+ * Omite estritamente caminhoPrivadoArquivo, storageUrl e passwordHash.
+ */
+export interface ImportacaoDetailResponseDto extends ImportacaoHistoryItemDto {
+  readonly nascentesInseridasCount: number;
+  readonly isOwner: boolean;
+  readonly preview: ImportacaoValidationResponseDto | null;
+}

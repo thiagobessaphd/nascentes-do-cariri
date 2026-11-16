@@ -9,10 +9,17 @@ import { Prisma, StatusImportacao, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import type { FileIntegrityResult, StorageDriver, StoragePayload } from '@/lib/storage';
 import type { UploadedFileEntry } from './file-validator';
-import type {
-  ImportacaoCancelResponseDto,
-  ImportacaoConfirmResponseDto,
-  ImportacaoValidationResponseDto,
+import {
+  DEFAULT_HISTORY_PAGE,
+  DEFAULT_HISTORY_PAGE_SIZE,
+  IMPORTACAO_STATUS_VALUES,
+  MAX_HISTORY_PAGE_SIZE,
+  type ImportacaoCancelResponseDto,
+  type ImportacaoConfirmResponseDto,
+  type ImportacaoDetailResponseDto,
+  type ImportacaoHistoryListResponseDto,
+  type ImportacaoStatus,
+  type ImportacaoValidationResponseDto,
 } from './importacoes.contracts';
 
 export * from './importacoes.contracts';
@@ -229,4 +236,96 @@ export interface ImportacaoRouteContext {
   readonly params: Promise<{
     readonly id: string;
   }>;
+}
+
+// CONTRATOS E TIPOS DAS CONSULTAS ADMINISTRATIVAS DE HISTÓRICO E DETALHE (SERVER-ONLY)
+
+/**
+ * Schema Zod para validação em runtime dos parâmetros de listagem do histórico de importações.
+ */
+export const listImportacoesHistoryQuerySchema = z.object({
+  page: z
+    .number()
+    .int('A página deve ser um número inteiro.')
+    .min(1, 'A página deve ser maior ou igual a 1.')
+    .default(DEFAULT_HISTORY_PAGE),
+  pageSize: z
+    .number()
+    .int('O tamanho da página deve ser um número inteiro.')
+    .min(1, 'O tamanho da página deve ser maior ou igual a 1.')
+    .max(
+      MAX_HISTORY_PAGE_SIZE,
+      `O tamanho da página não pode exceder ${MAX_HISTORY_PAGE_SIZE} registros.`
+    )
+    .default(DEFAULT_HISTORY_PAGE_SIZE),
+  status: z.enum(IMPORTACAO_STATUS_VALUES).optional(),
+});
+
+/**
+ * Parâmetros validados para consulta paginada do histórico de importações.
+ */
+export interface ListImportacoesHistoryQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly status?: ImportacaoStatus | undefined;
+}
+
+/**
+ * Entrada opcionalmente parcial para listagem do histórico de importações.
+ */
+export interface ListImportacoesHistoryInput {
+  readonly page?: number | undefined;
+  readonly pageSize?: number | undefined;
+  readonly status?: ImportacaoStatus | undefined;
+}
+
+/**
+ * Schema Zod para validação em runtime da consulta de detalhe de uma importação por ID.
+ */
+export const getImportacaoDetailInputSchema = z.object({
+  importacaoId: z
+    .number()
+    .int('O identificador da importação deve ser um número inteiro.')
+    .positive('O identificador da importação deve ser maior que zero.'),
+  usuarioId: z
+    .number()
+    .int('O identificador do usuário deve ser um número inteiro.')
+    .positive('O identificador do usuário deve ser maior que zero.')
+    .optional(),
+  requirePreview: z.boolean().optional(),
+});
+
+/**
+ * Parâmetros de entrada validados para consulta de detalhe de uma importação.
+ */
+export type GetImportacaoDetailInput = Readonly<
+  z.infer<typeof getImportacaoDetailInputSchema>
+>;
+
+/**
+ * Opções de execução por chamada para consulta de detalhe de importação.
+ */
+export interface GetImportacaoDetailOptions {
+  readonly storageDriver?: StorageDriver | undefined;
+}
+
+/**
+ * Dependências opcionais injetáveis no serviço de histórico e detalhe de importações.
+ */
+export interface ImportacaoHistoryServiceDeps {
+  readonly prismaClient?: PrismaClient | undefined;
+  readonly storageService?: IImportacaoStorageService | undefined;
+}
+
+/**
+ * Interface de contrato do serviço administrativo de histórico e detalhe de importações.
+ */
+export interface IImportacaoHistoryService {
+  listHistory(
+    input?: ListImportacoesHistoryInput
+  ): Promise<ImportacaoHistoryListResponseDto>;
+  getById(
+    input: GetImportacaoDetailInput,
+    options?: GetImportacaoDetailOptions
+  ): Promise<ImportacaoDetailResponseDto>;
 }
