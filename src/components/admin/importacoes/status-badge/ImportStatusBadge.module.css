@@ -1,0 +1,69 @@
+/**
+ * Nascentes do Cariri — Estilos do Badge Semântico de Status de Importação
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sizeSm {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.71875rem;
+}
+
+.sizeMd {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+}
+
+.sizeLg {
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.label {
+  display: inline-block;
+}
+
+.toneSuccess {
+  background-color: #f4fbf7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.toneWarning {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.toneDanger {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.toneNeutral {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.toneInfo {
+  background-color: #f0f7fa;
+  border-color: #bce3f0;
+  color: #0b4f6c;
+}

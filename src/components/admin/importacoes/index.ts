@@ -22,3 +22,12 @@ export type { ImportPreviewTableProps } from './preview-table/ImportPreviewTable
 
 export { default as ImportActionBar } from './action-bar/ImportActionBar';
 export type { ImportActionBarProps } from './action-bar/ImportActionBar';
+
+export { default as ImportStatusBadge } from './status-badge/ImportStatusBadge';
+export type { ImportStatusBadgeProps } from './status-badge/ImportStatusBadge';
+
+export {
+  default as ImportCancelModal,
+  shouldCloseCancelModalOnKeyDown,
+} from './cancel-modal/ImportCancelModal';
+export type { ImportCancelModalProps } from './cancel-modal/ImportCancelModal';

@@ -7,7 +7,10 @@
 
 import type { TxtParseSummary } from '@/modules/importacoes/importacoes.contracts';
 import type { PreviewClassification } from '@/services/importacoes.client';
-import { formatFileSizeBytes } from '@/services/importacoes.client';
+import {
+  formatFileSizeBytes,
+  formatHashSha256Short,
+} from '@/services/importacoes.client';
 import styles from './ImportSummaryCards.module.css';
 
 export interface ImportSummaryCardsProps {
@@ -18,6 +21,10 @@ export interface ImportSummaryCardsProps {
   readonly classification: PreviewClassification;
   readonly hasHeaderError?: boolean | undefined;
   readonly hideDiagnosticBanner?: boolean | undefined;
+  readonly hideMetadataBar?: boolean | undefined;
+  readonly validCardTitle?: string | undefined;
+  readonly validCardCountOverride?: number | undefined;
+  readonly validCardFooterOverride?: string | undefined;
 }
 
 function getBannerStyleClass(kind: PreviewClassification['kind']): string {
@@ -67,13 +74,16 @@ export default function ImportSummaryCards({
   classification,
   hasHeaderError = false,
   hideDiagnosticBanner = false,
+  hideMetadataBar = false,
+  validCardTitle = 'Novas Nascentes',
+  validCardCountOverride,
+  validCardFooterOverride,
 }: ImportSummaryCardsProps) {
   // Trunca visualmente o hash preservando início e fim
-  const shortHash = hashSha256
-    ? `${hashSha256.slice(0, 10)}...${hashSha256.slice(-8)}`
-    : null;
+  const shortHash = hashSha256 ? formatHashSha256Short(hashSha256) : null;
 
-  const hasValidas = summary.totalValidas > 0;
+  const displayedValidCount = validCardCountOverride ?? summary.totalValidas;
+  const hasValidas = displayedValidCount > 0;
   const hasDuplicadas = summary.totalDuplicadas > 0;
   const hasInvalidas = summary.totalInvalidas > 0;
 
@@ -84,25 +94,27 @@ export default function ImportSummaryCards({
       </h2>
 
       {/* 1. Barra de Metadados do Arquivo */}
-      <div className={styles.metadataBar} data-testid="summary-metadata-bar">
-        <div className={styles.metadataGroup}>
-          <span className={styles.metadataLabel}>Arquivo:</span>
-          <span className={styles.metadataValue}>{fileName}</span>
-          {fileSize !== undefined && (
-            <span className={styles.tabularNum}>({formatFileSizeBytes(fileSize)})</span>
+      {!hideMetadataBar && (
+        <div className={styles.metadataBar} data-testid="summary-metadata-bar">
+          <div className={styles.metadataGroup}>
+            <span className={styles.metadataLabel}>Arquivo:</span>
+            <span className={styles.metadataValue}>{fileName}</span>
+            {fileSize !== undefined && (
+              <span className={styles.tabularNum}>({formatFileSizeBytes(fileSize)})</span>
+            )}
+          </div>
+
+          {shortHash && (
+            <div className={styles.metadataGroup}>
+              <span className={styles.metadataLabel}>SHA-256:</span>
+              <span className={styles.hashTag} title={`Hash SHA-256: ${hashSha256}`}>
+                {shortHash}
+              </span>
+              <span className={styles.srOnly}> (hash completo: {hashSha256})</span>
+            </div>
           )}
         </div>
-
-        {shortHash && (
-          <div className={styles.metadataGroup}>
-            <span className={styles.metadataLabel}>SHA-256:</span>
-            <span className={styles.hashTag} title={`Hash SHA-256: ${hashSha256}`}>
-              {shortHash}
-            </span>
-            <span className={styles.srOnly}> (hash completo: {hashSha256})</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* 2. Banner de Diagnóstico Acessível */}
       {!hideDiagnosticBanner && (
@@ -156,7 +168,7 @@ export default function ImportSummaryCards({
           data-testid="card-validas"
         >
           <div className={styles.cardHeader}>
-            <h3 className={styles.cardTitle}>Novas Nascentes</h3>
+            <h3 className={styles.cardTitle}>{validCardTitle}</h3>
             <span className={styles.cardIcon} aria-hidden="true">
               <svg
                 width="18"
@@ -170,9 +182,10 @@ export default function ImportSummaryCards({
               </svg>
             </span>
           </div>
-          <p className={styles.cardValue}>{summary.totalValidas}</p>
+          <p className={styles.cardValue}>{displayedValidCount}</p>
           <p className={styles.cardFooter}>
-            {hasValidas ? 'Válidas para inclusão na base' : 'Nenhum novo registro válido'}
+            {validCardFooterOverride ??
+              (hasValidas ? 'Válidas para inclusão na base' : 'Nenhum novo registro válido')}
           </p>
         </article>
 
