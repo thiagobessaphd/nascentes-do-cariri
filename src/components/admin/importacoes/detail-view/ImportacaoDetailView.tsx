@@ -245,24 +245,56 @@ export default function ImportacaoDetailView({
     </nav>
   );
 
-  // Estado de Carregamento
+  // Estado de Carregamento (Skeleton estrutural do Detalhe)
   if (state.kind === 'loading') {
     return (
       <div className={styles.container} data-testid="importacao-detail-loading">
         {backBreadcrumb}
-        <section
-          className={styles.loadingCard}
+        <div
+          className={styles.skeletonLayout}
           role="status"
           aria-live="polite"
           aria-busy="true"
         >
-          <div className={styles.loadingHeader}>
-            <span className={styles.spinner} aria-hidden="true" />
-            <span>Carregando detalhes do lote #{importacaoId}...</span>
-          </div>
-          <div className={styles.skeletonWide} aria-hidden="true" />
-          <div className={styles.skeletonMedium} aria-hidden="true" />
-        </section>
+          <span className={styles.srOnly}>
+            Carregando detalhes do lote #{importacaoId}...
+          </span>
+
+          <section className={styles.skeletonHeroCard} aria-hidden="true">
+            <div className={styles.skeletonHeroTop}>
+              <div className={styles.skeletonStack}>
+                <span className={`${styles.skeletonLine} ${styles.skeletonOverline}`} />
+                <span className={`${styles.skeletonLine} ${styles.skeletonTitle}`} />
+                <span className={`${styles.skeletonLine} ${styles.skeletonSubtitle}`} />
+              </div>
+              <span className={`${styles.skeletonLine} ${styles.skeletonBadge}`} />
+            </div>
+            <div className={styles.skeletonMetaGrid}>
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className={styles.skeletonMetaItem}>
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetaLabel}`} />
+                  <span className={`${styles.skeletonLine} ${styles.skeletonMetaVal}`} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={styles.skeletonKpiGrid} aria-hidden="true">
+            {[0, 1, 2, 3].map((card) => (
+              <div key={card} className={styles.skeletonKpiCard}>
+                <span className={`${styles.skeletonLine} ${styles.skeletonKpiLabel}`} />
+                <span className={`${styles.skeletonLine} ${styles.skeletonKpiValue}`} />
+              </div>
+            ))}
+          </section>
+
+          <section className={styles.skeletonSectionCard} aria-hidden="true">
+            <span className={`${styles.skeletonLine} ${styles.skeletonSectionTitle}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonRowBar}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonRowBar}`} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonRowBarShort}`} />
+          </section>
+        </div>
       </div>
     );
   }
@@ -593,7 +625,7 @@ export default function ImportacaoDetailView({
                 }}
                 data-testid="detail-back-to-analyze-link"
               >
-                Voltar para analisar
+                Reanalisar
               </Link>
             )}
 

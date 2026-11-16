@@ -1,72 +1,179 @@
 /**
- * Nascentes do Cariri — Estilos de Carregamento (loading.tsx) do Detalhe
+ * Nascentes do Cariri — Skeleton de Carregamento (loading.tsx) do Detalhe
  */
 
 .container {
   max-width: 1240px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem 1.5rem 3rem;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   box-sizing: border-box;
 }
 
-.card {
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes youtubeDetailRoutePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.38;
+  }
+}
+
+.skeletonLine {
+  display: block;
+  border-radius: 5px;
+  background-color: #dbe3ed;
+  animation: youtubeDetailRoutePulse 1.35s ease-in-out infinite;
+}
+
+.breadcrumbBar {
+  display: flex;
+  align-items: center;
+}
+
+.backBar {
+  height: 36px;
+  width: 190px;
+  border-radius: 5px;
+}
+
+.heroCard,
+.sectionCard {
   background-color: #ffffff;
   border: 1px solid #d8dee9;
   border-top: 3px solid #331509;
   border-radius: 6px;
-  padding: 2rem;
+  padding: 1.75rem 2rem;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sectionCard {
+  border-top-color: #0b4f6c;
+  gap: 0.875rem;
+}
+
+.heroTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.heroText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1 1 320px;
+}
+
+.overlineBar {
+  height: 12px;
+  width: 170px;
+}
+
+.titleBar {
+  height: 26px;
+  width: 56%;
+}
+
+.subtitleBar {
+  height: 14px;
+  width: 40%;
+}
+
+.badgeBar {
+  height: 30px;
+  width: 148px;
+  border-radius: 9999px;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.metaLabel {
+  height: 11px;
+  width: 90px;
+}
+
+.metaValue {
+  height: 15px;
+  width: 165px;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 }
 
-.loadingHeader {
+.kpiCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  padding: 1.125rem 1.25rem;
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.spinner {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2.5px solid #cbd5e1;
-  border-top-color: #0b4f6c;
-  animation: detailRouteSpin 0.8s linear infinite;
-  flex-shrink: 0;
+.kpiLabel {
+  height: 12px;
+  width: 55%;
 }
 
-@keyframes detailRouteSpin {
-  to {
-    transform: rotate(360deg);
-  }
+.kpiVal {
+  height: 26px;
+  width: 38%;
 }
 
-.title {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #0f172a;
+.sectionTitle {
+  height: 18px;
+  width: 240px;
 }
 
-.skeletonBlock {
-  height: 16px;
-  border-radius: 4px;
-  background-color: #f1f5f9;
+.rowWide {
+  height: 44px;
+  width: 100%;
 }
 
-.skeletonWide {
-  width: 72%;
-}
-
-.skeletonMedium {
-  width: 48%;
+.rowShort {
+  height: 44px;
+  width: 78%;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner {
+  .skeletonLine {
     animation: none;
   }
 }
