@@ -934,16 +934,17 @@ async function parseImportacaoErrorResponse(
         readNonEmptyString(record['error']) ??
         readNonEmptyString(nestedError?.['message']);
 
-      if (parsedMessage) {
-        errorMessage = parsedMessage;
-      }
-
       const parsedCode =
         readNonEmptyString(record['code']) ??
         readNonEmptyString(nestedError?.['code']);
 
       if (parsedCode) {
         errorCode = parsedCode;
+      }
+
+      // Em falhas 5xx (ex.: DATABASE_ERROR / INTERNAL_SERVER_ERROR), preserva a mensagem do cliente
+      if (parsedMessage && response.status < 500) {
+        errorMessage = parsedMessage;
       }
 
       if ('details' in record) {
