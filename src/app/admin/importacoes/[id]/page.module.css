@@ -1,0 +1,21 @@
+/**
+ * Nascentes do Cariri — Estilos da Página Administrativa de Detalhe da Importação
+ */
+
+.pageContainer {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .pageContainer {
+    padding: 1rem 1rem 2rem;
+    gap: 1.125rem;
+  }
+}
