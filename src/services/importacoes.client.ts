@@ -300,6 +300,221 @@ export function formatFileSizeBytes(bytes: number | null | undefined): string {
 }
 
 /**
+ * Formata timestamps ISO-8601 em 'DD/MM/AAAA às HH:mm' com fuso explícito
+ * (America/Fortaleza) para evitar divergência de fuso entre SSR e navegador.
+ */
+export function formatDateTimePtBr(
+  isoString: string | null | undefined,
+  fallback = '—'
+): string {
+  if (!isoString || typeof isoString !== 'string' || !isoString.trim()) {
+    return fallback;
+  }
+
+  const date = new Date(isoString.trim());
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Fortaleza',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const lookup = new Map<string, string>();
+  for (const part of parts) {
+    lookup.set(part.type, part.value);
+  }
+
+  const day = lookup.get('day');
+  const month = lookup.get('month');
+  const year = lookup.get('year');
+  const rawHour = lookup.get('hour');
+  const minute = lookup.get('minute');
+
+  if (!day || !month || !year || !rawHour || !minute) {
+    return fallback;
+  }
+
+  const hour = rawHour === '24' ? '00' : rawHour;
+  return `${day}/${month}/${year} às ${hour}:${minute}`;
+}
+
+/**
+ * Trunca de forma legível um hash SHA-256 mantendo início e fim visíveis.
+ */
+export function formatHashSha256Short(hash: string | null | undefined): string {
+  if (!hash || typeof hash !== 'string' || !hash.trim()) {
+    return '—';
+  }
+
+  const trimmed = hash.trim();
+  if (trimmed.length <= 18) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, 10)}...${trimmed.slice(-8)}`;
+}
+
+export type ImportacaoStatusTone = 'success' | 'warning' | 'danger' | 'neutral' | 'info';
+
+export interface ImportacaoStatusMeta {
+  readonly status: ImportacaoStatus;
+  readonly label: string;
+  readonly description: string;
+  readonly tone: ImportacaoStatusTone;
+}
+
+const IMPORTACAO_STATUS_META_MAP: Readonly<Record<ImportacaoStatus, ImportacaoStatusMeta>> = {
+  VALIDANDO: {
+    status: 'VALIDANDO',
+    label: 'Validando',
+    description: 'Arquivo em verificação estrutural e de regras.',
+    tone: 'info',
+  },
+  AGUARDANDO_CONFIRMACAO: {
+    status: 'AGUARDANDO_CONFIRMACAO',
+    label: 'Aguardando confirmação',
+    description: 'Prévia disponível para análise e decisão.',
+    tone: 'warning',
+  },
+  PROCESSANDO: {
+    status: 'PROCESSANDO',
+    label: 'Processando',
+    description: 'Persistência transacional em andamento.',
+    tone: 'info',
+  },
+  CONCLUIDA: {
+    status: 'CONCLUIDA',
+    label: 'Concluída',
+    description: 'Importação concluída e publicada.',
+    tone: 'success',
+  },
+  FALHOU: {
+    status: 'FALHOU',
+    label: 'Falhou',
+    description: 'Importação rejeitada ou interrompida por erro.',
+    tone: 'danger',
+  },
+  CANCELADA: {
+    status: 'CANCELADA',
+    label: 'Cancelada',
+    description: 'Cancelada pelo administrador antes da gravação.',
+    tone: 'neutral',
+  },
+};
+
+/**
+ * Retorna os metadados visuais e textuais exaustivos de um status de importação.
+ */
+export function getImportacaoStatusMeta(status: ImportacaoStatus): ImportacaoStatusMeta {
+  switch (status) {
+    case 'VALIDANDO':
+    case 'AGUARDANDO_CONFIRMACAO':
+    case 'PROCESSANDO':
+    case 'CONCLUIDA':
+    case 'FALHOU':
+    case 'CANCELADA':
+      return IMPORTACAO_STATUS_META_MAP[status];
+    default: {
+      const exhaustiveCheck: never = status;
+      throw new Error(`Status de importação não mapeado: ${String(exhaustiveCheck)}`);
+    }
+  }
+}
+
+/**
+ * Converte qualquer status de importação em rótulo legível em pt-BR sem vazar código técnico.
+ */
+export function formatImportacaoStatusLabel(
+  status: ImportacaoStatus | string | null | undefined
+): string {
+  if (!status || typeof status !== 'string' || !status.trim()) {
+    return 'Status desconhecido';
+  }
+
+  const trimmed = status.trim();
+  if ((IMPORTACAO_STATUS_VALUES as readonly string[]).includes(trimmed)) {
+    return getImportacaoStatusMeta(trimmed as ImportacaoStatus).label;
+  }
+
+  return 'Status desconhecido';
+}
+
+/**
+ * Determina com precisão se um item do menu administrativo deve receber estado ativo
+ * para o pathname atual, evitando falso positivo entre /admin/importacoes e subrotas.
+ */
+export function isAdminNavItemActive(
+  pathname: string | null | undefined,
+  href: string
+): boolean {
+  if (!pathname || !href || href.startsWith('#')) {
+    return false;
+  }
+
+  const normalizedPath =
+    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  const normalizedHref =
+    href.length > 1 && href.endsWith('/') ? href.slice(0, -1) : href;
+
+  if (normalizedHref === '/admin/importacoes') {
+    return normalizedPath === '/admin/importacoes';
+  }
+
+  if (normalizedHref === '/admin/importacoes/historico') {
+    return (
+      normalizedPath === '/admin/importacoes/historico' ||
+      normalizedPath.startsWith('/admin/importacoes/historico/') ||
+      /^\/admin\/importacoes\/\d+$/.test(normalizedPath)
+    );
+  }
+
+  return (
+    normalizedPath === normalizedHref ||
+    normalizedPath.startsWith(`${normalizedHref}/`)
+  );
+}
+
+export interface ImportacaoActionEligibilityInput {
+  readonly status: ImportacaoStatus | string;
+  readonly isOwner: boolean;
+  readonly preview?: ImportacaoValidationResponseDto | null | undefined;
+}
+
+/**
+ * Avalia se a ação "Voltar para analisar" está disponível para uma importação.
+ * No detalhe, quando `preview` estiver presente como `null`, bloqueia a retomada.
+ */
+export function canBackToAnalyzeImportacao(
+  item: ImportacaoActionEligibilityInput | null | undefined
+): boolean {
+  if (!item || item.status !== 'AGUARDANDO_CONFIRMACAO' || !item.isOwner) {
+    return false;
+  }
+
+  if ('preview' in item && item.preview === null) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Avalia se a ação "Cancelar" no histórico ou detalhe está disponível para uma importação.
+ */
+export function canCancelPendingImportacao(
+  item: Pick<ImportacaoActionEligibilityInput, 'status' | 'isOwner'> | null | undefined
+): boolean {
+  return Boolean(item && item.status === 'AGUARDANDO_CONFIRMACAO' && item.isOwner);
+}
+
+/**
  * Rótulos descritivos e amigáveis para campos de dados e cabeçalho.
  */
 const FIELD_LABEL_MAP: Readonly<Record<string, string>> = {
@@ -1170,5 +1385,16 @@ export function loadPreviewSession(): ImportacaoValidationResponseDto | null {
   } catch {
     clearPreviewSession();
     return null;
+  }
+}
+
+/**
+ * Remove a prévia salva da sessão apenas quando ela corresponder ao ID informado,
+ * evitando descartar uma análise distinta em andamento ao cancelar outro lote no histórico.
+ */
+export function clearPreviewSessionIfId(importacaoId: number): void {
+  const current = loadPreviewSession();
+  if (current && current.importacaoId === importacaoId) {
+    clearPreviewSession();
   }
 }
