@@ -1,0 +1,80 @@
+/**
+ * Nascentes do Cariri — Estilos da Lista de Navegação Administrativa
+ */
+
+.navMenuList {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.navMenuItem {
+  display: flex;
+  align-items: center;
+}
+
+.navMenuLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.navMenuLink:hover {
+  color: #0f172a;
+}
+
+.navMenuLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.navMenuLinkActive {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.navMenuLinkActive::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 3px;
+  background: #804224;
+  border-radius: 2px;
+}
+
+.navMenuLinkActive:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navMenuLink,
+  .navMenuLinkActive {
+    transition: none;
+  }
+}
