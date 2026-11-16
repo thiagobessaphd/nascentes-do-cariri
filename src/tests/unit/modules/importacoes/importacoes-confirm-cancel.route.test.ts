@@ -40,7 +40,6 @@ import {
 } from '@/app/api/admin/importacoes/[id]/confirmar/route';
 import {
   DELETE as CANCEL_DELETE,
-  GET as ITEM_ROUTE_GET,
   PATCH as ITEM_ROUTE_PATCH,
   POST as ITEM_ROUTE_POST,
   PUT as ITEM_ROUTE_PUT,
@@ -375,9 +374,8 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
   // 2. DELETE /api/admin/importacoes/[id]
   describe('DELETE /api/admin/importacoes/[id]', () => {
-    it('deve responder 405 Method Not Allowed com Allow: DELETE para GET, POST, PUT e PATCH', async () => {
+    it('deve responder 405 Method Not Allowed com Allow: GET, DELETE para POST, PUT e PATCH', async () => {
       const responses = await Promise.all([
-        ITEM_ROUTE_GET(),
         ITEM_ROUTE_POST(),
         ITEM_ROUTE_PUT(),
         ITEM_ROUTE_PATCH(),
@@ -385,7 +383,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
       for (const response of responses) {
         expect(response.status).toBe(405);
-        expect(response.headers.get('Allow')).toBe('DELETE');
+        expect(response.headers.get('Allow')).toBe('GET, DELETE');
         expect(response.headers.get('Cache-Control')).toBe('no-store');
         const body = (await response.json()) as PublicErrorResponse;
         expect(body.code).toBe('METHOD_NOT_ALLOWED');
