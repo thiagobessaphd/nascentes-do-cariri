@@ -172,6 +172,8 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(detailPageHtml).toMatch(
         /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes\/historico"[^>]*>Histórico de Lotes<\/a>|<a[^>]*href="\/admin\/importacoes\/historico"[^>]*aria-current="page"[^>]*>Histórico de Lotes<\/a>/
       );
+      expect(detailPageHtml).toContain('aria-disabled="true"');
+      expect(detailPageHtml).toContain('Módulo em desenvolvimento para as próximas sprints');
     });
 
     it('ImportacoesHistoryPage deve declarar robots noindex/nofollow, force-dynamic, <h1> único e sanitizar query params', async () => {
@@ -669,7 +671,10 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(html).toContain('data-testid="history-page-12"');
       expect(html).toContain('…');
 
-      // Comboboxes customizados
+      // Comboboxes customizados e região rolável acessível por teclado
+      expect(html).toContain('role="region"');
+      expect(html).toContain('aria-label="Tabela do histórico de importações"');
+      expect(html).toContain('tabindex="0"');
       expect(html).toContain('data-testid="history-status-filter"');
       expect(html).toContain('data-testid="history-page-size-filter"');
       expect(html).toContain('5 importações');
