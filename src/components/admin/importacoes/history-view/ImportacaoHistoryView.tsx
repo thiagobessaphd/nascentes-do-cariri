@@ -1138,7 +1138,12 @@ export default function ImportacaoHistoryView({
         <>
           {/* Tabela Semântica para Desktop (> 768px) */}
           <div className={styles.desktopTableCard}>
-            <div className={styles.tableScrollContainer}>
+            <div
+              className={styles.tableScrollContainer}
+              role="region"
+              aria-label="Tabela do histórico de importações"
+              tabIndex={0}
+            >
               <table className={styles.table} data-testid="history-desktop-table">
                 <caption className={styles.srOnly}>
                   Histórico administrativo das importações de arquivos TXT

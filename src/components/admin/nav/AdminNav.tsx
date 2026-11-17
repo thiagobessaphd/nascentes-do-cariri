@@ -41,7 +41,13 @@ export default function AdminNav({
         if (item.isPlaceholder) {
           return (
             <li key={item.label} className={styles.navMenuItem}>
-              <a href={item.href} className={styles.navMenuLink}>
+              <a
+                href={item.href}
+                className={styles.navMenuLink}
+                aria-disabled="true"
+                title="Módulo em desenvolvimento para as próximas sprints"
+                onClick={(event) => event.preventDefault()}
+              >
                 {item.label}
               </a>
             </li>
