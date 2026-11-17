@@ -26,6 +26,7 @@ import { prisma } from '@/lib/db/prisma';
 import {
   createAdminSessionToken,
   extractAuthTokenFromRequest,
+  getOptionalAdminSession,
   requireAdminSession,
   verifyAdminSessionToken,
 } from '@/lib/security/admin-guard';
@@ -245,6 +246,50 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         statusCode: 403,
         code: 'FORBIDDEN_INACTIVE_USER',
       });
+    });
+
+    it('getOptionalAdminSession deve retornar usuário ativo ou null para sessão ausente/inválida/inativa e propagar erros inesperados', async () => {
+      // Sem token -> null sem consultar banco
+      await expect(getOptionalAdminSession(null)).resolves.toBeNull();
+      await expect(getOptionalAdminSession(new Headers())).resolves.toBeNull();
+      expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+
+      // Token inválido/expirado -> null
+      await expect(
+        getOptionalAdminSession(new Headers({ authorization: 'Bearer token.invalido.hmac' }))
+      ).resolves.toBeNull();
+
+      // Usuário inexistente (401) -> null
+      const ghostToken = createAdminSessionToken({
+        userId: 999,
+        email: 'fantasma@ufca.edu.br',
+      });
+      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(null);
+      await expect(getOptionalAdminSession(ghostToken)).resolves.toBeNull();
+
+      // Conta inativa (403) -> null
+      const inactiveToken = createAdminSessionToken({
+        userId: INACTIVE_ADMIN.id,
+        email: INACTIVE_ADMIN.email,
+      });
+      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
+        INACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      );
+      await expect(getOptionalAdminSession(inactiveToken)).resolves.toBeNull();
+
+      // Admin ativo -> retorna sessão completa
+      const activeToken = createAdminSessionToken({
+        userId: ACTIVE_ADMIN.id,
+        email: ACTIVE_ADMIN.email,
+      });
+      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
+        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      );
+      await expect(getOptionalAdminSession(activeToken)).resolves.toEqual(ACTIVE_ADMIN);
+
+      // Erro inesperado de infraestrutura (ex: falha de conexão DB) deve ser propagado
+      vi.mocked(prisma.usuario.findUnique).mockRejectedValueOnce(new Error('DB connection lost'));
+      await expect(getOptionalAdminSession(activeToken)).rejects.toThrow('DB connection lost');
     });
   });
 
