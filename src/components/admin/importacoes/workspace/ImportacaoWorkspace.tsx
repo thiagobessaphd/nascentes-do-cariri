@@ -83,7 +83,7 @@ function stripImportacaoIdFromLocation(): void {
   const url = new URL(window.location.href);
   if (!url.searchParams.has('importacaoId')) return;
   url.searchParams.delete('importacaoId');
-  const nextUrl = `${url.pathname}${url.search ? url.search : ''}`;
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
   window.history.replaceState(null, '', nextUrl);
 }
 
