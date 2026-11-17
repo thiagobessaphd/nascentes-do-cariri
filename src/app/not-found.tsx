@@ -31,15 +31,12 @@ export default function GlobalNotFound() {
 
         <p className={styles.description}>
           O endereço acessado não existe ou foi movido dentro da plataforma Nascentes do Cariri.
-          Utilize os atalhos abaixo para retornar ao mapa público ou ao painel administrativo.
+          Utilize o atalho abaixo para retornar ao mapa público.
         </p>
 
         <div className={styles.actions}>
           <Link href="/mapa" className={styles.primaryLink}>
             Ir para o Mapa Público
-          </Link>
-          <Link href="/admin/importacoes/historico" className={styles.secondaryLink}>
-            Histórico de Importações
           </Link>
         </div>
       </section>

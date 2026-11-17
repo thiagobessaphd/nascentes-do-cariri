@@ -317,7 +317,7 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(globalNotFoundHtml).toContain('Erro 404');
       expect(globalNotFoundHtml).toContain('Página não encontrada');
       expect(globalNotFoundHtml).toContain('href="/mapa"');
-      expect(globalNotFoundHtml).toContain('href="/admin/importacoes/historico"');
+      expect(globalNotFoundHtml).not.toContain('href="/admin/importacoes/historico"');
       expect(globalNotFoundHtml).toContain('<svg');
     });
   });
