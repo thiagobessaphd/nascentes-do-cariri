@@ -186,11 +186,17 @@ function buildResultCountText(
       : 'Nenhuma importação registrada até o momento.';
   }
 
-  const start = (meta.page - 1) * meta.pageSize + 1;
-  const end = start + data.length - 1;
   const suffix = statusFilter
     ? ` com status "${formatImportacaoStatusLabel(statusFilter)}"`
     : '';
+
+  if (data.length === 0) {
+    const plural = meta.totalItems === 1 ? 'importação disponível' : 'importações disponíveis';
+    return `Página ${meta.page} sem registros (${meta.totalItems} ${plural}${suffix}).`;
+  }
+
+  const start = (meta.page - 1) * meta.pageSize + 1;
+  const end = start + data.length - 1;
   return `Exibindo ${start}–${end} de ${meta.totalItems} importações${suffix}`;
 }
 
@@ -1056,56 +1062,76 @@ export default function ImportacaoHistoryView({
         </section>
       )}
 
-      {/* Estado Vazio (Base sem lotes vs Filtro sem correspondência) */}
-      {state.kind === 'success' && state.response.data.length === 0 && (
-        <section
-          className={styles.emptyCard}
-          role="status"
-          aria-live="polite"
-          data-testid="history-empty-state"
-        >
-          <div className={styles.emptyIcon} aria-hidden="true">
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="9" y1="15" x2="15" y2="15" />
-            </svg>
-          </div>
-          <h2 className={styles.stateTitle}>
-            {statusFilter
-              ? `Nenhuma importação com status "${formatImportacaoStatusLabel(statusFilter)}"`
-              : 'Nenhuma importação registrada ainda'}
-          </h2>
-          <p className={styles.stateDescription}>
-            {statusFilter
-              ? 'Não encontramos lotes correspondentes ao status selecionado. Limpe o filtro para visualizar todos os envios.'
-              : 'Todo arquivo .txt enviado para validação ficará registrado aqui com autor, datas, totais e situação final para auditoria.'}
-          </p>
-          <div className={styles.stateActions}>
-            {statusFilter ? (
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={handleClearFilter}
-                data-testid="history-empty-clear-filter"
+      {/* Estado Vazio (Página fora do intervalo vs Filtro sem correspondência vs Base sem lotes) */}
+      {state.kind === 'success' && state.response.data.length === 0 && (() => {
+        const isOutOfRangePage =
+          state.response.meta.totalItems > 0 && state.response.meta.page > 1;
+        const totalAvailable = state.response.meta.totalItems;
+        const totalPages = Math.max(1, state.response.meta.totalPages);
+
+        return (
+          <section
+            className={styles.emptyCard}
+            role="status"
+            aria-live="polite"
+            data-testid="history-empty-state"
+          >
+            <div className={styles.emptyIcon} aria-hidden="true">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
               >
-                Limpar filtro
-              </button>
-            ) : (
-              <Link href="/admin/importacoes" className={styles.primaryLink}>
-                Nova Importação (.txt)
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="9" y1="15" x2="15" y2="15" />
+              </svg>
+            </div>
+            <h2 className={styles.stateTitle}>
+              {isOutOfRangePage
+                ? `Página ${state.response.meta.page} sem registros`
+                : statusFilter
+                  ? `Nenhuma importação com status "${formatImportacaoStatusLabel(statusFilter)}"`
+                  : 'Nenhuma importação registrada ainda'}
+            </h2>
+            <p className={styles.stateDescription}>
+              {isOutOfRangePage
+                ? `Existem ${totalAvailable} ${totalAvailable === 1 ? 'importação disponível' : 'importações disponíveis'} distribuídas em ${totalPages} ${totalPages === 1 ? 'página' : 'páginas'}.`
+                : statusFilter
+                  ? 'Não encontramos lotes correspondentes ao status selecionado. Limpe o filtro para visualizar todos os envios.'
+                  : 'Todo arquivo .txt enviado para validação ficará registrado aqui com autor, datas, totais e situação final para auditoria.'}
+            </p>
+            <div className={styles.stateActions}>
+              {isOutOfRangePage ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => handlePageChange(1)}
+                  data-testid="history-empty-back-page-one"
+                >
+                  Voltar para a página 1
+                </button>
+              ) : statusFilter ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={handleClearFilter}
+                  data-testid="history-empty-clear-filter"
+                >
+                  Limpar filtro
+                </button>
+              ) : (
+                <Link href="/admin/importacoes" className={styles.primaryLink}>
+                  Nova Importação (.txt)
+                </Link>
+              )}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Listagem Populada — Tabela Desktop + Cards Mobile */}
       {state.kind === 'success' && state.response.data.length > 0 && (
