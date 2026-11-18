@@ -24,10 +24,10 @@ A matriz estabelece para cada requisito:
 |:---|:---|:---|:---|:---|:---|:---|
 | **CT-BE-01** | Login válido e inválido | Backend | Integração | Autenticação | `src/tests/integration/auth/login.test.ts` | Planejado |
 | **CT-BE-02** | Bloqueio de rota administrativa sem autenticação | Backend | Integração | Autenticação / Guarda | `src/tests/integration/auth/admin-guard.test.ts` | Planejado |
-| **CT-BE-03** | Arquivo vazio | Backend | Unitário | Importação TXT | `src/tests/unit/import/file-validator.test.ts` | Planejado |
+| **CT-BE-03** | Arquivo vazio | Backend | Unitário | Importação TXT | `src/tests/unit/import/file-validator.test.ts` | Ativo |
 | **CT-BE-04** | Extensão inválida (diferente de `.txt`) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-05** | Arquivo acima do limite (5 MB) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
-| **CT-BE-06** | Cabeçalho ausente ou incorreto | Backend | Unitário | Importação TXT | `src/tests/unit/import/txt-parser.test.ts` | Planejado |
+| **CT-BE-06** | Cabeçalho ausente ou incorreto | Backend | Unitário | Importação TXT | `src/tests/unit/import/txt-parser.test.ts` | Ativo |
 | **CT-BE-07** | Coordenada fora dos limites (Cariri) | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-08** | Data inválida | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
 | **CT-BE-09** | Vazão negativa ou não numérica | Backend | Unitário | Domínio e Validação | `src/tests/unit/domain/nascente-validation.test.ts` | Ativo |
@@ -42,7 +42,6 @@ A matriz estabelece para cada requisito:
 | **CT-FE-02** | Tooltip no mouseover | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/tooltip.test.ts` | Ativo |
 | **CT-FE-03** | Popup no clique e toque | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/popup.test.ts` | Ativo |
 | **CT-FE-04** | Filtros de busca e município | Frontend | Unitário/E2E | Mapa Interativo | `src/tests/unit/mapa/filters.test.ts` | Ativo |
-| **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Planejado |
 | **CT-FE-05** | Estado sem dados (Empty state) | Frontend | Unitário | Mapa Interativo | `src/tests/unit/mapa/empty-state.test.ts` | Ativo |
 | **CT-FE-06** | Estado de erro da API | Frontend | Unitário | Resiliência de Erros | `src/tests/unit/errors/api-error-handler.test.ts` | Ativo |
 | **CT-FE-07** | Carregamento responsivo dentro do iframe | Frontend | Unitário/E2E | Layout e Framing | `src/tests/unit/mapa/viewport-responsive.test.ts` | Ativo |
@@ -173,24 +172,32 @@ A matriz estabelece para cada requisito:
     - Região de alerta (`role="alert"`, `aria-live="assertive"`) detalhando linha, campo traduzido, motivo do erro e valor bruto informado (ou fallback acessível `"Não informado"`), com paginação para lotes extensos.
   - **Tabela de Prévia (`ImportPreviewTable`):**
     - Unificação e ordenação cronológica por linha dos registros novos e duplicados, abas WAI-ARIA (`role="tablist"`, `role="tab"`, `role="tabpanel"`), coordenadas com 6 decimais, datas em `DD/MM/AAAA` sem desvio de fuso e vazão média em `m³/s`.
-  - **Regra de Habilitação da Confirmação (`ImportActionBar` / `canConfirmImportacao`):**
+  - **Regra de Habilitação da Confirmação e Estados da Barra de Ações (`ImportActionBar` / `canConfirmImportacao`):**
     - Botão de confirmação habilitado exclusivamente quando `canConfirm === true`, `totalInvalidas === 0`, `allErrors.length === 0` e `totalValidas > 0`.
-  - **Validação de Contrato e Resiliência do Cliente HTTP (`uploadAndValidateTxt`):**
-    - Validação de esquema Zod em tempo de execução (`INVALID_SERVER_PAYLOAD`), bloqueio fail-fast de arquivos vazios, acima de 5 MB ou fora da extensão `.txt`, e mascaramento seguro de erros HTTP 5xx.
+    - Estados operacionais de cancelamento em curso (`isCanceling`, rótulo `"Cancelando..."` com travamento mútuo dos botões) e conclusão pós-confirmação (`isConfirmed`, rótulo `"Lote Validado"` travado e `"Enviar Novo Arquivo"` ativo).
+  - **Cliente HTTP e Persistência Temporária de Prévia (`src/services/importacoes.client.ts`):**
+    - `uploadAndValidateTxt`, `confirmImportacaoById` (`POST /api/admin/importacoes/[id]/confirmar`) e `cancelImportacaoById` (`DELETE /api/admin/importacoes/[id]`): validação de ID no cliente (`400 INVALID_IMPORTACAO_INPUT`), validação de esquema Zod (`INVALID_SERVER_RESPONSE`), propagação de `AbortError`, tratamento de falhas de rede e mapeamento seguro de erros HTTP 4xx/5xx.
+    - Recuperação de prévia em `sessionStorage` (`savePreviewSession`, `loadPreviewSession`, `clearPreviewSession`): persistência restrita a estados recuperáveis (`AGUARDANDO_CONFIRMACAO`, `FALHOU`), limpeza automática de JSON corrompido ou estados finais e resiliência em ambiente SSR.
 
-### 3.11. Persistência Transacional, Deduplicação, Rollback e Cache na Confirmação (`US-13` / `Task-26` / `CT-BE-13`)
+### 3.11. Persistência Transacional, Cancelamento, Rotas Admin, Rollback e Cache (`US-13` / `US-14` / `Task-25` / `Task-26` / `CT-BE-13` / `CT-BE-15`)
 * **Arquivos:**
   - `src/tests/unit/modules/importacoes/importacoes-commit.service.test.ts`
+  - `src/tests/unit/modules/importacoes/importacoes-confirm-cancel.route.test.ts`
   - `src/tests/integration/import/import-commit.test.ts`
 * **Regras Verificadas:**
-  - **Adição Cumulativa e Vínculo com `importacaoId` (`CT-BE-13` / `RF06`):**
+  - **Rotas Administrativas (`POST /api/admin/importacoes/[id]/confirmar` e `DELETE /api/admin/importacoes/[id]`):**
+    - Bloqueio `405 Method Not Allowed` com cabeçalho `Allow` para métodos não suportados; guarda HMAC-SHA256 (`401 UNAUTHORIZED` e `403 FORBIDDEN_INACTIVE_USER`), suporte a Cookie HttpOnly e `Authorization: Bearer`, validação de parâmetro `[id]` (`parseImportacaoRouteId` -> `400 INVALID_IMPORTACAO_INPUT`), cabeçalhos anti-cache (`NO_STORE_HEADERS`), omissão estrita de caminhos privados (`caminhoPrivadoArquivo`, `storageUrl`), propagação de erros `403`/`404`/`409`/`422` e mascaramento `500 INTERNAL_SERVER_ERROR`.
+  - **Adição Cumulativa, Ownership e Vínculo com `importacaoId` (`CT-BE-13` / `RF06`):**
+    - Validação estrita de propriedade do lote (`403 IMPORTACAO_OWNERSHIP_FORBIDDEN`) em `confirmImportacao` e `cancelImportacao`.
     - Inserção atômica apenas dos registros novos com `importacaoId` e `ativo: true`, transição da importação para `CONCLUIDA` com preenchimento de `concluidaAt` e preservação integral dos registros e arquivos `.txt` de importações anteriores (`CT-BE-14`, `CT-BE-15`).
+  - **Cancelamento Atômico e Auditoria (`cancelImportacao` / `CT-BE-15`):**
+    - Transição compare-and-swap de `AGUARDANDO_CONFIRMACAO` para `StatusImportacao.CANCELADA` com preenchimento de `concluidaAt` e `mensagemErro`, preservação integral do arquivo TXT no storage privado, sem invalidação do cache público, e bloqueio cruzado de transições (`CANCELADA <-> CONCLUIDA`, `409 IMPORTACAO_ALREADY_PROCESSED`).
   - **Deduplicação Intratransacional (`CT-BE-11`):**
     - Rechecagem das chaves existentes `[latitude, longitude, fonte]` dentro da transação ativa (case-insensitive e accent-insensitive), ignorando registros já cadastrados sem reinserção e contabilizando `totalDuplicadas`.
   - **Rollback Tudo-ou-Nada (`CT-BE-12`):**
     - Falha forçada no meio da operação (`onAfterRowInsert`) reverte 100% das inserções parciais no MySQL, restaura o status `AGUARDANDO_CONFIRMACAO` e preserva dados e arquivos prévios.
   - **Invalidação de Cache Pós-Commit e Concorrência (`RNF04` / `RNF05`):**
-    - Invalidação do cache público (`onImportacaoConcluida`) disparada exclusivamente após o commit bem-sucedido no banco, e trava atômica compare-and-swap (`updateMany`) bloqueando confirmações simultâneas ou repetidas (`409 IMPORTACAO_ALREADY_PROCESSED`).
+    - Invalidação do cache público (`onImportacaoConcluida`) disparada exclusivamente após o commit bem-sucedido no banco, e trava atômica compare-and-swap (`updateMany`) bloqueando confirmações/cancelamentos simultâneos ou repetidos (`409 IMPORTACAO_ALREADY_PROCESSED`).
 
 ---
 

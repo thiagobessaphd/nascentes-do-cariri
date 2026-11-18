@@ -167,6 +167,15 @@
   animation: spin 0.8s linear infinite;
 }
 
+.spinnerDark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(51, 65, 85, 0.25);
+  border-top-color: #334155;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -180,7 +189,8 @@
     transition: none;
   }
 
-  .spinner {
+  .spinner,
+  .spinnerDark {
     animation: none;
   }
 }

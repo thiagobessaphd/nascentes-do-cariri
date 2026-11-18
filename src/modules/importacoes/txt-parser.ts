@@ -93,7 +93,8 @@ function validateCalendarDate(
   year: number,
   month: number,
   day: number,
-  line: number
+  line: number,
+  rawValue: string
 ): { valid: true; dateUtc: Date } | { valid: false; error: ImportRowError } {
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1000 || year > 9999) {
     return {
@@ -103,6 +104,7 @@ function validateCalendarDate(
         field: 'data_criacao',
         code: IMPORT_ERROR_CODES.INVALID_CALENDAR_DATE,
         message: 'Data de criação não representa uma data válida do calendário.',
+        rawValue,
       },
     };
   }
@@ -122,6 +124,7 @@ function validateCalendarDate(
         field: 'data_criacao',
         code: IMPORT_ERROR_CODES.INVALID_CALENDAR_DATE,
         message: `Data de criação inválida para o calendário: ${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}.`,
+        rawValue,
       },
     };
   }
@@ -138,6 +141,7 @@ function validateCalendarDate(
         field: 'data_criacao',
         code: IMPORT_ERROR_CODES.FUTURE_DATE,
         message: 'Data de criação não pode ser futura.',
+        rawValue,
       },
     };
   }
@@ -430,7 +434,7 @@ export function parseTxtLine(rawLine: string, lineNumber: number): ParseLineOutc
     const month = Number(mStr);
     const day = Number(dStr);
 
-    const dateResult = validateCalendarDate(year, month, day, lineNumber);
+    const dateResult = validateCalendarDate(year, month, day, lineNumber, rawDataCriacao);
     if (!dateResult.valid) {
       errors.push(dateResult.error);
     } else {

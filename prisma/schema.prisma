@@ -80,6 +80,7 @@ enum StatusImportacao {
   PROCESSANDO
   CONCLUIDA
   FALHOU
+  CANCELADA
 
   @@map("status_importacao")
 }

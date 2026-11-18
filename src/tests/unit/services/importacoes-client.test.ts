@@ -12,7 +12,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  cancelImportacaoById,
   canConfirmImportacao,
+  clearPreviewSession,
+  confirmImportacaoById,
   derivePreviewState,
   formatCoordinates,
   formatDuplicateReason,
@@ -21,11 +24,18 @@ import {
   formatFileSizeBytes,
   formatIsoDateToPtBr,
   formatVazaoMedia,
+  IMPORTACAO_PREVIEW_STORAGE_KEY,
   ImportacaoClientError,
+  loadPreviewSession,
   paginateSlice,
+  savePreviewSession,
   uploadAndValidateTxt,
 } from '@/services/importacoes.client';
-import type { ImportacaoValidationResponseDto } from '@/modules/importacoes/importacoes.types';
+import type {
+  ImportacaoCancelResponseDto,
+  ImportacaoConfirmResponseDto,
+  ImportacaoValidationResponseDto,
+} from '@/modules/importacoes/importacoes.types';
 
 describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.client.ts)', () => {
   describe('formatVazaoMedia', () => {
@@ -511,5 +521,348 @@ describe('Cliente HTTP uploadAndValidateTxt (src/services/importacoes.client.ts)
     await expect(uploadAndValidateTxt(file)).rejects.toThrow(
       'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.'
     );
+  });
+});
+
+describe('Cliente HTTP confirmImportacaoById e cancelImportacaoById (src/services/importacoes.client.ts)', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const MOCK_CONFIRM_RESPONSE: ImportacaoConfirmResponseDto = {
+    importacaoId: 42,
+    nomeArquivo: 'nascentes-cariri.txt',
+    hashSha256: 'a'.repeat(64),
+    status: 'CONCLUIDA',
+    summary: {
+      totalLinhas: 5,
+      totalInseridas: 4,
+      totalDuplicadas: 1,
+      totalInvalidas: 0,
+    },
+    cacheInvalidated: true,
+    concluidaAt: '2026-11-15T18:00:00.000Z',
+  };
+
+  const MOCK_CANCEL_RESPONSE: ImportacaoCancelResponseDto = {
+    importacaoId: 88,
+    nomeArquivo: 'nascentes-pendente.txt',
+    hashSha256: 'b'.repeat(64),
+    status: 'CANCELADA',
+    mensagemErro: 'Importação cancelada pelo administrador antes da confirmação.',
+    concluidaAt: '2026-11-15T18:05:00.000Z',
+  };
+
+  it('confirmImportacaoById deve rejeitar IDs inválidos no cliente sem chamar fetch', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    for (const invalidId of [0, -3, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(confirmImportacaoById(invalidId)).rejects.toMatchObject({
+        name: 'ImportacaoClientError',
+        statusCode: 400,
+        code: 'INVALID_IMPORTACAO_INPUT',
+      });
+    }
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('confirmImportacaoById deve enviar POST /api/admin/importacoes/[id]/confirmar e retornar DTO validado (200 OK)', async () => {
+    const controller = new AbortController();
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(MOCK_CONFIRM_RESPONSE),
+    });
+    globalThis.fetch = mockFetch;
+
+    const result = await confirmImportacaoById(42, {
+      authToken: 'admin-jwt-token',
+      signal: controller.signal,
+    });
+
+    expect(result).toEqual(MOCK_CONFIRM_RESPONSE);
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/importacoes/42/confirmar',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        signal: controller.signal,
+        headers: expect.any(Headers),
+      })
+    );
+
+    const headers = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(headers.get('Accept')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('Bearer admin-jwt-token');
+  });
+
+  it('confirmImportacaoById deve mapear erros estruturados (403, 404, 409, 422) e fallback 500 não-JSON', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: vi.fn().mockResolvedValue({
+        error: 'A importação 42 já foi confirmada anteriormente.',
+        code: 'IMPORTACAO_ALREADY_PROCESSED',
+      }),
+    });
+
+    await expect(confirmImportacaoById(42)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'IMPORTACAO_ALREADY_PROCESSED',
+      message: 'A importação 42 já foi confirmada anteriormente.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error('HTML 500')),
+    });
+
+    await expect(confirmImportacaoById(42)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Erro interno no servidor ao confirmar a importação. Tente novamente mais tarde.',
+    });
+  });
+
+  it('confirmImportacaoById deve rejeitar payload 200 fora do schema Zod e propagar AbortError sem mascaramento', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ importacaoId: 42, status: 'PENDENTE_DESCONHECIDO' }),
+    });
+
+    await expect(confirmImportacaoById(42)).rejects.toMatchObject({
+      statusCode: 200,
+      code: 'INVALID_SERVER_RESPONSE',
+    });
+
+    const abortErr = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(abortErr);
+
+    await expect(confirmImportacaoById(42)).rejects.toBe(abortErr);
+
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(confirmImportacaoById(42)).rejects.toMatchObject({
+      isNetworkError: true,
+    });
+  });
+
+  it('cancelImportacaoById deve rejeitar IDs inválidos no cliente sem chamar fetch', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    for (const invalidId of [0, -1, 2.75]) {
+      await expect(cancelImportacaoById(invalidId)).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'INVALID_IMPORTACAO_INPUT',
+      });
+    }
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('cancelImportacaoById deve enviar DELETE /api/admin/importacoes/[id] e retornar DTO validado (200 OK)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(MOCK_CANCEL_RESPONSE),
+    });
+    globalThis.fetch = mockFetch;
+
+    const result = await cancelImportacaoById(88, { authToken: 'cancel-token' });
+
+    expect(result).toEqual(MOCK_CANCEL_RESPONSE);
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/importacoes/88',
+      expect.objectContaining({
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: expect.any(Headers),
+      })
+    );
+  });
+
+  it('cancelImportacaoById deve mapear erro 404/409, fallback 500 de cancelamento e schema 200 inválido', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: vi.fn().mockResolvedValue({
+        error: 'Importação com ID 88 não foi encontrada.',
+        code: 'IMPORTACAO_NOT_FOUND',
+      }),
+    });
+
+    await expect(cancelImportacaoById(88)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'IMPORTACAO_NOT_FOUND',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error('500 Plain Text')),
+    });
+
+    await expect(cancelImportacaoById(88)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Erro interno no servidor ao cancelar a importação. Tente novamente mais tarde.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ importacaoId: 88, status: 'CONCLUIDA' }),
+    });
+
+    await expect(cancelImportacaoById(88)).rejects.toMatchObject({
+      statusCode: 200,
+      code: 'INVALID_SERVER_RESPONSE',
+    });
+  });
+});
+
+describe('Persistência Temporária de Prévia em sessionStorage (src/services/importacoes.client.ts)', () => {
+  function createMockStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length(): number {
+        return store.size;
+      },
+      clear(): void {
+        store.clear();
+      },
+      getItem(key: string): string | null {
+        return store.has(key) ? (store.get(key) ?? null) : null;
+      },
+      key(index: number): string | null {
+        return Array.from(store.keys())[index] ?? null;
+      },
+      removeItem(key: string): void {
+        store.delete(key);
+      },
+      setItem(key: string, value: string): void {
+        store.set(key, value);
+      },
+    };
+  }
+
+  function createValidationDto(
+    overrides?: Partial<ImportacaoValidationResponseDto>
+  ): ImportacaoValidationResponseDto {
+    return {
+      importacaoId: 202,
+      nomeArquivo: 'previa-cariri.txt',
+      hashSha256: 'c'.repeat(64),
+      tamanhoBytes: 128,
+      status: 'AGUARDANDO_CONFIRMACAO',
+      canConfirm: true,
+      summary: {
+        totalLinhas: 1,
+        totalValidas: 1,
+        totalInvalidas: 0,
+        totalDuplicadas: 0,
+      },
+      validRows: [
+        {
+          line: 2,
+          duplicateKey: '-7.228900|-39.414400|fonte da batateira',
+          data: {
+            latitude: -7.2289,
+            longitude: -39.4144,
+            municipio: 'Crato',
+            fonte: 'Fonte da Batateira',
+            localidade: 'Sítio Fundão',
+            dataCriacaoIso: '2024-05-10',
+            dataCriacao: '2024-05-10T00:00:00.000Z',
+            vazaoMedia: 0.45,
+            unidadeVazao: 'm³/s',
+          },
+        },
+      ],
+      duplicateRows: [],
+      invalidRows: [],
+      allErrors: [],
+      createdAt: '2026-11-15T17:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('deve operar sem erro e retornar null em ambiente sem window (SSR / Node)', () => {
+    const dto = createValidationDto();
+    expect(() => savePreviewSession(dto)).not.toThrow();
+    expect(loadPreviewSession()).toBeNull();
+    expect(() => clearPreviewSession()).not.toThrow();
+  });
+
+  it('deve salvar e recuperar prévia recuperável (AGUARDANDO_CONFIRMACAO e FALHOU) em sessionStorage', () => {
+    const mockStorage = createMockStorage();
+    vi.stubGlobal('window', { sessionStorage: mockStorage });
+
+    const pendingDto = createValidationDto({ status: 'AGUARDANDO_CONFIRMACAO', canConfirm: true });
+    savePreviewSession(pendingDto);
+    expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).not.toBeNull();
+    expect(loadPreviewSession()).toEqual(pendingDto);
+
+    const failedDto = createValidationDto({
+      importacaoId: 203,
+      status: 'FALHOU',
+      canConfirm: false,
+      summary: {
+        totalLinhas: 1,
+        totalValidas: 0,
+        totalInvalidas: 1,
+        totalDuplicadas: 0,
+      },
+      validRows: [],
+      allErrors: [
+        {
+          line: 2,
+          field: 'vazao_media',
+          code: 'NEGATIVE_FLOW',
+          message: 'Vazão média não pode ser negativa.',
+          rawValue: '-1.5',
+        },
+      ],
+    });
+    savePreviewSession(failedDto);
+    expect(loadPreviewSession()).toEqual(failedDto);
+
+    clearPreviewSession();
+    expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).toBeNull();
+    expect(loadPreviewSession()).toBeNull();
+  });
+
+  it('não deve salvar estados finais (CONCLUIDA / CANCELADA) e deve limpar JSON corrompido ou expirado', () => {
+    const mockStorage = createMockStorage();
+    vi.stubGlobal('window', { sessionStorage: mockStorage });
+
+    savePreviewSession(createValidationDto({ status: 'CONCLUIDA' }));
+    savePreviewSession(createValidationDto({ status: 'CANCELADA' }));
+    expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).toBeNull();
+
+    mockStorage.setItem(IMPORTACAO_PREVIEW_STORAGE_KEY, '{json-corrompido');
+    expect(loadPreviewSession()).toBeNull();
+    expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).toBeNull();
+
+    mockStorage.setItem(
+      IMPORTACAO_PREVIEW_STORAGE_KEY,
+      JSON.stringify(createValidationDto({ status: 'CONCLUIDA' }))
+    );
+    expect(loadPreviewSession()).toBeNull();
+    expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).toBeNull();
   });
 });

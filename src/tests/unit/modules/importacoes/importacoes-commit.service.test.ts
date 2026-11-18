@@ -12,9 +12,13 @@ import type { PrismaClient } from '@prisma/client';
 import { AppError } from '@/lib/errors';
 import { computeFileSha256 } from '@/lib/storage/crypto';
 import { MemoryStorageDriver } from '@/lib/storage/drivers/memory-storage.driver';
-import { ImportacaoCommitService } from '@/modules/importacoes/importacoes-commit.service';
+import {
+  ImportacaoCommitService,
+  parseImportacaoRouteId,
+} from '@/modules/importacoes/importacoes-commit.service';
 import { ImportacaoStorageService } from '@/modules/importacoes/importacoes-storage.service';
 import {
+  CANCELLED_IMPORTACAO_DEFAULT_MESSAGE,
   IMPORTACAO_COMMIT_ERROR_CODES,
   StatusImportacao,
   type PrismaTransactionClient,
@@ -220,9 +224,46 @@ describe('QA Unitário — ImportacaoCommitService (Persistência Transacional e
       }
     );
 
+    const mockTopLevelUpdateMany = vi.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: number; status: StatusImportacao; usuarioId?: number };
+        data: Partial<SimulatedImportacaoRow>;
+      }) => {
+        if (simulateConcurrentClaimForId === where.id) {
+          const raceRow = importacoesStore.get(where.id);
+          if (raceRow) {
+            importacoesStore.set(where.id, {
+              ...raceRow,
+              status: StatusImportacao.PROCESSANDO,
+            });
+          }
+          return { count: 0 };
+        }
+
+        const current = importacoesStore.get(where.id);
+        if (
+          !current ||
+          current.status !== where.status ||
+          (where.usuarioId !== undefined && current.usuarioId !== where.usuarioId)
+        ) {
+          return { count: 0 };
+        }
+
+        importacoesStore.set(where.id, {
+          ...current,
+          ...data,
+        });
+        return { count: 1 };
+      }
+    );
+
     mockPrisma = {
       importacao: {
         findUnique: mockFindUnique,
+        updateMany: mockTopLevelUpdateMany,
       },
       $transaction: mockTransaction,
     } as unknown as PrismaClient;
@@ -614,6 +655,248 @@ describe('QA Unitário — ImportacaoCommitService (Persistência Transacional e
       expect(await memoryDriver.exists(row.caminhoPrivadoArquivo)).toBe(true);
 
       // 5. Cache público NÃO foi invalidado
+      expect(cacheInvalidatorMock).not.toHaveBeenCalled();
+    });
+  });
+
+
+  // 6. Validação de Parâmetro de Rota (parseImportacaoRouteId) e Ownership
+  describe('6. Validação de Parâmetro de Rota (parseImportacaoRouteId) e Ownership (usuarioId)', () => {
+    it('deve aceitar strings inteiras positivas válidas (inclusive com espaços ao redor)', () => {
+      expect(parseImportacaoRouteId('1')).toBe(1);
+      expect(parseImportacaoRouteId('42')).toBe(42);
+      expect(parseImportacaoRouteId('  105  ')).toBe(105);
+    });
+
+    it.each<unknown>(['0', '-5', 'abc', '12abc', '1.5', '', '   ', null, undefined, '9007199254740993'])(
+      'deve rejeitar parâmetro de rota inválido (%p) com INVALID_IMPORTACAO_INPUT (400)',
+      (invalidId) => {
+        try {
+          parseImportacaoRouteId(invalidId);
+          expect.unreachable('Esperava AppError 400 para ID de rota inválido');
+        } catch (error) {
+          expect(error).toBeInstanceOf(AppError);
+          const appErr = error as AppError;
+          expect(appErr.statusCode).toBe(400);
+          expect(appErr.code).toBe(IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT);
+        }
+      }
+    );
+
+    it('deve bloquear confirmImportacao com 403 IMPORTACAO_OWNERSHIP_FORBIDDEN quando usuarioId divergir do proprietário', async () => {
+      const row = await seedImportacaoWithFile({
+        id: 601,
+        usuarioId: 7,
+      });
+
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      await expect(
+        service.confirmImportacao({ importacaoId: row.id, usuarioId: 99 })
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_OWNERSHIP_FORBIDDEN,
+      });
+
+      expect(importacoesStore.get(601)?.status).toBe(StatusImportacao.AGUARDANDO_CONFIRMACAO);
+      expect(nascentesStore).toHaveLength(0);
+      expect(cacheInvalidatorMock).not.toHaveBeenCalled();
+      expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
+    it('deve permitir confirmImportacao quando usuarioId coincidir com o proprietário do lote', async () => {
+      const row = await seedImportacaoWithFile({
+        id: 602,
+        usuarioId: 7,
+      });
+
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      const result = await service.confirmImportacao({
+        importacaoId: row.id,
+        usuarioId: 7,
+      });
+
+      expect(result.status).toBe(StatusImportacao.CONCLUIDA);
+      expect(result.summary.totalInseridas).toBe(3);
+      expect(nascentesStore).toHaveLength(3);
+      expect(cacheInvalidatorMock).toHaveBeenCalledWith(602);
+    });
+
+    it('deve bloquear cancelImportacao com 403 IMPORTACAO_OWNERSHIP_FORBIDDEN quando usuarioId divergir do proprietário', async () => {
+      const row = await seedImportacaoWithFile({
+        id: 603,
+        usuarioId: 7,
+      });
+
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      await expect(
+        service.cancelImportacao({ importacaoId: row.id, usuarioId: 99 })
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_OWNERSHIP_FORBIDDEN,
+      });
+
+      expect(importacoesStore.get(603)?.status).toBe(StatusImportacao.AGUARDANDO_CONFIRMACAO);
+      expect(importacoesStore.get(603)?.concluidaAt).toBeNull();
+    });
+  });
+
+  // 7. Cancelamento de Importação Pendente (cancelImportacao) e Auditoria
+  describe('7. Cancelamento de Importação Pendente (cancelImportacao) e Preservação de Auditoria', () => {
+    it('deve cancelar lote AGUARDANDO_CONFIRMACAO, registrar concluidaAt e preservar arquivo no storage', async () => {
+      const row = await seedImportacaoWithFile({
+        id: 701,
+        usuarioId: 7,
+        nomeArquivo: 'lote-para-cancelar.txt',
+      });
+
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      const result = await service.cancelImportacao({
+        importacaoId: row.id,
+        usuarioId: 7,
+      });
+
+      expect(result.importacaoId).toBe(701);
+      expect(result.nomeArquivo).toBe('lote-para-cancelar.txt');
+      expect(result.hashSha256).toBe(row.hashArquivo);
+      expect(result.status).toBe(StatusImportacao.CANCELADA);
+      expect(result.mensagemErro).toBe(CANCELLED_IMPORTACAO_DEFAULT_MESSAGE);
+      expect(Number.isNaN(Date.parse(result.concluidaAt))).toBe(false);
+
+      const persisted = importacoesStore.get(701);
+      expect(persisted?.status).toBe(StatusImportacao.CANCELADA);
+      expect(persisted?.mensagemErro).toBe(CANCELLED_IMPORTACAO_DEFAULT_MESSAGE);
+      expect(persisted?.concluidaAt).toBeInstanceOf(Date);
+
+      // Arquivo TXT original permanece no storage privado para auditoria
+      expect(await memoryDriver.exists(row.caminhoPrivadoArquivo)).toBe(true);
+      expect(nascentesStore).toHaveLength(0);
+      expect(cacheInvalidatorMock).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar importacaoId inválido no cancelImportacao com INVALID_IMPORTACAO_INPUT (400)', async () => {
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      await expect(service.cancelImportacao({ importacaoId: 0 })).rejects.toMatchObject({
+        statusCode: 400,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT,
+      });
+
+      await expect(service.cancelImportacao({ importacaoId: -3 })).rejects.toMatchObject({
+        statusCode: 400,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_INPUT,
+      });
+    });
+
+    it('deve lançar IMPORTACAO_NOT_FOUND (404) ao tentar cancelar importação inexistente', async () => {
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      await expect(service.cancelImportacao({ importacaoId: 999999 })).rejects.toMatchObject({
+        statusCode: 404,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_NOT_FOUND,
+      });
+    });
+
+    it.each<StatusImportacao>([
+      StatusImportacao.CONCLUIDA,
+      StatusImportacao.PROCESSANDO,
+      StatusImportacao.CANCELADA,
+    ])(
+      'deve rejeitar cancelImportacao em estado terminal/em processamento (%s) com IMPORTACAO_ALREADY_PROCESSED (409)',
+      async (status) => {
+        const row = await seedImportacaoWithFile({
+          id: 702,
+          status,
+        });
+
+        const service = new ImportacaoCommitService({
+          prismaClient: mockPrisma,
+          storageService,
+          cacheInvalidator: cacheInvalidatorMock,
+        });
+
+        await expect(
+          service.cancelImportacao({ importacaoId: row.id, usuarioId: row.usuarioId })
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          code: IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_ALREADY_PROCESSED,
+        });
+      }
+    );
+
+    it.each<StatusImportacao>([
+      StatusImportacao.VALIDANDO,
+      StatusImportacao.FALHOU,
+    ])(
+      'deve rejeitar cancelImportacao em estado não pendente (%s) com INVALID_IMPORTACAO_STATE (409)',
+      async (status) => {
+        const row = await seedImportacaoWithFile({
+          id: 703,
+          status,
+        });
+
+        const service = new ImportacaoCommitService({
+          prismaClient: mockPrisma,
+          storageService,
+          cacheInvalidator: cacheInvalidatorMock,
+        });
+
+        await expect(
+          service.cancelImportacao({ importacaoId: row.id, usuarioId: row.usuarioId })
+        ).rejects.toMatchObject({
+          statusCode: 409,
+          code: IMPORTACAO_COMMIT_ERROR_CODES.INVALID_IMPORTACAO_STATE,
+        });
+      }
+    );
+
+    it('deve bloquear cancelImportacao concorrente com 409 IMPORTACAO_ALREADY_PROCESSED quando outro processo reivindicar o lote', async () => {
+      const row = await seedImportacaoWithFile({
+        id: 704,
+        usuarioId: 7,
+      });
+      simulateConcurrentClaimForId = row.id;
+
+      const service = new ImportacaoCommitService({
+        prismaClient: mockPrisma,
+        storageService,
+        cacheInvalidator: cacheInvalidatorMock,
+      });
+
+      await expect(
+        service.cancelImportacao({ importacaoId: row.id, usuarioId: 7 })
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        code: IMPORTACAO_COMMIT_ERROR_CODES.IMPORTACAO_ALREADY_PROCESSED,
+      });
+
       expect(cacheInvalidatorMock).not.toHaveBeenCalled();
     });
   });

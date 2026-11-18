@@ -39,6 +39,7 @@ import {
   type TxtParseSummary,
   type ValidTxtPreviewRow,
 } from '@/modules/importacoes/importacoes.contracts';
+import { parseTxtLine } from '@/modules/importacoes/txt-parser';
 import { createAdminSessionToken } from '@/lib/security/admin-guard';
 import { prisma } from '@/lib/db/prisma';
 import { GET as devSessionGET, DELETE as devSessionDELETE } from '@/app/api/admin/dev-session/route';
@@ -558,6 +559,153 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(res.headers.get('location')).toBe('http://localhost:3000/admin/importacoes');
       expect(res.headers.get('set-cookie')).toContain('HttpOnly');
       expect(res.headers.get('set-cookie')).toContain('SameSite=Lax');
+    });
+  });
+
+  describe('Task-25 — Estados Pós-Confirmação, Cancelamento, Campo Vazio e Data Futura', () => {
+    it('ImportSummaryCards deve omitir banner diagnóstico quando hideDiagnosticBanner=true preservando metadados e cards', () => {
+      const summary: TxtParseSummary = {
+        totalLinhas: 5,
+        totalValidas: 5,
+        totalInvalidas: 0,
+        totalDuplicadas: 0,
+      };
+      const classification = derivePreviewState({
+        canConfirm: true,
+        summary,
+        allErrors: [],
+      });
+
+      const markupWithBanner = renderToStaticMarkup(
+        React.createElement(ImportSummaryCards, {
+          summary,
+          fileName: 'lote-valido.txt',
+          classification,
+          hideDiagnosticBanner: false,
+        })
+      );
+      expect(markupWithBanner).toContain('data-testid="diagnostic-banner-valid"');
+
+      const markupHidden = renderToStaticMarkup(
+        React.createElement(ImportSummaryCards, {
+          summary,
+          fileName: 'lote-valido.txt',
+          classification,
+          hideDiagnosticBanner: true,
+        })
+      );
+      expect(markupHidden).not.toContain('data-testid="diagnostic-banner-valid"');
+      expect(markupHidden).not.toContain('data-testid="diagnostic-banner-invalid"');
+      expect(markupHidden).not.toContain('data-testid="diagnostic-banner-empty"');
+      expect(markupHidden).toContain('data-testid="summary-metadata-bar"');
+      expect(markupHidden).toContain('data-testid="card-total-linhas"');
+    });
+
+    it('ImportErrorsList deve exibir "(Não informado)" para rawValue vazio, com espaços ou ausente', () => {
+      const errors: readonly ImportRowError[] = [
+        {
+          line: 2,
+          field: 'data_criacao',
+          code: IMPORT_ERROR_CODES.REQUIRED_FIELD_EMPTY,
+          message: 'Data de criação é obrigatória.',
+          rawValue: '',
+        },
+        {
+          line: 3,
+          field: 'localidade',
+          code: IMPORT_ERROR_CODES.REQUIRED_FIELD_EMPTY,
+          message: 'Localidade é obrigatória.',
+          rawValue: '   ',
+        },
+        {
+          line: 4,
+          field: 'vazao_media',
+          code: IMPORT_ERROR_CODES.REQUIRED_FIELD_EMPTY,
+          message: 'Vazão média é obrigatória.',
+        },
+      ];
+
+      const markup = renderToStaticMarkup(
+        React.createElement(ImportErrorsList, {
+          errors,
+        })
+      );
+
+      const matches = markup.match(/\(Não informado\)/g) ?? [];
+      expect(matches).toHaveLength(3);
+    });
+
+    it('parseTxtLine deve preservar rawValue em FUTURE_DATE e INVALID_CALENDAR_DATE e exibi-lo em ImportErrorsList', () => {
+      const futureOutcome = parseTxtLine(
+        '-7.228900;-39.414400;Crato;Fonte Teste;Sitio Fundao;2099-12-31;0.45',
+        3
+      );
+      expect(futureOutcome.valid).toBe(false);
+      if (!futureOutcome.valid) {
+        const futureErr = futureOutcome.errors.find(
+          (err) => err.code === IMPORT_ERROR_CODES.FUTURE_DATE
+        );
+        expect(futureErr).toBeDefined();
+        expect(futureErr?.rawValue).toBe('2099-12-31');
+
+        const markup = renderToStaticMarkup(
+          React.createElement(ImportErrorsList, {
+            errors: futureOutcome.errors,
+          })
+        );
+        expect(markup).toContain('2099-12-31');
+      }
+
+      const calendarOutcome = parseTxtLine(
+        '-7.228900;-39.414400;Crato;Fonte Teste;Sitio Fundao;2024-02-30;0.45',
+        4
+      );
+      expect(calendarOutcome.valid).toBe(false);
+      if (!calendarOutcome.valid) {
+        const calErr = calendarOutcome.errors.find(
+          (err) => err.code === IMPORT_ERROR_CODES.INVALID_CALENDAR_DATE
+        );
+        expect(calErr).toBeDefined();
+        expect(calErr?.rawValue).toBe('2024-02-30');
+      }
+    });
+
+    it('ImportActionBar deve exibir estado de carregamento "Cancelando..." e desabilitar botões quando isCanceling=true', () => {
+      const markup = renderToStaticMarkup(
+        React.createElement(ImportActionBar, {
+          canConfirm: true,
+          totalValidas: 5,
+          isCanceling: true,
+          onConfirm: () => {},
+          onCancel: () => {},
+        })
+      );
+
+      expect(markup).toContain('Cancelando...');
+      expect(markup).toMatch(/data-testid="import-cancel-button"[^>]*disabled=""|disabled=""[^>]*data-testid="import-cancel-button"/);
+      expect(markup).toMatch(/aria-disabled="true"[^>]*data-testid="import-cancel-button"/);
+      expect(markup).toMatch(/aria-disabled="true"[^>]*data-testid="import-confirm-button"/);
+    });
+
+    it('ImportActionBar deve exibir estado pós-confirmação (isConfirmed=true) com botão "Enviar Novo Arquivo" ativo e "Lote Validado" travado', () => {
+      const markup = renderToStaticMarkup(
+        React.createElement(ImportActionBar, {
+          canConfirm: true,
+          totalValidas: 5,
+          isConfirmed: true,
+          onConfirm: () => {},
+          onCancel: () => {},
+        })
+      );
+
+      expect(markup).toContain('Importação concluída e publicada no mapa');
+      expect(markup).toContain(
+        'Os novos registros foram gravados com sucesso e já estão disponíveis para consulta pública no mapa.'
+      );
+      expect(markup).toContain('Enviar Novo Arquivo');
+      expect(markup).toContain('Lote Validado');
+      expect(markup).toMatch(/aria-disabled="false"[^>]*data-testid="import-cancel-button"/);
+      expect(markup).toMatch(/aria-disabled="true"[^>]*data-testid="import-confirm-button"/);
     });
   });
 });

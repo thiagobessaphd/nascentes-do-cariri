@@ -17,6 +17,7 @@ export interface ImportSummaryCardsProps {
   readonly hashSha256?: string | undefined;
   readonly classification: PreviewClassification;
   readonly hasHeaderError?: boolean | undefined;
+  readonly hideDiagnosticBanner?: boolean | undefined;
 }
 
 function getBannerStyleClass(kind: PreviewClassification['kind']): string {
@@ -65,6 +66,7 @@ export default function ImportSummaryCards({
   hashSha256,
   classification,
   hasHeaderError = false,
+  hideDiagnosticBanner = false,
 }: ImportSummaryCardsProps) {
   // Trunca visualmente o hash preservando início e fim
   const shortHash = hashSha256
@@ -103,23 +105,25 @@ export default function ImportSummaryCards({
       </div>
 
       {/* 2. Banner de Diagnóstico Acessível */}
-      <div
-        className={`${styles.banner} ${getBannerStyleClass(classification.kind)}`}
-        role="status"
-        aria-live="polite"
-        data-testid={`diagnostic-banner-${classification.kind}`}
-      >
-        <span className={styles.bannerIcon} aria-hidden="true">
-          {renderBannerIcon(classification.kind)}
-        </span>
+      {!hideDiagnosticBanner && (
+        <div
+          className={`${styles.banner} ${getBannerStyleClass(classification.kind)}`}
+          role="status"
+          aria-live="polite"
+          data-testid={`diagnostic-banner-${classification.kind}`}
+        >
+          <span className={styles.bannerIcon} aria-hidden="true">
+            {renderBannerIcon(classification.kind)}
+          </span>
 
-        <div className={styles.bannerContent}>
-          <p className={styles.bannerTitle}>{classification.message}</p>
-          {classification.blockingReason && (
-            <p className={styles.bannerDescription}>{classification.blockingReason}</p>
-          )}
+          <div className={styles.bannerContent}>
+            <p className={styles.bannerTitle}>{classification.message}</p>
+            {classification.blockingReason && (
+              <p className={styles.bannerDescription}>{classification.blockingReason}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 3. Grid dos 4 Cards de Resumo Numérico */}
       <div className={styles.cardsGrid}>

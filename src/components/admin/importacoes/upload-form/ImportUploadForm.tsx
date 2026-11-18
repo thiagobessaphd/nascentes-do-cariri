@@ -268,7 +268,7 @@ export default function ImportUploadForm({
             <div className={styles.domainRuleCard}>
               <div className={styles.domainRuleTop}>
                 <span className={styles.domainRuleTitle}>Latitude</span>
-                <code className={styles.domainRuleColumn}>latitude</code>
+                <code className={styles.domainRuleColumn}>campo: latitude</code>
               </div>
               <div className={styles.domainRuleValue}>
                 Entre <code>-8.0</code> e <code>-6.5</code>
@@ -279,7 +279,7 @@ export default function ImportUploadForm({
             <div className={styles.domainRuleCard}>
               <div className={styles.domainRuleTop}>
                 <span className={styles.domainRuleTitle}>Longitude</span>
-                <code className={styles.domainRuleColumn}>longitude</code>
+                <code className={styles.domainRuleColumn}>campo: longitude</code>
               </div>
               <div className={styles.domainRuleValue}>
                 Entre <code>-40.5</code> e <code>-38.5</code>
@@ -290,7 +290,7 @@ export default function ImportUploadForm({
             <div className={styles.domainRuleCard}>
               <div className={styles.domainRuleTop}>
                 <span className={styles.domainRuleTitle}>Data de Criação</span>
-                <code className={styles.domainRuleColumn}>data_criacao</code>
+                <code className={styles.domainRuleColumn}>campo: data_criacao</code>
               </div>
               <div className={styles.domainRuleValue}>
                 Formato <code>AAAA-MM-DD</code>
@@ -301,7 +301,7 @@ export default function ImportUploadForm({
             <div className={styles.domainRuleCard}>
               <div className={styles.domainRuleTop}>
                 <span className={styles.domainRuleTitle}>Vazão Média</span>
-                <code className={styles.domainRuleColumn}>vazao_media</code>
+                <code className={styles.domainRuleColumn}>campo: vazao_media</code>
               </div>
               <div className={styles.domainRuleValue}>
                 Valor <code>&ge; 0</code> em <code>m³/s</code>
