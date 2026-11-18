@@ -8,4 +8,5 @@ export * from './importacoes-storage.service';
 export * from './file-validator';
 export * from './importacoes-validation.service';
 export * from './importacoes-commit.service';
+export * from './importacoes-history.service';
 

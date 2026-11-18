@@ -199,6 +199,21 @@ A matriz estabelece para cada requisito:
   - **Invalidação de Cache Pós-Commit e Concorrência (`RNF04` / `RNF05`):**
     - Invalidação do cache público (`onImportacaoConcluida`) disparada exclusivamente após o commit bem-sucedido no banco, e trava atômica compare-and-swap (`updateMany`) bloqueando confirmações/cancelamentos simultâneos ou repetidos (`409 IMPORTACAO_ALREADY_PROCESSED`).
 
+### 3.12. Consultas Administrativas do Histórico, Detalhe e Reconstrução de Prévia (`US-14` / `Task-27` / `RF07`)
+* **Arquivos:**
+  - `src/tests/unit/modules/importacoes/importacoes-history.service.test.ts`
+  - `src/tests/unit/modules/importacoes/importacoes-history.route.test.ts`
+  - `src/tests/unit/services/importacoes-client.test.ts`
+  - `src/tests/integration/import/import-history.test.ts`
+* **Regras Verificadas:**
+  - **Listagem Administrativa Paginada (`GET /api/admin/importacoes` — `RF07`):**
+    - Bloqueio `405 Method Not Allowed` (`Allow: GET`), guarda HMAC-SHA256 (`401 UNAUTHORIZED` e `403 FORBIDDEN_INACTIVE_USER`), cabeçalhos anti-cache (`NO_STORE_HEADERS`), validação estrita de `page`, `pageSize`/`limit` (`<= 100`) e `status` (`400 INVALID_IMPORTACAO_INPUT`), ordenação determinística `createdAt DESC, id DESC` e resposta `{ data, meta }`.
+  - **Detalhe Administrativo e Reconstrução de Prévia (`GET /api/admin/importacoes/[id]`):**
+    - Metadados completos (`nascentesInseridasCount`, `isOwner`, autor `{ id, nome, email }`, totais, timestamps e mensagem segura) para estados `CONCLUIDA`, `FALHOU`, `CANCELADA`, `VALIDANDO`, `PROCESSANDO` e `AGUARDANDO_CONFIRMACAO`, além de `404 IMPORTACAO_NOT_FOUND` para IDs inexistentes.
+    - Reconstrução sob demanda da prévia (`preview`) para lotes pendentes em `AGUARDANDO_CONFIRMACAO` a partir do arquivo TXT original no storage privado com verificação SHA-256 (`422 FILE_INTEGRITY_ERROR` / `INVALID_IMPORTACAO_CONTENT` em falha), recálculo atualizado de duplicidades no MySQL e trava de propriedade (`canConfirm = isOwner && parseResult.canConfirm`).
+  - **Privacidade e Fronteira HTTP (`LGPD` / Zod `.strict()`):**
+    - Omissão estrita de `caminhoPrivadoArquivo`, `storageUrl` e `passwordHash` na camada de persistência, nas respostas das rotas e na validação estrita do cliente HTTP (`fetchImportacoesHistory` e `fetchImportacaoDetailById`).
+
 ---
 
 ## 4. Scripts Automatizados

@@ -17,6 +17,8 @@ import {
   clearPreviewSession,
   confirmImportacaoById,
   derivePreviewState,
+  fetchImportacaoDetailById,
+  fetchImportacoesHistory,
   formatCoordinates,
   formatDuplicateReason,
   formatErrorCodeLabel,
@@ -34,6 +36,8 @@ import {
 import type {
   ImportacaoCancelResponseDto,
   ImportacaoConfirmResponseDto,
+  ImportacaoDetailResponseDto,
+  ImportacaoHistoryListResponseDto,
   ImportacaoValidationResponseDto,
 } from '@/modules/importacoes/importacoes.types';
 
@@ -864,5 +868,270 @@ describe('Persistência Temporária de Prévia em sessionStorage (src/services/i
     );
     expect(loadPreviewSession()).toBeNull();
     expect(mockStorage.getItem(IMPORTACAO_PREVIEW_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('Cliente HTTP — fetchImportacoesHistory e fetchImportacaoDetailById', () => {
+  const originalFetch = globalThis.fetch;
+
+  const MOCK_HISTORY_RESPONSE: ImportacaoHistoryListResponseDto = {
+    data: [
+      {
+        id: 120,
+        nomeArquivo: 'cariri-historico.txt',
+        hashSha256: 'd'.repeat(64),
+        status: 'CONCLUIDA',
+        totalLinhas: 4,
+        totalValidas: 3,
+        totalInvalidas: 0,
+        totalDuplicadas: 1,
+        mensagemErro: null,
+        createdAt: '2026-11-15T18:00:00.000Z',
+        concluidaAt: '2026-11-15T18:02:00.000Z',
+        usuario: {
+          id: 1,
+          nome: 'Thiago Bessa',
+          email: 'thiago.bessa@ufca.edu.br',
+        },
+      },
+    ],
+    meta: {
+      page: 1,
+      pageSize: 20,
+      totalItems: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    },
+  };
+
+  const MOCK_DETAIL_RESPONSE: ImportacaoDetailResponseDto = {
+    ...MOCK_HISTORY_RESPONSE.data[0]!,
+    id: 121,
+    status: 'AGUARDANDO_CONFIRMACAO',
+    concluidaAt: null,
+    nascentesInseridasCount: 0,
+    isOwner: true,
+    preview: {
+      importacaoId: 121,
+      nomeArquivo: 'cariri-pendente.txt',
+      hashSha256: 'e'.repeat(64),
+      tamanhoBytes: 256,
+      status: 'AGUARDANDO_CONFIRMACAO',
+      canConfirm: true,
+      summary: {
+        totalLinhas: 1,
+        totalValidas: 1,
+        totalInvalidas: 0,
+        totalDuplicadas: 0,
+      },
+      validRows: [],
+      duplicateRows: [],
+      invalidRows: [],
+      allErrors: [],
+      createdAt: '2026-11-15T18:10:00.000Z',
+    },
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('fetchImportacoesHistory deve rejeitar parâmetros inválidos no cliente sem chamar fetch', async () => {
+    const mockFetch = vi.fn();
+    globalThis.fetch = mockFetch;
+
+    await expect(fetchImportacoesHistory({ page: 0 })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_IMPORTACAO_INPUT',
+    });
+
+    await expect(fetchImportacoesHistory({ pageSize: 101 })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_IMPORTACAO_INPUT',
+    });
+
+    await expect(
+      fetchImportacoesHistory({ status: 'INVALIDA' as never })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_IMPORTACAO_INPUT',
+    });
+
+    await expect(fetchImportacaoDetailById(-10)).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_IMPORTACAO_INPUT',
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('fetchImportacoesHistory deve construir URL com/sem query params, headers e validar resposta', async () => {
+    const controller = new AbortController();
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(MOCK_HISTORY_RESPONSE),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(MOCK_HISTORY_RESPONSE),
+      });
+    globalThis.fetch = mockFetch;
+
+    const first = await fetchImportacoesHistory();
+    expect(first).toEqual(MOCK_HISTORY_RESPONSE);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/admin/importacoes',
+      expect.objectContaining({
+        method: 'GET',
+        credentials: 'same-origin',
+      })
+    );
+
+    const second = await fetchImportacoesHistory(
+      { page: 2, pageSize: 10, status: 'CONCLUIDA' },
+      { authToken: 'hist-token', signal: controller.signal }
+    );
+    expect(second).toEqual(MOCK_HISTORY_RESPONSE);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/admin/importacoes?page=2&pageSize=10&status=CONCLUIDA',
+      expect.objectContaining({
+        method: 'GET',
+        signal: controller.signal,
+      })
+    );
+    const callHeaders = mockFetch.mock.calls[1]?.[1]?.headers as Headers;
+    expect(callHeaders.get('Authorization')).toBe('Bearer hist-token');
+  });
+
+  it('fetchImportacaoDetailById deve consultar com/sem includePreview e validar DTO completo', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(MOCK_DETAIL_RESPONSE),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ ...MOCK_DETAIL_RESPONSE, preview: null }),
+      });
+    globalThis.fetch = mockFetch;
+
+    const fullDetail = await fetchImportacaoDetailById(121);
+    expect(fullDetail).toEqual(MOCK_DETAIL_RESPONSE);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/admin/importacoes/121',
+      expect.objectContaining({ method: 'GET' })
+    );
+
+    const metaOnly = await fetchImportacaoDetailById(121, { includePreview: false });
+    expect(metaOnly.preview).toBeNull();
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/admin/importacoes/121?includePreview=false',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('deve rejeitar payload do servidor que viole schema Zod strict (ex: vazamento de caminhoPrivadoArquivo ou passwordHash)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        ...MOCK_HISTORY_RESPONSE,
+        data: [
+          {
+            ...MOCK_HISTORY_RESPONSE.data[0],
+            caminhoPrivadoArquivo: 'importacoes/secret.txt',
+          },
+        ],
+      }),
+    });
+
+    await expect(fetchImportacoesHistory()).rejects.toMatchObject({
+      statusCode: 200,
+      code: 'INVALID_SERVER_RESPONSE',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        ...MOCK_DETAIL_RESPONSE,
+        usuario: {
+          ...MOCK_DETAIL_RESPONSE.usuario,
+          passwordHash: '$2b$12$leak',
+        },
+      }),
+    });
+
+    await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
+      statusCode: 200,
+      code: 'INVALID_SERVER_RESPONSE',
+    });
+  });
+
+  it('deve mapear erros HTTP (401/403/404/422/500), AbortError e falhas de rede em listHistory e getDetail', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: vi.fn().mockResolvedValue({
+        error: 'Importação com ID 121 não foi encontrada.',
+        code: 'IMPORTACAO_NOT_FOUND',
+      }),
+    });
+
+    await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'IMPORTACAO_NOT_FOUND',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error('500 HTML')),
+    });
+
+    await expect(fetchImportacoesHistory()).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message:
+        'Erro interno no servidor ao carregar o histórico de importações. Tente novamente mais tarde.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error('500 HTML')),
+    });
+
+    await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'INTERNAL_SERVER_ERROR',
+      message:
+        'Erro interno no servidor ao carregar os detalhes da importação. Tente novamente mais tarde.',
+    });
+
+    const abortErr = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(abortErr);
+    await expect(fetchImportacoesHistory()).rejects.toBe(abortErr);
+
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
+      isNetworkError: true,
+    });
   });
 });

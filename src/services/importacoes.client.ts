@@ -13,6 +13,10 @@ import type {
   ImportRowField,
   ImportacaoCancelResponseDto,
   ImportacaoConfirmResponseDto,
+  ImportacaoDetailResponseDto,
+  ImportacaoHistoryItemDto,
+  ImportacaoHistoryListResponseDto,
+  ImportacaoStatus,
   ImportacaoValidationResponseDto,
   TxtParseSummary,
 } from '@/modules/importacoes/importacoes.contracts';
@@ -21,6 +25,7 @@ import {
   EXPECTED_TXT_HEADER_COLUMNS,
   IMPORTACAO_STATUS_VALUES,
   IMPORT_ERROR_CODES,
+  MAX_HISTORY_PAGE_SIZE,
   MAX_UPLOAD_SIZE_BYTES_CLIENT,
   UNIDADE_VAZAO_PADRAO,
 } from '@/modules/importacoes/importacoes.contracts';
@@ -34,6 +39,16 @@ export interface UploadAndValidateOptions {
 }
 
 export type ImportacaoRequestOptions = UploadAndValidateOptions;
+
+export interface FetchImportacoesHistoryParams {
+  readonly page?: number | undefined;
+  readonly pageSize?: number | undefined;
+  readonly status?: ImportacaoStatus | undefined;
+}
+
+export interface FetchImportacaoDetailOptions extends ImportacaoRequestOptions {
+  readonly includePreview?: boolean | undefined;
+}
 
 /**
  * Erro customizado com metadados para falhas de requisição e validação prévia de upload.
@@ -511,7 +526,58 @@ const importacaoCancelResponseSchema = z.object({
   concluidaAt: z.string(),
 });
 
-type ImportacaoHttpOperation = 'validate' | 'confirm' | 'cancel';
+const importacaoHistoryUserSchema = z
+  .object({
+    id: z.number().finite().int().positive(),
+    nome: z.string(),
+    email: z.string(),
+  })
+  .strict();
+
+const importacaoHistoryItemSchema = z
+  .object({
+    id: z.number().finite().int().positive(),
+    nomeArquivo: z.string(),
+    hashSha256: z.string(),
+    status: z.enum(IMPORTACAO_STATUS_VALUES),
+    totalLinhas: z.number().finite().int().nonnegative(),
+    totalValidas: z.number().finite().int().nonnegative(),
+    totalInvalidas: z.number().finite().int().nonnegative(),
+    totalDuplicadas: z.number().finite().int().nonnegative(),
+    mensagemErro: z.string().nullable(),
+    createdAt: z.string(),
+    concluidaAt: z.string().nullable(),
+    usuario: importacaoHistoryUserSchema,
+  })
+  .strict();
+
+const importacaoHistoryPaginationMetaSchema = z
+  .object({
+    page: z.number().finite().int().positive(),
+    pageSize: z.number().finite().int().positive(),
+    totalItems: z.number().finite().int().nonnegative(),
+    totalPages: z.number().finite().int().nonnegative(),
+    hasPreviousPage: z.boolean(),
+    hasNextPage: z.boolean(),
+  })
+  .strict();
+
+const importacaoHistoryListResponseSchema = z
+  .object({
+    data: z.array(importacaoHistoryItemSchema),
+    meta: importacaoHistoryPaginationMetaSchema,
+  })
+  .strict();
+
+const importacaoDetailResponseSchema = importacaoHistoryItemSchema
+  .extend({
+    nascentesInseridasCount: z.number().finite().int().nonnegative(),
+    isOwner: z.boolean(),
+    preview: importacaoValidationResponseSchema.nullable(),
+  })
+  .strict();
+
+type ImportacaoHttpOperation = 'validate' | 'confirm' | 'cancel' | 'listHistory' | 'getDetail';
 
 function validateClientImportacaoId(importacaoId: number): number {
   if (
@@ -588,6 +654,10 @@ function resolveHttpStatusFallback(
       validate: 'Erro interno no servidor ao processar o arquivo. Tente novamente mais tarde.',
       confirm: 'Erro interno no servidor ao confirmar a importação. Tente novamente mais tarde.',
       cancel: 'Erro interno no servidor ao cancelar a importação. Tente novamente mais tarde.',
+      listHistory:
+        'Erro interno no servidor ao carregar o histórico de importações. Tente novamente mais tarde.',
+      getDetail:
+        'Erro interno no servidor ao carregar os detalhes da importação. Tente novamente mais tarde.',
     };
 
     return {
@@ -600,6 +670,8 @@ function resolveHttpStatusFallback(
     validate: 'Não foi possível validar o arquivo de importação.',
     confirm: 'Não foi possível confirmar a importação no servidor.',
     cancel: 'Não foi possível cancelar a importação no servidor.',
+    listHistory: 'Não foi possível carregar o histórico de importações.',
+    getDetail: 'Não foi possível carregar os detalhes da importação.',
   };
 
   return {
@@ -676,7 +748,7 @@ async function parseImportacaoErrorResponse(
 
 async function executeImportacaoRequest<T>(params: {
   readonly url: string;
-  readonly method: 'POST' | 'DELETE';
+  readonly method: 'GET' | 'POST' | 'DELETE';
   readonly operation: ImportacaoHttpOperation;
   readonly parsePayload: (rawPayload: unknown) =>
     | { readonly success: true; readonly data: T }
@@ -883,6 +955,135 @@ export async function cancelImportacaoById(
       }
       const cancelledDto: ImportacaoCancelResponseDto = parsed.data;
       return { success: true, data: cancelledDto };
+    },
+  });
+}
+
+function validateAndBuildHistoryQueryUrl(
+  params?: FetchImportacoesHistoryParams
+): string {
+  const searchParams = new URLSearchParams();
+
+  if (params?.page !== undefined) {
+    if (
+      typeof params.page !== 'number' ||
+      !Number.isFinite(params.page) ||
+      !Number.isInteger(params.page) ||
+      params.page < 1 ||
+      !Number.isSafeInteger(params.page)
+    ) {
+      throw new ImportacaoClientError(
+        'Número de página inválido. Informe um número inteiro positivo.',
+        {
+          statusCode: 400,
+          code: 'INVALID_IMPORTACAO_INPUT',
+        }
+      );
+    }
+    searchParams.set('page', String(params.page));
+  }
+
+  if (params?.pageSize !== undefined) {
+    if (
+      typeof params.pageSize !== 'number' ||
+      !Number.isFinite(params.pageSize) ||
+      !Number.isInteger(params.pageSize) ||
+      params.pageSize < 1 ||
+      params.pageSize > MAX_HISTORY_PAGE_SIZE
+    ) {
+      throw new ImportacaoClientError(
+        `Tamanho de página inválido. Informe um número inteiro entre 1 e ${MAX_HISTORY_PAGE_SIZE}.`,
+        {
+          statusCode: 400,
+          code: 'INVALID_IMPORTACAO_INPUT',
+        }
+      );
+    }
+    searchParams.set('pageSize', String(params.pageSize));
+  }
+
+  if (params?.status !== undefined) {
+    if (!(IMPORTACAO_STATUS_VALUES as readonly string[]).includes(params.status)) {
+      throw new ImportacaoClientError(
+        'Filtro de status de importação inválido.',
+        {
+          statusCode: 400,
+          code: 'INVALID_IMPORTACAO_INPUT',
+        }
+      );
+    }
+    searchParams.set('status', params.status);
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `/api/admin/importacoes?${queryString}` : '/api/admin/importacoes';
+}
+
+/**
+ * Consulta o histórico paginado de importações no endpoint GET /api/admin/importacoes.
+ *
+ * @param params Parâmetros opcionais de paginação e filtragem por status
+ * @param options Opções com AbortSignal e token opcional de autenticação
+ * @returns Envelope paginado com itens de auditoria e metadados de paginação
+ * @throws ImportacaoClientError com mensagens amigáveis e código de status
+ */
+export async function fetchImportacoesHistory(
+  params?: FetchImportacoesHistoryParams,
+  options?: ImportacaoRequestOptions
+): Promise<ImportacaoHistoryListResponseDto> {
+  const url = validateAndBuildHistoryQueryUrl(params);
+
+  return executeImportacaoRequest<ImportacaoHistoryListResponseDto>({
+    url,
+    method: 'GET',
+    operation: 'listHistory',
+    options,
+    parsePayload: (rawPayload) => {
+      const parsed = importacaoHistoryListResponseSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        return { success: false, details: parsed.error.flatten() };
+      }
+      const items: readonly ImportacaoHistoryItemDto[] = parsed.data.data;
+      const historyListDto: ImportacaoHistoryListResponseDto = {
+        data: items,
+        meta: parsed.data.meta,
+      };
+      return { success: true, data: historyListDto };
+    },
+  });
+}
+
+/**
+ * Consulta os metadados e eventual prévia reconstruída de uma importação
+ * no endpoint GET /api/admin/importacoes/[id].
+ *
+ * @param importacaoId Identificador numérico inteiro positivo da importação
+ * @param options Opções incluindo flag opcional includePreview, AbortSignal e token
+ * @returns Detalhes da importação e prévia completa quando aplicável
+ * @throws ImportacaoClientError com mensagens amigáveis e código de status
+ */
+export async function fetchImportacaoDetailById(
+  importacaoId: number,
+  options?: FetchImportacaoDetailOptions
+): Promise<ImportacaoDetailResponseDto> {
+  const safeId = validateClientImportacaoId(importacaoId);
+  const query =
+    options?.includePreview !== undefined
+      ? `?includePreview=${options.includePreview ? 'true' : 'false'}`
+      : '';
+
+  return executeImportacaoRequest<ImportacaoDetailResponseDto>({
+    url: `/api/admin/importacoes/${safeId}${query}`,
+    method: 'GET',
+    operation: 'getDetail',
+    options,
+    parsePayload: (rawPayload) => {
+      const parsed = importacaoDetailResponseSchema.safeParse(rawPayload);
+      if (!parsed.success) {
+        return { success: false, details: parsed.error.flatten() };
+      }
+      const detailDto: ImportacaoDetailResponseDto = parsed.data;
+      return { success: true, data: detailDto };
     },
   });
 }
