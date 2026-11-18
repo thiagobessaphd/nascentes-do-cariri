@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { env } from '@/config/env';
 import { requireAdminSession } from '@/lib/security/admin-guard';
 import { handleApiError, AppError, type PublicErrorResponse } from '@/lib/errors';
 import {
@@ -59,7 +60,7 @@ export async function POST(
     const sessionUser = await requireAdminSession(request);
 
     const contentType = request.headers.get('content-type') ?? '';
-    if (!contentType.includes('multipart/form-data')) {
+    if (!contentType.toLowerCase().includes('multipart/form-data')) {
       throw new AppError(
         'Content-Type inválido. A requisição deve ser multipart/form-data.',
         400,
@@ -77,12 +78,17 @@ export async function POST(
       );
     }
 
-    const files = await extractUploadedFilesFromFormData(formData);
-
-    const result = await importacaoValidationService.validateAndPreview({
-      files,
-      usuarioId: sessionUser.id,
+    const files = await extractUploadedFilesFromFormData(formData, {
+      maxSizeBytes: env.MAX_UPLOAD_SIZE_BYTES,
     });
+
+    const result = await importacaoValidationService.validateAndPreview(
+      {
+        files,
+        usuarioId: sessionUser.id,
+      },
+      { maxSizeBytes: env.MAX_UPLOAD_SIZE_BYTES }
+    );
 
     return NextResponse.json(result, {
       status: 200,

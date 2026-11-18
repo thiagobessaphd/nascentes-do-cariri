@@ -1,0 +1,92 @@
+/**
+ * Nascentes do Cariri — Estilos da Página Administrativa de Importação (.txt)
+ */
+
+.pageContainer {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Cabeçalho Institucional da Página */
+.pageHeader {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #331509;
+  border-radius: 6px;
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.titleArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 820px;
+}
+
+.moduleOverline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.71875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #0b4f6c;
+}
+
+.pageTitle {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.pageSubtitle {
+  font-size: 0.9375rem;
+  color: #475569;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.workspaceSection {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .pageContainer {
+    padding: 1rem 1rem 2rem;
+    gap: 1.125rem;
+  }
+
+  .pageHeader {
+    padding: 1.25rem;
+  }
+
+  .pageTitle {
+    font-size: 1.3125rem;
+  }
+
+  .pageSubtitle {
+    font-size: 0.875rem;
+  }
+}

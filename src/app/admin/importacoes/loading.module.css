@@ -1,0 +1,72 @@
+/**
+ * Nascentes do Cariri — Estilos de Carregamento (loading.tsx) de Importações
+ */
+
+.container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+.card {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #331509;
+  border-radius: 6px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.loadingHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2.5px solid #cbd5e1;
+  border-top-color: #0b4f6c;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.skeletonBlock {
+  height: 16px;
+  border-radius: 4px;
+  background-color: #f1f5f9;
+}
+
+.skeletonWide {
+  width: 72%;
+}
+
+.skeletonMedium {
+  width: 48%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

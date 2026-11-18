@@ -1,0 +1,240 @@
+/**
+ * Nascentes do Cariri — Estilos dos Cards de Resumo e Diagnóstico da Prévia
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.metadataBar {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-left: 4px solid #331509;
+  border-radius: 5px;
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.metadataGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.metadataLabel {
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.71875rem;
+  letter-spacing: 0.04em;
+}
+
+.metadataValue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.tabularNum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hashTag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.banner {
+  border-radius: 6px;
+  padding: 1.125rem 1.375rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  border: 1px solid transparent;
+}
+
+.bannerValid {
+  background-color: #f4fbf7;
+  border-color: #86efac;
+  border-left: 4px solid #166534;
+  color: #14532d;
+}
+
+.bannerInvalid {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  border-left: 4px solid #b91c1c;
+  color: #7f1d1d;
+}
+
+.bannerEmpty {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  border-left: 4px solid #b45309;
+  color: #78350f;
+}
+
+.bannerIcon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.bannerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bannerTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.bannerDescription {
+  font-size: 0.8125rem;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border-radius: 6px;
+  padding: 1.25rem 1.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid #d8dee9;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  margin: 0;
+}
+
+.cardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardValue {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.cardFooter {
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Card Neutro: Total de Linhas */
+.cardTotal {
+  border-top: 3px solid #331509;
+}
+.cardTotal .cardValue {
+  color: #0f172a;
+}
+.cardTotal .cardFooter {
+  color: #64748b;
+}
+
+/* Card Neutro Inativo (Quando valor = 0 em Novas, Duplicadas ou Erros) */
+.cardNeutral {
+  border-top: 3px solid #cbd5e1;
+  background-color: #f8fafc;
+}
+.cardNeutral .cardTitle {
+  color: #64748b;
+}
+.cardNeutral .cardValue {
+  color: #475569;
+}
+.cardNeutral .cardFooter {
+  color: #64748b;
+}
+
+/* Card Sucesso: Novas Válidas (> 0) */
+.cardValid {
+  border-top: 3px solid #166534;
+}
+.cardValid .cardValue {
+  color: #166534;
+}
+.cardValid .cardFooter {
+  color: #15803d;
+}
+
+/* Card Alerta: Duplicadas (> 0) */
+.cardDuplicate {
+  border-top: 3px solid #b45309;
+}
+.cardDuplicate .cardValue {
+  color: #b45309;
+}
+.cardDuplicate .cardFooter {
+  color: #b45309;
+}
+
+/* Card Erro: Linhas Inválidas (> 0) */
+.cardInvalid {
+  border-top: 3px solid #b91c1c;
+}
+.cardInvalid .cardValue {
+  color: #b91c1c;
+}
+.cardInvalid .cardFooter {
+  color: #b91c1c;
+}

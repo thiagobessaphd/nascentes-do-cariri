@@ -161,6 +161,23 @@ A matriz estabelece para cada requisito:
     - Botão de ação contextual `"Limpar filtros"` exibido exclusivamente quando há filtro ativo (`isFilterActive === true`), acionando `onClearFilters` em clique único e restaurando os marcadores do mapa.
     - Distinção semântica rigorosa WAI-ARIA: `role="status"` + `aria-live="polite"` para carregamento e estado sem dados (`empty`), reservando `role="alert"` + `aria-live="assertive"` exclusivamente para falhas de comunicação com a API (`error`).
 
+### 3.10. Interface Administrativa de Prévia, Resumo e Erros de Importação (`US-12` / `CT-FE-06`)
+* **Arquivos:**
+  - `src/tests/unit/admin/importacoes-ui.test.ts`
+  - `src/tests/unit/services/importacoes-client.test.ts`
+* **Regras Verificadas:**
+  - **Resumo e Diagnóstico (`ImportSummaryCards`):**
+    - Exibição dos 4 cards quantitativos (`Total Lido`, `Novas Nascentes`, `Duplicadas` e `Linhas com Erro`), metadados do arquivo e hash SHA-256 truncado visualmente e completo para leitores de tela (`srOnly`).
+    - Banner de diagnóstico acessível (`role="status"`, `aria-live="polite"`) diferenciando lote válido (`valid`), lote com inconsistências (`invalid`) e lote sem novos registros (`empty`).
+  - **Lista de Erros Impeditivos (`ImportErrorsList`):**
+    - Região de alerta (`role="alert"`, `aria-live="assertive"`) detalhando linha, campo traduzido, motivo do erro e valor bruto informado (ou fallback acessível `"Não informado"`), com paginação para lotes extensos.
+  - **Tabela de Prévia (`ImportPreviewTable`):**
+    - Unificação e ordenação cronológica por linha dos registros novos e duplicados, abas WAI-ARIA (`role="tablist"`, `role="tab"`, `role="tabpanel"`), coordenadas com 6 decimais, datas em `DD/MM/AAAA` sem desvio de fuso e vazão média em `m³/s`.
+  - **Regra de Habilitação da Confirmação (`ImportActionBar` / `canConfirmImportacao`):**
+    - Botão de confirmação habilitado exclusivamente quando `canConfirm === true`, `totalInvalidas === 0`, `allErrors.length === 0` e `totalValidas > 0`.
+  - **Validação de Contrato e Resiliência do Cliente HTTP (`uploadAndValidateTxt`):**
+    - Validação de esquema Zod em tempo de execução (`INVALID_SERVER_PAYLOAD`), bloqueio fail-fast de arquivos vazios, acima de 5 MB ou fora da extensão `.txt`, e mascaramento seguro de erros HTTP 5xx.
+
 ---
 
 ## 4. Scripts Automatizados
