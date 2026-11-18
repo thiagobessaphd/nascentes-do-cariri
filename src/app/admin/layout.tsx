@@ -5,6 +5,7 @@ import Link from 'next/link';
 import logoUfcaSymbol from '@/assets/images/logo_ufca.png';
 import logoUfcaFull from '@/assets/images/logo_ufca-full.png';
 import logoCnpq from '@/assets/images/logo_cnpq.png';
+import { AdminNav } from '@/components/admin/nav';
 import styles from './admin-layout.module.css';
 
 export const metadata: Metadata = {
@@ -120,32 +121,7 @@ export default function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
 
             {/* Menu de Navegação Formal + Ação de Destaque para o Mapa */}
             <nav aria-label="Navegação Administrativa" className={styles.adminNav}>
-              <ul className={styles.navMenuList}>
-                <li className={styles.navMenuItem}>
-                  <a href="#pagina-futura" className={styles.navMenuLink}>
-                    Visão Geral
-                  </a>
-                </li>
-                <li className={styles.navMenuItem}>
-                  <a href="#pagina-futura" className={styles.navMenuLink}>
-                    Nascentes
-                  </a>
-                </li>
-                <li className={styles.navMenuItem}>
-                  <Link
-                    href="/admin/importacoes"
-                    className={styles.navMenuLinkActive}
-                    aria-current="page"
-                  >
-                    Importação de Dados
-                  </Link>
-                </li>
-                <li className={styles.navMenuItem}>
-                  <a href="#pagina-futura" className={styles.navMenuLink}>
-                    Histórico de Lotes
-                  </a>
-                </li>
-              </ul>
+              <AdminNav />
 
               <div className={styles.navDivider} aria-hidden="true" />
 

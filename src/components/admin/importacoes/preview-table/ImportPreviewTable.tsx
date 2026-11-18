@@ -8,10 +8,11 @@
  * e paginação para arquivos de milhares de linhas.
  */
 
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type {
-  DuplicateTxtPreviewRow,
-  ValidTxtPreviewRow,
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  MAX_HISTORY_PAGE_SIZE,
+  type DuplicateTxtPreviewRow,
+  type ValidTxtPreviewRow,
 } from '@/modules/importacoes/importacoes.contracts';
 import {
   formatCoordinates,
@@ -31,6 +32,14 @@ export interface ImportPreviewTableProps {
 type FilterTab = 'all' | 'valid' | 'duplicate';
 
 const FILTER_TABS: readonly FilterTab[] = ['all', 'valid', 'duplicate'];
+const ALLOWED_PREVIEW_PAGE_SIZES = [10, 25, 50, 100] as const;
+
+function sanitizePreviewPageSize(raw: number): number {
+  if (Number.isSafeInteger(raw) && raw >= 1 && raw <= MAX_HISTORY_PAGE_SIZE) {
+    return raw;
+  }
+  return 25;
+}
 
 type CombinedRow =
   | {
@@ -56,12 +65,49 @@ export default function ImportPreviewTable({
   }>({ validRows, duplicateRows });
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [selectedPageSize, setSelectedPageSize] = useState<number>(() =>
+    sanitizePreviewPageSize(pageSize)
+  );
+  const [isPageSizeOpen, setIsPageSizeOpen] = useState<boolean>(false);
+  const [highlightedPageSizeIndex, setHighlightedPageSizeIndex] = useState<number>(1);
   const tabRefs = useRef<Partial<Record<FilterTab, HTMLButtonElement | null>>>({});
+  const pageSizeContainerRef = useRef<HTMLDivElement | null>(null);
+  const pageSizeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const pageSizeListboxRef = useRef<HTMLUListElement | null>(null);
 
   if (prevRowsKey.validRows !== validRows || prevRowsKey.duplicateRows !== duplicateRows) {
     setPrevRowsKey({ validRows, duplicateRows });
     setCurrentPage(1);
   }
+
+  useEffect(() => {
+    if (!isPageSizeOpen) return;
+
+    function handleOutsidePointer(event: MouseEvent | TouchEvent) {
+      if (
+        pageSizeContainerRef.current &&
+        !pageSizeContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsPageSizeOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsidePointer);
+    document.addEventListener('touchstart', handleOutsidePointer);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsidePointer);
+      document.removeEventListener('touchstart', handleOutsidePointer);
+    };
+  }, [isPageSizeOpen]);
+
+  useEffect(() => {
+    if (!isPageSizeOpen || !pageSizeListboxRef.current) return;
+    const optionEl = pageSizeListboxRef.current.children[highlightedPageSizeIndex];
+    if (optionEl instanceof HTMLElement && typeof optionEl.scrollIntoView === 'function') {
+      optionEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isPageSizeOpen, highlightedPageSizeIndex]);
 
   // Unifica e ordena cronologicamente pelo número da linha do arquivo
   const combinedRows = useMemo<readonly CombinedRow[]>(() => {
@@ -99,10 +145,105 @@ export default function ImportPreviewTable({
   }, [combinedRows, activeTab]);
 
   // Paginação determinística O(1)
-  const pagination = paginateSlice(filteredRows, currentPage, pageSize);
+  const pagination = paginateSlice(filteredRows, currentPage, selectedPageSize);
   const startItem =
     pagination.totalItems === 0 ? 0 : (pagination.currentPage - 1) * pagination.pageSize + 1;
   const endItem = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems);
+
+  const currentPageSizeIndex = ALLOWED_PREVIEW_PAGE_SIZES.indexOf(
+    selectedPageSize as (typeof ALLOWED_PREVIEW_PAGE_SIZES)[number]
+  );
+
+  function handleSelectPageSizeOption(nextSize: number) {
+    setSelectedPageSize(nextSize);
+    setCurrentPage(1);
+    setIsPageSizeOpen(false);
+    pageSizeTriggerRef.current?.focus();
+  }
+
+  function handleTogglePageSize() {
+    setIsPageSizeOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setHighlightedPageSizeIndex(currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1);
+      }
+      return next;
+    });
+  }
+
+  function handlePageSizeKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    const total = ALLOWED_PREVIEW_PAGE_SIZES.length;
+
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault();
+        if (!isPageSizeOpen) {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        } else {
+          setHighlightedPageSizeIndex((prev) => (prev + 1) % total);
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        if (!isPageSizeOpen) {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        } else {
+          setHighlightedPageSizeIndex((prev) => (prev - 1 + total) % total);
+        }
+        break;
+      }
+      case 'Home': {
+        if (isPageSizeOpen) {
+          e.preventDefault();
+          setHighlightedPageSizeIndex(0);
+        }
+        break;
+      }
+      case 'End': {
+        if (isPageSizeOpen) {
+          e.preventDefault();
+          setHighlightedPageSizeIndex(total - 1);
+        }
+        break;
+      }
+      case 'Enter':
+      case ' ': {
+        e.preventDefault();
+        if (isPageSizeOpen) {
+          const chosen = ALLOWED_PREVIEW_PAGE_SIZES[highlightedPageSizeIndex];
+          if (chosen !== undefined) {
+            handleSelectPageSizeOption(chosen);
+          }
+        } else {
+          setIsPageSizeOpen(true);
+          setHighlightedPageSizeIndex(
+            currentPageSizeIndex >= 0 ? currentPageSizeIndex : 1
+          );
+        }
+        break;
+      }
+      case 'Escape': {
+        if (isPageSizeOpen) {
+          e.preventDefault();
+          setIsPageSizeOpen(false);
+        }
+        break;
+      }
+      case 'Tab': {
+        if (isPageSizeOpen) {
+          setIsPageSizeOpen(false);
+        }
+        break;
+      }
+    }
+  }
 
   function handleTabChange(tab: FilterTab) {
     setActiveTab(tab);
@@ -297,30 +438,146 @@ export default function ImportPreviewTable({
             <strong>{pagination.totalPages}</strong>)
           </span>
 
-          {pagination.totalPages > 1 && (
-            <div className={styles.paginationButtons}>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(Math.max(1, pagination.currentPage - 1))}
-                disabled={!pagination.hasPreviousPage}
-                className={styles.pageButton}
-                aria-label="Página anterior da prévia"
+          <div className={styles.paginationRight}>
+            <div className={styles.pageSizeGroup} ref={pageSizeContainerRef}>
+              <label
+                id="preview-page-size-label"
+                htmlFor="preview-page-size-filter"
+                className={styles.pageSizeLabel}
               >
-                Anterior
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setCurrentPage(Math.min(pagination.totalPages, pagination.currentPage + 1))
-                }
-                disabled={!pagination.hasNextPage}
-                className={styles.pageButton}
-                aria-label="Próxima página da prévia"
-              >
-                Próxima
-              </button>
+                Exibir:
+              </label>
+              <div className={styles.pageSizeWrapper}>
+                <button
+                  ref={pageSizeTriggerRef}
+                  id="preview-page-size-filter"
+                  type="button"
+                  role="combobox"
+                  aria-autocomplete="none"
+                  aria-haspopup="listbox"
+                  aria-expanded={isPageSizeOpen}
+                  aria-controls="preview-page-size-listbox"
+                  aria-labelledby="preview-page-size-label preview-page-size-filter"
+                  aria-activedescendant={
+                    isPageSizeOpen
+                      ? `preview-page-size-opt-${highlightedPageSizeIndex}`
+                      : undefined
+                  }
+                  onClick={handleTogglePageSize}
+                  onKeyDown={handlePageSizeKeyDown}
+                  className={[
+                    styles.pageSizeControl,
+                    isPageSizeOpen ? styles.pageSizeControlOpen : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  data-testid="preview-page-size-filter"
+                >
+                  <span>{selectedPageSize} nascentes</span>
+                  <svg
+                    className={[
+                      styles.pageSizeChevron,
+                      isPageSizeOpen ? styles.pageSizeChevronOpen : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {isPageSizeOpen && (
+                  <ul
+                    ref={pageSizeListboxRef}
+                    id="preview-page-size-listbox"
+                    role="listbox"
+                    aria-labelledby="preview-page-size-label"
+                    className={styles.pageSizeMenu}
+                    data-testid="preview-page-size-listbox"
+                  >
+                    {ALLOWED_PREVIEW_PAGE_SIZES.map((sizeOption, index) => {
+                      const isSelected = sizeOption === selectedPageSize;
+                      const isHighlighted = index === highlightedPageSizeIndex;
+                      const optionClasses = [
+                        styles.pageSizeOption,
+                        isSelected ? styles.pageSizeOptionSelected : '',
+                        isHighlighted ? styles.pageSizeOptionHighlighted : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
+
+                      return (
+                        <li
+                          key={sizeOption}
+                          id={`preview-page-size-opt-${index}`}
+                          role="option"
+                          aria-selected={isSelected}
+                          className={optionClasses}
+                          onMouseEnter={() => setHighlightedPageSizeIndex(index)}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSelectPageSizeOption(sizeOption)}
+                          data-testid={`preview-page-size-option-${sizeOption}`}
+                        >
+                          <span className={styles.pageSizeOptionLabel}>
+                            {sizeOption} nascentes
+                          </span>
+                          {isSelected && (
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
-          )}
+
+            {pagination.totalPages > 1 && (
+              <div className={styles.paginationButtons}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(Math.max(1, pagination.currentPage - 1))}
+                  disabled={!pagination.hasPreviousPage}
+                  className={styles.pageButton}
+                  aria-label="Página anterior da prévia"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage(Math.min(pagination.totalPages, pagination.currentPage + 1))
+                  }
+                  disabled={!pagination.hasNextPage}
+                  className={styles.pageButton}
+                  aria-label="Próxima página da prévia"
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

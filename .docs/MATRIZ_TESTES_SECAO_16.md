@@ -214,6 +214,28 @@ A matriz estabelece para cada requisito:
   - **Privacidade e Fronteira HTTP (`LGPD` / Zod `.strict()`):**
     - Omissão estrita de `caminhoPrivadoArquivo`, `storageUrl` e `passwordHash` na camada de persistência, nas respostas das rotas e na validação estrita do cliente HTTP (`fetchImportacoesHistory` e `fetchImportacaoDetailById`).
 
+### 3.13. Interface Administrativa de Histórico, Detalhe, Navegação e Retomada (`US-14` / `Task-28` / `RF07`)
+* **Arquivos:**
+  - `src/tests/unit/admin/importacoes-history-detail-ui.test.ts`
+  - `src/tests/unit/admin/importacoes-ui.test.ts`
+  - `src/tests/unit/services/importacoes-client.test.ts`
+  - `src/tests/unit/modules/importacoes/importacoes-validation.route.test.ts`
+* **Regras Verificadas:**
+  - **Navegação Dinâmica, App Router e Boundaries (`/admin/importacoes/historico`, `/admin/importacoes/[id]` e 404):**
+    - Destaque dinâmico no menu (`AdminNav` / `isAdminNavItemActive`) diferenciando `/admin/importacoes` de `/admin/importacoes/historico` e mantendo `Histórico de Lotes` ativo na subrota de detalhe `/admin/importacoes/[id]`.
+    - Metadados `robots: noindex, nofollow` e `force-dynamic`, leitura opcional não-bloqueante de sessão (`getOptionalAdminSession`), sanitização defensiva de query params (`page`, `pageSize`/`limit`, `status`) e validação estrita do parâmetro dinâmico `[id]` disparando `notFound()` para valores inválidos.
+    - Boundaries de carregamento com skeleton (`role="status"`, `aria-busy="true"`), boundaries de erro (`role="alert"`, `aria-live="assertive"`) e páginas 404 centralizadas (`ImportacaoDetailNotFound` e `GlobalNotFound`) sem vazamento de identificadores internos ou `#id`.
+  - **Visão do Histórico (`ImportacaoHistoryView`) e Seletor de Quantidade (`ImportPreviewTable`):**
+    - Estados assíncronos distintos (skeleton loading, erro recuperável, vazio sem filtro, vazio com filtro e regressão de página fora do intervalo `meta.totalItems > 0 && data.length === 0` com retorno à página 1 sem intervalos invertidos).
+    - Travas de ownership (`canBackToAnalyzeImportacao` / `canCancelPendingImportacao`) liberando `Reanalisar` e `Cancelar` apenas ao autor em `AGUARDANDO_CONFIRMACAO`, proibição estrita de confirmação direta na listagem, paginação numérica com reticências e comboboxes WAI-ARIA de filtro por status e itens por página.
+    - Adaptação da tabela de prévia (`ImportPreviewTable`) com combobox acessível para seleção da quantidade de nascentes exibidas por página e sanitização de limites inválidos.
+  - **Visão Detalhada (`ImportacaoDetailView`), Badge e Modal Acessível (`ImportStatusBadge` / `ImportCancelModal`):**
+    - Badge semântico com ícone decorativo + rótulo em português para todos os 6 status oficiais (`VALIDANDO`, `AGUARDANDO_CONFIRMACAO`, `PROCESSANDO`, `CONCLUIDA`, `FALHOU`, `CANCELADA`).
+    - Cartão de metadados `<dl>` com hash SHA-256 truncado e completo (`srOnly`), datas em fuso explícito `America/Fortaleza` (`formatDateTimePtBr`), banners específicos para `CONCLUIDA` (link ao `/mapa` e KPI `Nascentes Inseridas`), `FALHOU` (`role="alert"`) e `CANCELADA`, além de inspeção somente leitura da prévia e travamento de `Reanalisar` quando `preview === null`.
+    - Modal acessível de cancelamento (`role="dialog"`, `aria-modal="true"`, travamento durante `isCanceling`, anúncio `role="alert"` em erro e fechamento condicional por `Escape`).
+  - **Formatadores, Proteção 5xx e Retomada no Workspace (`src/services/importacoes.client.ts` / `ImportacaoWorkspace`):**
+    - Regressão contra vazamento de erros internos 5xx em respostas JSON nas operações HTTP do cliente, remoção seletiva de prévia (`clearPreviewSessionIfId`) e interpretação estrita de `?importacaoId=<id>` (`parseImportacaoIdSearchParam`).
+
 ---
 
 ## 4. Scripts Automatizados

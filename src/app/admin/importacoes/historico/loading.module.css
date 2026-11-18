@@ -1,0 +1,251 @@
+/**
+ * Nascentes do Cariri — Skeleton de Carregamento (loading.tsx) do Histórico
+ */
+
+.container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes youtubeRoutePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.38;
+  }
+}
+
+.skeletonLine {
+  display: block;
+  border-radius: 5px;
+  background-color: #dbe3ed;
+  animation: youtubeRoutePulse 1.35s ease-in-out infinite;
+}
+
+.headerCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #331509;
+  border-radius: 6px;
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.headerTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1 1 320px;
+  max-width: 780px;
+}
+
+.overlineBar {
+  height: 12px;
+  width: 185px;
+}
+
+.titleBar {
+  height: 28px;
+  width: 310px;
+  max-width: 100%;
+}
+
+.subtitleBar {
+  height: 14px;
+  width: 86%;
+}
+
+.subtitleShortBar {
+  height: 14px;
+  width: 58%;
+}
+
+.ctaButtonBar {
+  height: 44px;
+  width: 196px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.filterCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.filterControls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.labelBar {
+  height: 11px;
+  width: 128px;
+}
+
+.labelShortBar {
+  height: 11px;
+  width: 108px;
+}
+
+.selectBar {
+  height: 44px;
+  width: 280px;
+  border-radius: 5px;
+}
+
+.pageSizeBar {
+  height: 44px;
+  width: 175px;
+  border-radius: 5px;
+}
+
+.countBar {
+  height: 14px;
+  width: 185px;
+  margin-bottom: 0.5rem;
+}
+
+.tableCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #0b4f6c;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.tableHeadRow,
+.tableRow {
+  display: grid;
+  grid-template-columns: 1.6fr 1.45fr 1.15fr 0.95fr 1.05fr 144px;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.05rem 1rem;
+}
+
+.tableHeadRow {
+  background-color: #f8fafc;
+  border-bottom: 1.5px solid #cbd5e1;
+}
+
+.headBar {
+  height: 12px;
+  width: 70%;
+}
+
+.tableRow {
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cellWide {
+  height: 14px;
+  width: 84%;
+}
+
+.cellMedium {
+  height: 14px;
+  width: 68%;
+}
+
+.cellTag {
+  height: 18px;
+  width: 64px;
+}
+
+.cellGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem 0.65rem;
+}
+
+.cellMini {
+  height: 12px;
+  width: 100%;
+}
+
+.pillBar {
+  height: 24px;
+  width: 116px;
+  border-radius: 9999px;
+}
+
+.cellActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.375rem;
+}
+
+.btnBar {
+  height: 36px;
+  width: 100%;
+  border-radius: 5px;
+}
+
+@media (max-width: 1200px) {
+  .container {
+    padding: 1.5rem 1.25rem 2.25rem;
+    gap: 1.25rem;
+  }
+
+  .tableHeadRow,
+  .tableRow {
+    gap: 0.65rem;
+    padding: 0.85rem 0.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine {
+    animation: none;
+  }
+}

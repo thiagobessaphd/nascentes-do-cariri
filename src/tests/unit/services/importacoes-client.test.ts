@@ -13,32 +13,41 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   cancelImportacaoById,
+  canBackToAnalyzeImportacao,
+  canCancelPendingImportacao,
   canConfirmImportacao,
   clearPreviewSession,
+  clearPreviewSessionIfId,
   confirmImportacaoById,
   derivePreviewState,
   fetchImportacaoDetailById,
   fetchImportacoesHistory,
   formatCoordinates,
+  formatDateTimePtBr,
   formatDuplicateReason,
   formatErrorCodeLabel,
   formatFieldLabel,
   formatFileSizeBytes,
+  formatHashSha256Short,
+  formatImportacaoStatusLabel,
   formatIsoDateToPtBr,
   formatVazaoMedia,
+  getImportacaoStatusMeta,
   IMPORTACAO_PREVIEW_STORAGE_KEY,
   ImportacaoClientError,
+  isAdminNavItemActive,
   loadPreviewSession,
   paginateSlice,
   savePreviewSession,
   uploadAndValidateTxt,
 } from '@/services/importacoes.client';
-import type {
-  ImportacaoCancelResponseDto,
-  ImportacaoConfirmResponseDto,
-  ImportacaoDetailResponseDto,
-  ImportacaoHistoryListResponseDto,
-  ImportacaoValidationResponseDto,
+import {
+  IMPORTACAO_STATUS_VALUES,
+  type ImportacaoCancelResponseDto,
+  type ImportacaoConfirmResponseDto,
+  type ImportacaoDetailResponseDto,
+  type ImportacaoHistoryListResponseDto,
+  type ImportacaoValidationResponseDto,
 } from '@/modules/importacoes/importacoes.types';
 
 describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.client.ts)', () => {
@@ -1132,6 +1141,250 @@ describe('Cliente HTTP — fetchImportacoesHistory e fetchImportacaoDetailById',
     globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
       isNetworkError: true,
+    });
+  });
+
+  it('não deve vazar mensagem bruta do backend em falhas 5xx mesmo com envelope JSON (regressão)', async () => {
+    const leakyServerPayload = {
+      error: 'PrismaClientKnownRequestError: Can not reach database server at 127.0.0.1:3307',
+      code: 'DATABASE_ERROR',
+    };
+
+    const mock500 = () =>
+      ({
+        ok: false,
+        status: 500,
+        json: vi.fn().mockResolvedValue(leakyServerPayload),
+      }) as unknown as Response;
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(mock500());
+    await expect(fetchImportacoesHistory()).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DATABASE_ERROR',
+      message:
+        'Erro interno no servidor ao carregar o histórico de importações. Tente novamente mais tarde.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(mock500());
+    await expect(fetchImportacaoDetailById(121)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DATABASE_ERROR',
+      message:
+        'Erro interno no servidor ao carregar os detalhes da importação. Tente novamente mais tarde.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(mock500());
+    await expect(confirmImportacaoById(121)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DATABASE_ERROR',
+      message:
+        'Erro interno no servidor ao confirmar a importação. Tente novamente mais tarde.',
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(mock500());
+    await expect(cancelImportacaoById(121)).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'DATABASE_ERROR',
+      message:
+        'Erro interno no servidor ao cancelar a importação. Tente novamente mais tarde.',
+    });
+  });
+});
+
+describe('Task-28 — Formatadores de Histórico, Navegação Dinâmica e Guards de Ação', () => {
+  describe('formatDateTimePtBr', () => {
+    it('deve formatar timestamps ISO-8601 no fuso America/Fortaleza sem distorção de timezone', () => {
+      expect(formatDateTimePtBr('2026-11-16T02:30:00.000Z')).toBe('15/11/2026 às 23:30');
+      expect(formatDateTimePtBr('2026-11-15T18:05:00.000Z')).toBe('15/11/2026 às 15:05');
+      expect(formatDateTimePtBr('2026-11-16T03:00:00.000Z')).toBe('16/11/2026 às 00:00');
+    });
+
+    it('deve retornar fallback padrão ou personalizado quando o timestamp for vazio, nulo ou inválido', () => {
+      expect(formatDateTimePtBr(null)).toBe('—');
+      expect(formatDateTimePtBr(undefined)).toBe('—');
+      expect(formatDateTimePtBr('   ')).toBe('—');
+      expect(formatDateTimePtBr('data-invalida')).toBe('—');
+      expect(formatDateTimePtBr(null, 'Aguardando decisão')).toBe('Aguardando decisão');
+      expect(formatDateTimePtBr('', 'Em aberto')).toBe('Em aberto');
+    });
+  });
+
+  describe('formatHashSha256Short', () => {
+    it('deve truncar hashes SHA-256 extensos preservando os 10 primeiros e 8 últimos caracteres', () => {
+      const fullHash = 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0';
+      expect(formatHashSha256Short(fullHash)).toBe('a1b2c3d4e5...9abcdef0');
+    });
+
+    it('deve preservar strings curtas (<= 18 caracteres) e aplicar fallback "—" quando ausente', () => {
+      expect(formatHashSha256Short('abc123def456')).toBe('abc123def456');
+      expect(formatHashSha256Short('123456789012345678')).toBe('123456789012345678');
+      expect(formatHashSha256Short(null)).toBe('—');
+      expect(formatHashSha256Short(undefined)).toBe('—');
+      expect(formatHashSha256Short('   ')).toBe('—');
+    });
+  });
+
+  describe('getImportacaoStatusMeta e formatImportacaoStatusLabel', () => {
+    it('deve mapear exaustivamente todos os 6 status oficiais com rótulo pt-BR, descrição e tom semântico', () => {
+      const expectedTones = {
+        VALIDANDO: 'info',
+        AGUARDANDO_CONFIRMACAO: 'warning',
+        PROCESSANDO: 'info',
+        CONCLUIDA: 'success',
+        FALHOU: 'danger',
+        CANCELADA: 'neutral',
+      } as const;
+
+      for (const status of IMPORTACAO_STATUS_VALUES) {
+        const meta = getImportacaoStatusMeta(status);
+        expect(meta.status).toBe(status);
+        expect(meta.tone).toBe(expectedTones[status]);
+        expect(meta.label.trim().length).toBeGreaterThan(0);
+        expect(meta.description.trim().length).toBeGreaterThan(0);
+        expect(formatImportacaoStatusLabel(status)).toBe(meta.label);
+      }
+    });
+
+    it('deve retornar "Status desconhecido" sem vazar UPPER_SNAKE_CASE para valores inválidos ou nulos', () => {
+      expect(formatImportacaoStatusLabel(null)).toBe('Status desconhecido');
+      expect(formatImportacaoStatusLabel(undefined)).toBe('Status desconhecido');
+      expect(formatImportacaoStatusLabel('   ')).toBe('Status desconhecido');
+      expect(formatImportacaoStatusLabel('STATUS_INTERNO_NAO_MAPEADO')).toBe(
+        'Status desconhecido'
+      );
+    });
+  });
+
+  describe('isAdminNavItemActive', () => {
+    it('deve destacar Importação de Dados apenas em /admin/importacoes sem falso positivo em subrotas', () => {
+      expect(isAdminNavItemActive('/admin/importacoes', '/admin/importacoes')).toBe(true);
+      expect(isAdminNavItemActive('/admin/importacoes/', '/admin/importacoes')).toBe(true);
+      expect(isAdminNavItemActive('/admin/importacoes/historico', '/admin/importacoes')).toBe(false);
+      expect(isAdminNavItemActive('/admin/importacoes/42', '/admin/importacoes')).toBe(false);
+    });
+
+    it('deve destacar Histórico de Lotes na listagem, subrotas e página de detalhe /admin/importacoes/[id]', () => {
+      expect(
+        isAdminNavItemActive('/admin/importacoes/historico', '/admin/importacoes/historico')
+      ).toBe(true);
+      expect(
+        isAdminNavItemActive('/admin/importacoes/historico/', '/admin/importacoes/historico')
+      ).toBe(true);
+      expect(
+        isAdminNavItemActive('/admin/importacoes/42', '/admin/importacoes/historico')
+      ).toBe(true);
+      expect(
+        isAdminNavItemActive('/admin/importacoes/abc', '/admin/importacoes/historico')
+      ).toBe(false);
+      expect(
+        isAdminNavItemActive('/admin/importacoes', '/admin/importacoes/historico')
+      ).toBe(false);
+    });
+
+    it('deve retornar false para links placeholder ou pathnames vazios/nulos', () => {
+      expect(isAdminNavItemActive('/admin/importacoes', '#pagina-futura')).toBe(false);
+      expect(isAdminNavItemActive(null, '/admin/importacoes')).toBe(false);
+      expect(isAdminNavItemActive(undefined, '/admin/importacoes')).toBe(false);
+      expect(isAdminNavItemActive('', '/admin/importacoes')).toBe(false);
+    });
+  });
+
+  describe('canBackToAnalyzeImportacao e canCancelPendingImportacao', () => {
+    it('deve liberar Reanalisar e Cancelar apenas ao administrador autor quando status = AGUARDANDO_CONFIRMACAO', () => {
+      expect(
+        canBackToAnalyzeImportacao({
+          status: 'AGUARDANDO_CONFIRMACAO',
+          isOwner: true,
+        })
+      ).toBe(true);
+      expect(
+        canCancelPendingImportacao({
+          status: 'AGUARDANDO_CONFIRMACAO',
+          isOwner: true,
+        })
+      ).toBe(true);
+
+      // Bloqueia não-donos
+      expect(
+        canBackToAnalyzeImportacao({
+          status: 'AGUARDANDO_CONFIRMACAO',
+          isOwner: false,
+        })
+      ).toBe(false);
+      expect(
+        canCancelPendingImportacao({
+          status: 'AGUARDANDO_CONFIRMACAO',
+          isOwner: false,
+        })
+      ).toBe(false);
+
+      // Bloqueia outros status mesmo sendo dono
+      for (const status of ['VALIDANDO', 'PROCESSANDO', 'CONCLUIDA', 'FALHOU', 'CANCELADA']) {
+        expect(canBackToAnalyzeImportacao({ status, isOwner: true })).toBe(false);
+        expect(canCancelPendingImportacao({ status, isOwner: true })).toBe(false);
+      }
+
+      expect(canBackToAnalyzeImportacao(null)).toBe(false);
+      expect(canCancelPendingImportacao(undefined)).toBe(false);
+    });
+
+    it('deve bloquear Reanalisar no detalhe quando preview === null, mantendo Cancelar disponível ao dono', () => {
+      const detailWithoutPreview = {
+        status: 'AGUARDANDO_CONFIRMACAO',
+        isOwner: true,
+        preview: null,
+      } as const;
+
+      expect(canBackToAnalyzeImportacao(detailWithoutPreview)).toBe(false);
+      expect(canCancelPendingImportacao(detailWithoutPreview)).toBe(true);
+    });
+  });
+
+  describe('clearPreviewSessionIfId', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('deve limpar a sessão apenas quando o importacaoId armazenado coincidir com o informado', () => {
+      const store = new Map<string, string>();
+      const mockStorage = {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          store.set(k, v);
+        },
+        removeItem: (k: string) => {
+          store.delete(k);
+        },
+      };
+      vi.stubGlobal('window', { sessionStorage: mockStorage });
+
+      savePreviewSession({
+        importacaoId: 50,
+        nomeArquivo: 'lote50.txt',
+        hashSha256: 'f'.repeat(64),
+        tamanhoBytes: 128,
+        status: 'AGUARDANDO_CONFIRMACAO',
+        canConfirm: true,
+        summary: {
+          totalLinhas: 1,
+          totalValidas: 1,
+          totalInvalidas: 0,
+          totalDuplicadas: 0,
+        },
+        validRows: [],
+        duplicateRows: [],
+        invalidRows: [],
+        allErrors: [],
+        createdAt: '2026-11-16T10:00:00.000Z',
+      });
+
+      // Cancelar outro lote (99) não deve apagar o lote 50 em análise
+      clearPreviewSessionIfId(99);
+      expect(loadPreviewSession()?.importacaoId).toBe(50);
+
+      // Cancelar o próprio lote (50) deve limpar a sessão
+      clearPreviewSessionIfId(50);
+      expect(loadPreviewSession()).toBeNull();
     });
   });
 });

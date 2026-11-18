@@ -271,3 +271,26 @@ export async function requireAdminSession(
   return user;
 }
 
+/**
+ * Variante não-bloqueante de verificação de sessão administrativa para uso em
+ * Server Components que precisam apenas identificar o usuário conectado (ou null).
+ */
+export async function getOptionalAdminSession(
+  request: Request | Headers | string | null | undefined,
+  options?: RequireAdminSessionOptions
+): Promise<AdminUserSession | null> {
+  const token = extractAuthTokenFromRequest(request);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return await requireAdminSession(token, options);
+  } catch (error: unknown) {
+    if (error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {
+      return null;
+    }
+    throw error;
+  }
+}
+

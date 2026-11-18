@@ -29,7 +29,9 @@ import ImportErrorsList from '@/components/admin/importacoes/errors-list/ImportE
 import ImportPreviewTable from '@/components/admin/importacoes/preview-table/ImportPreviewTable';
 import ImportActionBar from '@/components/admin/importacoes/action-bar/ImportActionBar';
 import ImportUploadForm from '@/components/admin/importacoes/upload-form/ImportUploadForm';
-import ImportacaoWorkspace from '@/components/admin/importacoes/workspace/ImportacaoWorkspace';
+import ImportacaoWorkspace, {
+  parseImportacaoIdSearchParam,
+} from '@/components/admin/importacoes/workspace/ImportacaoWorkspace';
 import { derivePreviewState } from '@/services/importacoes.client';
 import {
   DUPLICATE_REASONS,
@@ -706,6 +708,94 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(markup).toContain('Lote Validado');
       expect(markup).toMatch(/aria-disabled="false"[^>]*data-testid="import-cancel-button"/);
       expect(markup).toMatch(/aria-disabled="true"[^>]*data-testid="import-confirm-button"/);
+    });
+  });
+
+  describe('Task-28 — Adaptações Reutilizáveis no Resumo, Seletor da Prévia e Retomada no Workspace', () => {
+    it('ImportSummaryCards deve suportar ocultação da barra de metadados e sobrescrita semântica do card de válidas', () => {
+      const summary: TxtParseSummary = {
+        totalLinhas: 10,
+        totalValidas: 6,
+        totalInvalidas: 0,
+        totalDuplicadas: 4,
+      };
+      const classification = derivePreviewState({
+        canConfirm: false,
+        summary,
+        allErrors: [],
+      });
+
+      const html = renderToStaticMarkup(
+        React.createElement(ImportSummaryCards, {
+          summary,
+          fileName: 'lote-concluido.txt',
+          hashSha256: 'a'.repeat(64),
+          classification,
+          hideMetadataBar: true,
+          hideDiagnosticBanner: true,
+          validCardTitle: 'Nascentes Inseridas',
+          validCardCountOverride: 6,
+          validCardFooterOverride: 'Gravadas na base oficial',
+        })
+      );
+
+      expect(html).not.toContain('data-testid="summary-metadata-bar"');
+      expect(html).not.toContain('data-testid="diagnostic-banner-valid"');
+      expect(html).toContain('Nascentes Inseridas');
+      expect(html).toContain('>6<');
+      expect(html).toContain('Gravadas na base oficial');
+    });
+
+    it('ImportPreviewTable deve renderizar combobox acessível de quantidade de nascentes por página com fallback seguro', () => {
+      const defaultHtml = renderToStaticMarkup(
+        React.createElement(ImportPreviewTable, {
+          validRows: MOCK_VALID_ROWS,
+          duplicateRows: MOCK_DUPLICATE_ROWS,
+        })
+      );
+
+      expect(defaultHtml).toContain('data-testid="preview-page-size-filter"');
+      expect(defaultHtml).toContain('role="combobox"');
+      expect(defaultHtml).toContain('aria-haspopup="listbox"');
+      expect(defaultHtml).toContain('25 nascentes');
+
+      const customHtml = renderToStaticMarkup(
+        React.createElement(ImportPreviewTable, {
+          validRows: MOCK_VALID_ROWS,
+          duplicateRows: MOCK_DUPLICATE_ROWS,
+          pageSize: 10,
+        })
+      );
+      expect(customHtml).toContain('10 nascentes');
+
+      const sanitizedHtml = renderToStaticMarkup(
+        React.createElement(ImportPreviewTable, {
+          validRows: MOCK_VALID_ROWS,
+          duplicateRows: MOCK_DUPLICATE_ROWS,
+          pageSize: 999,
+        })
+      );
+      expect(sanitizedHtml).toContain('25 nascentes');
+    });
+
+    it('parseImportacaoIdSearchParam deve aceitar apenas inteiros positivos seguros e ImportacaoWorkspace deve renderizar com initialImportacaoId', () => {
+      expect(parseImportacaoIdSearchParam('42')).toBe(42);
+      expect(parseImportacaoIdSearchParam(' 7 ')).toBe(7);
+      expect(parseImportacaoIdSearchParam(null)).toBeUndefined();
+      expect(parseImportacaoIdSearchParam(undefined)).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('')).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('0')).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('-5')).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('12.5')).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('42abc')).toBeUndefined();
+      expect(parseImportacaoIdSearchParam('9007199254740992')).toBeUndefined();
+
+      const html = renderToStaticMarkup(
+        React.createElement(ImportacaoWorkspace, {
+          initialImportacaoId: 42,
+        })
+      );
+      expect(html).toContain('data-testid="importacao-workspace"');
     });
   });
 });

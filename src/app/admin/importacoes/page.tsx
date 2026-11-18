@@ -31,7 +31,7 @@ export default function ImportacoesAdminPage() {
               Importação e Validação de Nascentes
             </h1>
             <p className={styles.pageSubtitle}>
-              Envie a planilha de campo para atualizar os dados do mapa com segurança: o sistema verifica o arquivo linha por linha, exibe uma prévia completa para sua conferência antes da publicação e adiciona apenas os registros novos, sem risco de apagar ou duplicar os dados já cadastrados.
+              Neste módulo do sistema, você importa os dados coletados em campo por meio de um arquivo .txt. O sistema confere as informações, separa possíveis duplicidades e exibe uma prévia para você validar antes de publicar no mapa.
             </p>
           </div>
         </div>

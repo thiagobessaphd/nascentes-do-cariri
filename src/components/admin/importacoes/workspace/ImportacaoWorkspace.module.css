@@ -207,6 +207,36 @@
   gap: 0.625rem;
 }
 
+.restoringBox {
+  background-color: #f0f7fa;
+  border: 1px solid #bce3f0;
+  border-left: 4px solid #0b4f6c;
+  color: #0b4f6c;
+  border-radius: 6px;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.restoringSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid #bce3f0;
+  border-top-color: #0b4f6c;
+  border-radius: 50%;
+  animation: workspaceRestoreSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes workspaceRestoreSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 860px) {
   .stepperList {
     grid-template-columns: 1fr;
@@ -220,7 +250,8 @@
     transition: none;
   }
 
-  .previewLayout {
+  .previewLayout,
+  .restoringSpinner {
     animation: none;
   }
 }

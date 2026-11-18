@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Nascentes do Cariri — Workspace Integrador de Validação e Prévia (Padrão Institucional UFCA)
+ * Nascentes do Cariri — Workspace Integrador de Validação e Prévia
  *
  * Gerencia a máquina de estados no cliente, stepper de progresso transacional,
  * foco assistivo programático ao detectar falhas e orquestração dos componentes
@@ -18,8 +18,10 @@ import {
   cancelImportacaoById,
   canConfirmImportacao,
   clearPreviewSession,
+  clearPreviewSessionIfId,
   confirmImportacaoById,
   derivePreviewState,
+  fetchImportacaoDetailById,
   ImportacaoClientError,
   loadPreviewSession,
   savePreviewSession,
@@ -52,6 +54,37 @@ export interface ImportacaoWorkspaceProps {
    * Token opcional de autenticação administrativa para execução via API
    */
   readonly authToken?: string | undefined;
+  /**
+   * Identificador opcional de lote pendente para restauração explícita da prévia
+   */
+  readonly initialImportacaoId?: number | undefined;
+}
+
+const STRICT_POSITIVE_INT_REGEX = /^[1-9]\d*$/;
+
+export function parseImportacaoIdSearchParam(
+  rawValue: string | null | undefined
+): number | undefined {
+  if (!rawValue) return undefined;
+  const trimmed = rawValue.trim();
+  if (!STRICT_POSITIVE_INT_REGEX.test(trimmed)) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function readImportacaoIdFromLocation(): number | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const params = new URLSearchParams(window.location.search);
+  return parseImportacaoIdSearchParam(params.get('importacaoId'));
+}
+
+function stripImportacaoIdFromLocation(): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('importacaoId')) return;
+  url.searchParams.delete('importacaoId');
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(null, '', nextUrl);
 }
 
 function scrollToWorkspaceTop(): void {
@@ -71,9 +104,11 @@ export default function ImportacaoWorkspace({
   onConfirmImportacao,
   onCancelImportacao,
   authToken,
+  initialImportacaoId,
 }: ImportacaoWorkspaceProps) {
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [isValidating, setIsValidating] = useState<boolean>(false);
+  const [isRestoringPreview, setIsRestoringPreview] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewDto, setPreviewDto] = useState<ImportacaoValidationResponseDto | null>(null);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -115,19 +150,103 @@ export default function ImportacaoWorkspace({
     };
   }, []);
 
-  // Restaura prévia pendente da sessão atual
+  // Restaura prévia pendente via ?importacaoId=<id> (Opção A) ou sessionStorage local
   useEffect(() => {
+    const targetId = initialImportacaoId ?? readImportacaoIdFromLocation();
     const storedPreview = loadPreviewSession();
-    if (!storedPreview) return;
 
-    const timerId = window.setTimeout(() => {
-      setPreviewDto((current) => current ?? storedPreview);
+    if (targetId === undefined) {
+      if (!storedPreview) return;
+
+      const timerId = window.setTimeout(() => {
+        setPreviewDto((current) => current ?? storedPreview);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timerId);
+      };
+    }
+
+    if (
+      storedPreview &&
+      storedPreview.importacaoId === targetId &&
+      storedPreview.status === 'AGUARDANDO_CONFIRMACAO'
+    ) {
+      const timerId = window.setTimeout(() => {
+        setPreviewDto((current) => current ?? storedPreview);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timerId);
+      };
+    }
+
+    const controller = new AbortController();
+    const startTimerId = window.setTimeout(() => {
+      setIsRestoringPreview(true);
+      setValidationError(null);
+      setCancellationNotice(null);
+      setConfirmationError(null);
     }, 0);
 
+    void fetchImportacaoDetailById(targetId, {
+      includePreview: true,
+      authToken,
+      signal: controller.signal,
+    })
+      .then((detail) => {
+        if (controller.signal.aborted) return;
+
+        if (detail.status !== 'AGUARDANDO_CONFIRMACAO') {
+          clearPreviewSessionIfId(targetId);
+          stripImportacaoIdFromLocation();
+          setValidationError(
+            `O lote #${targetId} não está mais aguardando confirmação e não pode ser retomado para análise.`
+          );
+          return;
+        }
+
+        if (!detail.isOwner) {
+          stripImportacaoIdFromLocation();
+          setValidationError(
+            `O lote #${targetId} pertence a ${detail.usuario.nome}. Apenas o administrador autor pode analisá-lo para confirmação.`
+          );
+          return;
+        }
+
+        if (!detail.preview) {
+          stripImportacaoIdFromLocation();
+          setValidationError(
+            `Não foi possível reconstruir a prévia do lote #${targetId} a partir do arquivo armazenado.`
+          );
+          return;
+        }
+
+        savePreviewSession(detail.preview);
+        setIsConfirmed(false);
+        setConfirmationNotice(null);
+        setPreviewDto(detail.preview);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        stripImportacaoIdFromLocation();
+        const message =
+          err instanceof Error
+            ? err.message
+            : `Não foi possível carregar a prévia do lote #${targetId}.`;
+        setValidationError(message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsRestoringPreview(false);
+        }
+      });
+
     return () => {
-      window.clearTimeout(timerId);
+      window.clearTimeout(startTimerId);
+      controller.abort();
     };
-  }, []);
+  }, [authToken, initialImportacaoId]);
 
   // Gerenciamento de foco programático nas transições de etapa
   useEffect(() => {
@@ -175,6 +294,7 @@ export default function ImportacaoWorkspace({
     const controller = new AbortController();
     abortControllerRef.current = controller;
     isValidatingRef.current = true;
+    stripImportacaoIdFromLocation();
 
     setIsValidating(true);
     setValidationError(null);
@@ -211,6 +331,7 @@ export default function ImportacaoWorkspace({
 
   function resetWorkspaceState(notice: string | null) {
     clearPreviewSession();
+    stripImportacaoIdFromLocation();
     setPreviewDto(null);
     setCurrentFile(null);
     setValidationError(null);
@@ -289,6 +410,7 @@ export default function ImportacaoWorkspace({
         await onConfirmImportacao(previewDto, commitResult);
       }
       clearPreviewSession();
+      stripImportacaoIdFromLocation();
       setPreviewDto((prev) =>
         prev ? { ...prev, status: commitResult.status } : prev
       );
@@ -429,6 +551,19 @@ export default function ImportacaoWorkspace({
             </svg>
             <span>{cancellationNotice}</span>
           </div>
+        </div>
+      )}
+
+      {!previewDto && isRestoringPreview && (
+        <div
+          className={styles.restoringBox}
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          data-testid="restoring-preview-notice"
+        >
+          <span className={styles.restoringSpinner} aria-hidden="true" />
+          <span>Recuperando prévia do lote selecionado no histórico...</span>
         </div>
       )}
 

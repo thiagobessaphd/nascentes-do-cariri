@@ -22,3 +22,18 @@ export type { ImportPreviewTableProps } from './preview-table/ImportPreviewTable
 
 export { default as ImportActionBar } from './action-bar/ImportActionBar';
 export type { ImportActionBarProps } from './action-bar/ImportActionBar';
+
+export { default as ImportStatusBadge } from './status-badge/ImportStatusBadge';
+export type { ImportStatusBadgeProps } from './status-badge/ImportStatusBadge';
+
+export {
+  default as ImportCancelModal,
+  shouldCloseCancelModalOnKeyDown,
+} from './cancel-modal/ImportCancelModal';
+export type { ImportCancelModalProps } from './cancel-modal/ImportCancelModal';
+
+export { default as ImportacaoHistoryView } from './history-view/ImportacaoHistoryView';
+export type { ImportacaoHistoryViewProps } from './history-view/ImportacaoHistoryView';
+
+export { default as ImportacaoDetailView } from './detail-view/ImportacaoDetailView';
+export type { ImportacaoDetailViewProps } from './detail-view/ImportacaoDetailView';
