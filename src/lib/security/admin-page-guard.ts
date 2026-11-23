@@ -1,9 +1,7 @@
 /**
  * Nascentes do Cariri — Guarda de Sessão para Server Components (App Router)
  *
- * Isola o acoplamento com `next/headers` e `next/navigation` fora de `admin-guard.ts`,
- * garantindo que páginas administrativas protegidas validem a sessão persistida no
- * servidor (defesa em profundidade além do proxy) e redirecionem para `/admin/login`.
+ * Isola `next/headers` e `next/navigation` fora de `admin-guard.ts` e redireciona não autenticados para `/admin/login`.
  */
 
 import { cookies } from 'next/headers';
@@ -30,9 +28,6 @@ export interface RequireAdminPageSessionOptions extends GetOptionalAdminPageSess
   readonly nextPath?: string | null | undefined;
 }
 
-/**
- * Extrai o token de sessão do cookie store do Next.js priorizando o cookie de produção (`__Host-`).
- */
 export function extractSessionTokenFromCookieStore(cookieStore: CookieReader): string | null {
   const prodToken = cookieStore.get(SESSION_COOKIE_NAMES.PRODUCTION)?.value;
   if (prodToken && prodToken.trim().length > 0) {
@@ -47,11 +42,6 @@ export function extractSessionTokenFromCookieStore(cookieStore: CookieReader): s
   return null;
 }
 
-/**
- * Exige sessão administrativa válida em um Server Component protegido.
- * Em falha de autenticação/autorização (401/403), redireciona para `/admin/login`.
- * Falhas inesperadas de infraestrutura são propagadas ao Error Boundary.
- */
 export async function requireAdminPageSession(
   options?: RequireAdminPageSessionOptions
 ): Promise<AdminUserSession> {
@@ -71,10 +61,6 @@ export async function requireAdminPageSession(
   }
 }
 
-/**
- * Variante não-bloqueante para Server Components que precisam apenas consultar se há
- * sessão administrativa válida no momento (ex.: redirecionar usuário já logado em `/admin/login`).
- */
 export async function getOptionalAdminPageSession(
   options?: GetOptionalAdminPageSessionOptions
 ): Promise<AdminUserSession | null> {

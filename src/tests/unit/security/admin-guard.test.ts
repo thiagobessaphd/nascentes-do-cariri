@@ -1,10 +1,5 @@
 /**
- * Nascentes do Cariri — Testes Unitários da Camada de Guarda Administrativa
- *
- * Módulos cobertos:
- * - src/lib/security/admin-guard.ts
- * - src/lib/security/admin-redirect.ts
- * - src/lib/security/admin-page-guard.ts
+ * Nascentes do Cariri — Testes Unitários da Guarda de Sessão e Redirecionamento
  */
 
 import { createHmac } from 'node:crypto';
@@ -229,14 +224,12 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       const nowSec = Math.floor(Date.now() / 1000);
       const validSid = generateSessionId();
 
-      // Token legado assinado com AUTH_SECRET, mas sem sid
       const legacyToken = signRawJwt(
         { alg: 'HS256', typ: 'JWT' },
         { userId: 1, email: 'admin@ufca.edu.br', iat: nowSec, exp: nowSec + 3600 }
       );
       expect(verifyAdminSessionToken(legacyToken)).toBeNull();
 
-      // sid não UUID v4
       const nonV4SidToken = signRawJwt(
         { alg: 'HS256', typ: 'JWT' },
         {
@@ -249,21 +242,19 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       );
       expect(verifyAdminSessionToken(nonV4SidToken)).toBeNull();
 
-      // Header com alg !== HS256
       const wrongAlgToken = signRawJwt(
         { alg: 'none', typ: 'JWT' },
         { sid: validSid, userId: 1, email: 'admin@ufca.edu.br', iat: nowSec, exp: nowSec + 3600 }
       );
       expect(verifyAdminSessionToken(wrongAlgToken)).toBeNull();
 
-      // userId enviado como string ("1") — rejeita sem coerção silenciosa
+      // Rejeita userId string sem coerção silenciosa
       const stringUserIdToken = signRawJwt(
         { alg: 'HS256', typ: 'JWT' },
         { sid: validSid, userId: '1', email: 'admin@ufca.edu.br', iat: nowSec, exp: nowSec + 3600 }
       );
       expect(verifyAdminSessionToken(stringUserIdToken)).toBeNull();
 
-      // role não string
       const invalidRoleToken = signRawJwt(
         { alg: 'HS256', typ: 'JWT' },
         {
@@ -431,13 +422,11 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         expiresInSeconds: 86400,
       });
 
-      // Sessão ausente no banco
       findUnique.mockResolvedValueOnce(null);
       await expect(
         requireAdminSession(token, { prismaClient, now })
       ).rejects.toMatchObject({ statusCode: 401, code: 'UNAUTHORIZED' });
 
-      // Divergência entre usuarioId do registro e payload.userId
       findUnique.mockResolvedValueOnce({
         id: 10,
         usuarioId: 999,
@@ -449,7 +438,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         requireAdminSession(token, { prismaClient, now })
       ).rejects.toMatchObject({ statusCode: 401, code: 'UNAUTHORIZED' });
 
-      // Sessão revogada no servidor (logout prévio)
       findUnique.mockResolvedValueOnce({
         id: 10,
         usuarioId: ACTIVE_USER.id,
@@ -461,7 +449,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         requireAdminSession(token, { prismaClient, now })
       ).rejects.toMatchObject({ statusCode: 401, code: 'UNAUTHORIZED' });
 
-      // Sessão expirada no banco mesmo com JWT válido
       findUnique.mockResolvedValueOnce({
         id: 10,
         usuarioId: ACTIVE_USER.id,
@@ -508,12 +495,10 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         email: ACTIVE_USER.email,
       });
 
-      // Ausente -> null sem consultar banco
       await expect(getOptionalAdminSession(null, { prismaClient })).resolves.toBeNull();
       await expect(getOptionalAdminSession(new Headers(), { prismaClient })).resolves.toBeNull();
       expect(findUnique).not.toHaveBeenCalled();
 
-      // Revogada (401) -> null
       findUnique.mockResolvedValueOnce({
         id: 10,
         usuarioId: ACTIVE_USER.id,
@@ -523,7 +508,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       });
       await expect(getOptionalAdminSession(activeToken, { prismaClient, now })).resolves.toBeNull();
 
-      // Inativa (403) -> null
       findUnique.mockResolvedValueOnce({
         id: 11,
         usuarioId: ACTIVE_USER.id,
@@ -533,7 +517,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       });
       await expect(getOptionalAdminSession(activeToken, { prismaClient, now })).resolves.toBeNull();
 
-      // Válida -> retorna sessão completa
       const expiresAt = new Date(now.getTime() + 60_000);
       findUnique.mockResolvedValueOnce({
         id: 12,
@@ -548,7 +531,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         sessionExpiresAt: expiresAt,
       });
 
-      // Erro inesperado de infraestrutura -> propaga
       findUnique.mockRejectedValueOnce(new Error('MySQL pool exhausted'));
       await expect(getOptionalAdminSession(activeToken, { prismaClient, now })).rejects.toThrow(
         'MySQL pool exhausted'
@@ -627,7 +609,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       const { prismaClient, findUnique } = createPrismaMock();
       const now = new Date();
 
-      // Sem cookie -> redireciona para /admin/login sem ?next quando nextPath omitido
       await expect(
         requireAdminPageSession({
           prismaClient,
@@ -636,7 +617,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       ).rejects.toBeInstanceOf(RedirectSignal);
       expect(mockRedirect).toHaveBeenLastCalledWith('/admin/login');
 
-      // Cookie inválido + nextPath válido -> redireciona preservando ?next
       await expect(
         requireAdminPageSession({
           prismaClient,
@@ -648,7 +628,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         '/admin/login?next=%2Fadmin%2Fimportacoes%2F15'
       );
 
-      // Conta inativa (403) + nextPath malicioso -> redireciona para /admin/login sem ?next
       const inactiveToken = createAdminSessionToken({
         userId: INACTIVE_USER.id,
         email: INACTIVE_USER.email,
@@ -669,7 +648,6 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
       ).rejects.toBeInstanceOf(RedirectSignal);
       expect(mockRedirect).toHaveBeenLastCalledWith('/admin/login');
 
-      // Sessão válida usando fallback padrão de next/headers (cookies()) e prisma padrão
       const activeToken = createAdminSessionToken({
         userId: ACTIVE_USER.id,
         email: ACTIVE_USER.email,

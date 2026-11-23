@@ -1,9 +1,7 @@
 /**
- * Nascentes do Cariri — Guarda de Autenticação Administrativa (Admin Auth Guard)
+ * Nascentes do Cariri — Guarda de Autenticação Administrativa
  *
- * Responsável pela emissão e verificação criptográfica (HMAC-SHA256) de tokens de
- * sessão administrativos vinculados a um registro persistido na tabela `sessoes`,
- * garantindo revogação server-side, controle de expiração e bloqueio de contas inativas.
+ * Emissão e verificação HMAC-SHA256 de tokens vinculados a sessões persistidas em `sessoes`.
  */
 
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -52,9 +50,6 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * Codifica uma string em formato Base64URL seguro para cabeçalhos HTTP e URLs.
- */
 function base64UrlEncode(input: string): string {
   return Buffer.from(input, 'utf-8')
     .toString('base64')
@@ -63,9 +58,6 @@ function base64UrlEncode(input: string): string {
     .replace(/\//g, '_');
 }
 
-/**
- * Decodifica uma string Base64URL para UTF-8.
- */
 function base64UrlDecode(input: string): string {
   let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4 !== 0) {
@@ -74,24 +66,14 @@ function base64UrlDecode(input: string): string {
   return Buffer.from(base64, 'base64').toString('utf-8');
 }
 
-/**
- * Gera um identificador único de sessão (UUID v4).
- */
 export function generateSessionId(): string {
   return randomUUID();
 }
 
-/**
- * Type guard estrito para validar se um valor é um UUID v4 de sessão.
- */
 export function isValidSessionId(value: unknown): value is string {
   return typeof value === 'string' && SESSION_ID_UUID_V4_REGEX.test(value);
 }
 
-/**
- * Calcula o hash SHA-256 (64 caracteres hexadecimais) de um identificador de sessão
- * para armazenamento seguro na coluna `sessoes.token_hash`.
- */
 export function hashSessionId(sid: string): string {
   if (!isValidSessionId(sid)) {
     throw new Error('Identificador de sessão inválido: esperado UUID v4.');
@@ -99,10 +81,6 @@ export function hashSessionId(sid: string): string {
   return createHash('sha256').update(sid, 'utf8').digest('hex');
 }
 
-/**
- * Gera um token de sessão administrativo assinado com HMAC-SHA256 (RFC 7519 / JWT standard)
- * contendo obrigatoriamente o identificador único `sid`.
- */
 export function createAdminSessionToken(params: CreateAdminSessionTokenParams): string {
   const sid = params.sid ?? generateSessionId();
   if (!isValidSessionId(sid)) {
@@ -151,10 +129,6 @@ export function createAdminSessionToken(params: CreateAdminSessionTokenParams): 
   return `${message}.${signature}`;
 }
 
-/**
- * Valida a integridade criptográfica, estrutura, `sid` e expiração de um token de sessão.
- * Retorna o payload decodificado se válido, ou null caso expirado, adulterado, sem `sid` ou malformado.
- */
 export function verifyAdminSessionToken(
   token: string,
   now?: Date
@@ -248,11 +222,6 @@ export function verifyAdminSessionToken(
   }
 }
 
-/**
- * Extrai o token de autenticação de uma requisição HTTP a partir de:
- * 1. Cookie seguro de sessão (via extractSessionToken);
- * 2. Cabeçalho Authorization: Bearer <token>.
- */
 export function extractAuthTokenFromRequest(
   request: Request | Headers | string | null | undefined
 ): string | null {
@@ -260,7 +229,6 @@ export function extractAuthTokenFromRequest(
     return null;
   }
 
-  // Caso seja uma string direta de cookie ou token
   if (typeof request === 'string') {
     const fromCookie = extractSessionToken(request);
     if (fromCookie) return fromCookie;
@@ -272,14 +240,12 @@ export function extractAuthTokenFromRequest(
 
   const headers = request instanceof Headers ? request : request.headers;
 
-  // Extração via Cookie
   const cookieHeader = headers.get('cookie');
   const tokenFromCookie = extractSessionToken(cookieHeader);
   if (tokenFromCookie) {
     return tokenFromCookie;
   }
 
-  // Extração via Authorization: Bearer <token>
   const authHeader = headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7).trim();
@@ -289,12 +255,6 @@ export function extractAuthTokenFromRequest(
 }
 
 /**
- * Guarda autoritativa de autenticação e autorização administrativa.
- *
- * Valida a assinatura HMAC-SHA256 do token e executa uma única consulta indexada
- * na tabela `sessoes` associada ao `usuario`, verificando existência, vínculo de
- * autoria, ausência de revogação, expiração e conta ativa.
- *
  * @throws AppError 401 caso a sessão seja ausente, inválida, revogada ou expirada.
  * @throws AppError 403 caso a conta do administrador esteja inativa.
  */
@@ -396,10 +356,6 @@ export async function requireAdminSession(
   };
 }
 
-/**
- * Variante não-bloqueante de verificação de sessão administrativa para uso em
- * contextos que precisam apenas identificar o usuário conectado (ou null).
- */
 export async function getOptionalAdminSession(
   request: Request | Headers | string | null | undefined,
   options?: RequireAdminSessionOptions

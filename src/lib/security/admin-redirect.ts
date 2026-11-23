@@ -1,8 +1,7 @@
 /**
  * Nascentes do Cariri — Sanitização de Redirecionamentos Administrativos
  *
- * Módulo compartilhado entre middleware/proxy, Server Components e futuras telas de autenticação para evitar
- * vulnerabilidades de Open Redirect e loops de redirecionamento.
+ * Valida destinos internos sob `/admin` contra Open Redirect e loops em `/admin/login`.
  */
 
 export const ADMIN_LOGIN_PATH = '/admin/login' as const;
@@ -42,10 +41,7 @@ function parseValidAdminRedirectPath(rawNext: string | null | undefined): string
   return trimmed;
 }
 
-/**
- * Valida e sanitiza o caminho de destino pós-login administrativo.
- * Retorna `fallback` para qualquer URL externa, relativa ambígua ou rota de login.
- */
+// Bloqueia URLs externas, relativas ambíguas e a própria rota de login (loop).
 export function sanitizeAdminRedirectPath(
   rawNext: string | null | undefined,
   fallback: string = DEFAULT_ADMIN_REDIRECT_PATH
@@ -53,10 +49,6 @@ export function sanitizeAdminRedirectPath(
   return parseValidAdminRedirectPath(rawNext) ?? fallback;
 }
 
-/**
- * Constrói a URL segura de redirecionamento para a tela de login administrativo,
- * anexando `?next=` apenas quando `rawNext` representa uma rota protegida válida.
- */
 export function buildAdminLoginRedirectUrl(rawNext?: string | null | undefined): string {
   const validPath = parseValidAdminRedirectPath(rawNext);
   if (!validPath) {
