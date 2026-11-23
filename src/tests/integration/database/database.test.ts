@@ -7,6 +7,8 @@ describe('Integração com o Banco de Dados (Prisma)', () => {
         await prisma.$connect();
 
         // Prepara banco limpo para testes
+        await prisma.tentativaLogin.deleteMany();
+        await prisma.sessao.deleteMany();
         await prisma.nascente.deleteMany();
         await prisma.importacao.deleteMany();
         await prisma.usuario.deleteMany();
@@ -21,10 +23,14 @@ describe('Integração com o Banco de Dados (Prisma)', () => {
             const countUsuarios = await prisma.usuario.count();
             const countImportacoes = await prisma.importacao.count();
             const countNascentes = await prisma.nascente.count();
+            const countSessoes = await prisma.sessao.count();
+            const countTentativasLogin = await prisma.tentativaLogin.count();
 
             expect(typeof countUsuarios).toBe('number');
             expect(typeof countImportacoes).toBe('number');
             expect(typeof countNascentes).toBe('number');
+            expect(typeof countSessoes).toBe('number');
+            expect(typeof countTentativasLogin).toBe('number');
         });
     });
 
@@ -99,6 +105,104 @@ describe('Integração com o Banco de Dados (Prisma)', () => {
             await prisma.nascente.delete({ where: { id: nascente.id } });
             await prisma.importacao.delete({ where: { id: importacao.id } });
             await prisma.usuario.delete({ where: { id: usuario.id } });
+        });
+    });
+
+    describe('Sessões e Tentativas de Login (Constraints e Cascata)', () => {
+        it('deve rejeitar tokenHash duplicado (P2002), aceitar revokedAt nulo/preenchido e remover sessões em cascata ao excluir Usuário', async () => {
+            const tokenHash = 'a'.repeat(64);
+            const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+            const usuario = await prisma.usuario.create({
+                data: {
+                    nome: 'QA Session User',
+                    email: `qa-session-${Date.now()}@exemplo.com`,
+                    passwordHash: 'hash',
+                },
+            });
+
+            try {
+                const sessao = await prisma.sessao.create({
+                    data: {
+                        usuarioId: usuario.id,
+                        tokenHash,
+                        expiresAt,
+                    },
+                });
+
+                expect(sessao.revokedAt).toBeNull();
+                expect(sessao.tokenHash).toBe(tokenHash);
+
+                await expect(
+                    prisma.sessao.create({
+                        data: {
+                            usuarioId: usuario.id,
+                            tokenHash,
+                            expiresAt,
+                        },
+                    })
+                ).rejects.toMatchObject({ code: 'P2002' });
+
+                const revokedAt = new Date();
+                const sessaoRevogada = await prisma.sessao.update({
+                    where: { id: sessao.id },
+                    data: { revokedAt },
+                });
+                expect(sessaoRevogada.revokedAt).toBeInstanceOf(Date);
+
+                // Exclusão de usuário sem importações deve remover sessões vinculadas via ON DELETE CASCADE
+                await prisma.usuario.delete({ where: { id: usuario.id } });
+
+                const sessaoRestante = await prisma.sessao.findUnique({
+                    where: { id: sessao.id },
+                });
+                expect(sessaoRestante).toBeNull();
+            } finally {
+                await prisma.sessao.deleteMany({ where: { usuarioId: usuario.id } });
+                await prisma.usuario.deleteMany({ where: { id: usuario.id } });
+            }
+        });
+
+        it('deve persistir janela/bloqueio em TentativaLogin e rejeitar chaveHash duplicado (P2002)', async () => {
+            const chaveHash = 'b'.repeat(64);
+            const janelaInicio = new Date();
+            const bloqueadoAte = new Date(janelaInicio.getTime() + 15 * 60 * 1000);
+
+            try {
+                const tentativa = await prisma.tentativaLogin.create({
+                    data: {
+                        chaveHash,
+                        tentativas: 1,
+                        janelaInicio,
+                    },
+                });
+
+                expect(tentativa.tentativas).toBe(1);
+                expect(tentativa.bloqueadoAte).toBeNull();
+
+                const tentativaBloqueada = await prisma.tentativaLogin.update({
+                    where: { id: tentativa.id },
+                    data: {
+                        tentativas: 5,
+                        bloqueadoAte,
+                    },
+                });
+
+                expect(tentativaBloqueada.tentativas).toBe(5);
+                expect(tentativaBloqueada.bloqueadoAte).toBeInstanceOf(Date);
+
+                await expect(
+                    prisma.tentativaLogin.create({
+                        data: {
+                            chaveHash,
+                            tentativas: 1,
+                            janelaInicio,
+                        },
+                    })
+                ).rejects.toMatchObject({ code: 'P2002' });
+            } finally {
+                await prisma.tentativaLogin.deleteMany({ where: { chaveHash } });
+            }
         });
     });
 });
