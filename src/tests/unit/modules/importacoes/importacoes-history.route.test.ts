@@ -20,7 +20,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_COOKIE_NAMES } from '@/config/session-cookies';
 import { prisma } from '@/lib/db/prisma';
 import { AppError, type PublicErrorResponse } from '@/lib/errors';
-import { createAdminSessionToken } from '@/lib/security/admin-guard';
+import {
+  createAdminSessionToken,
+  hashSessionId,
+} from '@/lib/security/admin-guard';
 import {
   IMPORTACAO_COMMIT_ERROR_CODES,
   StatusImportacao,
@@ -40,7 +43,7 @@ import { GET as ITEM_GET } from '@/app/api/admin/importacoes/[id]/route';
 
 vi.mock('@/lib/db/prisma', () => ({
   prisma: {
-    usuario: {
+    sessao: {
       findUnique: vi.fn(),
     },
   },
@@ -139,18 +142,36 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
     },
   };
 
+  const ACTIVE_SESSION_SID = '11111111-1111-4111-8111-111111111111';
+  const INACTIVE_SESSION_SID = '22222222-2222-4222-8222-222222222222';
+
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env['SESSION_SECRET'] = 'vitest-admin-guard-secret-32-chars-minimum';
 
-    vi.mocked(prisma.usuario.findUnique).mockImplementation(
-      (async (args: { where?: { id?: number } }) => {
-        const id = args.where?.id;
-        if (id === ACTIVE_ADMIN.id) {
-          return { ...ACTIVE_ADMIN };
+    const activeTokenHash = hashSessionId(ACTIVE_SESSION_SID);
+    const inactiveTokenHash = hashSessionId(INACTIVE_SESSION_SID);
+    const futureExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    vi.mocked(prisma.sessao.findUnique).mockImplementation(
+      (async (args: { where?: { tokenHash?: string } }) => {
+        const tokenHash = args.where?.tokenHash;
+        if (tokenHash === activeTokenHash) {
+          return {
+            id: 501,
+            usuarioId: ACTIVE_ADMIN.id,
+            expiresAt: futureExpiresAt,
+            revokedAt: null,
+            usuario: { ...ACTIVE_ADMIN },
+          };
         }
-        if (id === INACTIVE_ADMIN.id) {
-          return { ...INACTIVE_ADMIN };
+        if (tokenHash === inactiveTokenHash) {
+          return {
+            id: 502,
+            usuarioId: INACTIVE_ADMIN.id,
+            expiresAt: futureExpiresAt,
+            revokedAt: null,
+            usuario: { ...INACTIVE_ADMIN },
+          };
         }
         return null;
       }) as never
@@ -194,8 +215,12 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
         email: ACTIVE_ADMIN.email,
         expiresInSeconds: -60,
       });
+      const unpersistedToken = createAdminSessionToken({
+        userId: ACTIVE_ADMIN.id,
+        email: ACTIVE_ADMIN.email,
+      });
 
-      for (const token of ['token.invalido.forjado', expiredToken]) {
+      for (const token of ['token.invalido.forjado', expiredToken, unpersistedToken]) {
         const req = new NextRequest('http://localhost/api/admin/importacoes', {
           method: 'GET',
           headers: {
@@ -212,6 +237,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve retornar 403 FORBIDDEN_INACTIVE_USER quando administrador estiver inativo', async () => {
       const token = createAdminSessionToken({
+        sid: INACTIVE_SESSION_SID,
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
@@ -242,6 +268,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
       'deve retornar 400 INVALID_IMPORTACAO_INPUT para query param inválido "%s"',
       async (query) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -263,6 +290,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve retornar 200 OK com histórico paginado via Cookie HttpOnly e cabeçalhos anti-cache', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -302,6 +330,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve aceitar Authorization Bearer e aplicar defaults quando query params forem omitidos', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -327,6 +356,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve mascarar falha inesperada do banco em 500 INTERNAL_SERVER_ERROR', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -363,6 +393,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
       expect(anonRes.status).toBe(401);
 
       const inactiveToken = createAdminSessionToken({
+        sid: INACTIVE_SESSION_SID,
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
@@ -381,6 +412,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
       'deve retornar 400 INVALID_IMPORTACAO_INPUT para [id] inválido "%s"',
       async (invalidId) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -405,6 +437,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve retornar 400 INVALID_IMPORTACAO_INPUT quando includePreview for inválido', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -428,6 +461,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve retornar 200 OK com detalhe e prévia reconstruída via Cookie e Bearer', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -511,6 +545,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
       'deve propagar erro HTTP $status ($code) no detalhe',
       async ({ status, code, message }) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -536,6 +571,7 @@ describe('QA Unitário — Rotas GET /api/admin/importacoes e GET /api/admin/imp
 
     it('deve mascarar exceção inesperada no GET [id] em 500 INTERNAL_SERVER_ERROR', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });

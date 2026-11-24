@@ -42,14 +42,19 @@ import {
   type ValidTxtPreviewRow,
 } from '@/modules/importacoes/importacoes.contracts';
 import { parseTxtLine } from '@/modules/importacoes/txt-parser';
-import { createAdminSessionToken } from '@/lib/security/admin-guard';
+import {
+  createAdminSessionToken,
+  generateSessionId,
+  hashSessionId,
+} from '@/lib/security/admin-guard';
 import { prisma } from '@/lib/db/prisma';
 import { GET as devSessionGET, DELETE as devSessionDELETE } from '@/app/api/admin/dev-session/route';
 
 vi.mock('@/lib/db/prisma', () => ({
   prisma: {
-    usuario: {
+    sessao: {
       findUnique: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -538,18 +543,29 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(body.code).toBe('UNAUTHORIZED');
     });
 
-    it('deve emitir cookie HttpOnly e redirecionar 303 para rota administrativa segura quando o token pertencer a admin ativo em development', async () => {
+    it('deve emitir cookie HttpOnly e redirecionar 303 para rota administrativa segura quando a sessão persistida pertencer a admin ativo em development', async () => {
       vi.stubEnv('NODE_ENV', 'development');
 
+      const sid = generateSessionId();
       const validToken = createAdminSessionToken({
+        sid,
         userId: 10,
         email: 'admin@ufca.edu.br',
       });
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce({
-        id: 10,
-        ativo: true,
-      } as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>);
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce({
+        id: 77,
+        usuarioId: 10,
+        expiresAt,
+        revokedAt: null,
+        usuario: {
+          id: 10,
+          nome: 'Administrador UFCA',
+          email: 'admin@ufca.edu.br',
+          ativo: true,
+        },
+      } as unknown as Awaited<ReturnType<typeof prisma.sessao.findUnique>>);
 
       // Testa também a proteção contra Open Redirect (next=//evil.com deve cair em /admin/importacoes)
       const req = new NextRequest(
@@ -557,10 +573,24 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       );
       const res = await devSessionGET(req);
 
+      expect(prisma.sessao.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tokenHash: hashSessionId(sid) },
+        })
+      );
       expect(res.status).toBe(303);
       expect(res.headers.get('location')).toBe('http://localhost:3000/admin/importacoes');
       expect(res.headers.get('set-cookie')).toContain('HttpOnly');
       expect(res.headers.get('set-cookie')).toContain('SameSite=Lax');
+
+      // Sessão ausente/revogada no banco deve ser rejeitada com 401
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(null);
+      const revokedRes = await devSessionGET(
+        new NextRequest(
+          `http://localhost:3000/api/admin/dev-session?token=${encodeURIComponent(validToken)}`
+        )
+      );
+      expect(revokedRes.status).toBe(401);
     });
   });
 
