@@ -22,8 +22,8 @@ A matriz estabelece para cada requisito:
 
 | ID | Cenário Mínimo (Seção 16) | Camada | Nível | Módulo Funcional | Arquivo de Teste | Cobertura |
 |:---|:---|:---|:---|:---|:---|:---|
-| **CT-BE-01** | Login válido e inválido | Backend | Integração | Autenticação | `src/tests/integration/auth/login.test.ts` | Planejado |
-| **CT-BE-02** | Bloqueio de rota administrativa sem autenticação | Backend | Integração | Autenticação / Guarda | `src/tests/integration/auth/admin-guard.test.ts` | Planejado |
+| **CT-BE-01** | Login válido e inválido | Backend | Integração | Autenticação | `src/tests/integration/auth/login.test.ts` | Ativo |
+| **CT-BE-02** | Bloqueio de rota administrativa sem autenticação | Backend | Integração | Autenticação / Guarda | `src/tests/integration/auth/admin-guard.test.ts` | Ativo |
 | **CT-BE-03** | Arquivo vazio | Backend | Unitário | Importação TXT | `src/tests/unit/import/file-validator.test.ts` | Ativo |
 | **CT-BE-04** | Extensão inválida (diferente de `.txt`) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
 | **CT-BE-05** | Arquivo acima do limite (5 MB) | Backend | Unitário | Sanitização e Segurança | `src/tests/unit/security/sanitizer.test.ts` | Ativo |
@@ -235,6 +235,25 @@ A matriz estabelece para cada requisito:
     - Modal acessível de cancelamento (`role="dialog"`, `aria-modal="true"`, travamento durante `isCanceling`, anúncio `role="alert"` em erro e fechamento condicional por `Escape`).
   - **Formatadores, Proteção 5xx e Retomada no Workspace (`src/services/importacoes.client.ts` / `ImportacaoWorkspace`):**
     - Regressão contra vazamento de erros internos 5xx em respostas JSON nas operações HTTP do cliente, remoção seletiva de prévia (`clearPreviewSessionIfId`) e interpretação estrita de `?importacaoId=<id>` (`parseImportacaoIdSearchParam`).
+
+### 3.14. Autenticação Administrativa, Sessões Persistidas, Rate Limit LGPD e Proxy (`US-15` / `Task-29` / `CT-BE-01` / `CT-BE-02`)
+* **Arquivos:**
+  - `src/tests/integration/auth/login.test.ts`
+  - `src/tests/integration/auth/admin-guard.test.ts`
+  - `src/tests/unit/modules/auth/auth-service.test.ts`
+  - `src/tests/unit/modules/auth/auth-routes.test.ts`
+  - `src/tests/unit/security/admin-guard.test.ts`
+  - `src/tests/unit/security/proxy.test.ts`
+  - `src/tests/unit/security/session-cookies.test.ts`
+* **Regras Verificadas:**
+  - **Login e Anti-Enumeração (`CT-BE-01` / `POST /api/admin/auth/login`):**
+    - Autenticação por `email` e `password` (`.strict()`), equalização temporal com *bcrypt* (`DUMMY_BCRYPT_HASH`), resposta genérica unificada `401 INVALID_CREDENTIALS` para senha incorreta, e-mail inexistente ou conta inativa, emissão de cookie `HttpOnly` + `SameSite=Lax` (`__Host-` + `Secure` em produção) e atualização de `lastLoginAt`.
+    - Persistência exclusiva de `tokenHash` (`SHA-256(sid)`) em `sessoes`, cabeçalhos `no-store` / `no-referrer` e omissão estrita de `passwordHash`, `tokenHash` e do JWT no corpo JSON.
+  - **Rate Limit Persistido no MySQL e LGPD (`tentativas_login` / `RNF03`):**
+    - Contadores por e-mail (5 falhas / 15 min) e por IP (15 falhas / 15 min) persistidos com chaves pseudonimizadas via `HMAC-SHA256`, retorno `429 RATE_LIMITED` com cabeçalho `Retry-After`, reset da chave de e-mail após login válido e limpeza oportunista de registros expirados (`> 24h`).
+  - **Guarda Persistida e Defesa em Profundidade (`CT-BE-02` / `GET /api/admin/auth/me` / `src/proxy.ts`):**
+    - Proxy oficial do Next.js `16.3.1` (`src/proxy.ts`) interceptando `/admin`, `/admin/:path*` e `/api/admin/:path*`: redirecionamento `307` sanitizado para `/admin/login?next=...` (proteção contra *Open Redirect* e loops) e bloqueio `401 JSON` em APIs sem token válido, mantendo `/mapa` e `/api/public/*` livres.
+    - Verificação autoritativa no MySQL (`requireAdminSession` / `requireAdminPageSession`): bloqueio `401 UNAUTHORIZED` para sessão ausente, não persistida, expirada ou revogada (`revokedAt !== null`) — com suporte a revogação individual e em lote — e `403 FORBIDDEN_INACTIVE_USER` imediato para usuário desativado.
 
 ---
 
