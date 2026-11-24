@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { cookies } from 'next/headers';
-import { SESSION_COOKIE_NAMES } from '@/config/session-cookies';
-import { getOptionalAdminSession } from '@/lib/security/admin-guard';
+import { getOptionalAdminPageSession } from '@/lib/security/admin-page-guard';
 import {
   DEFAULT_HISTORY_PAGE,
   IMPORTACAO_STATUS_VALUES,
@@ -76,12 +74,7 @@ function parseOptionalStatusParam(
 
 async function resolveOptionalCurrentUserId(): Promise<number | null> {
   try {
-    const cookieStore = await cookies();
-    const rawToken =
-      cookieStore.get(SESSION_COOKIE_NAMES.PRODUCTION)?.value ??
-      cookieStore.get(SESSION_COOKIE_NAMES.DEVELOPMENT)?.value ??
-      null;
-    const session = await getOptionalAdminSession(rawToken);
+    const session = await getOptionalAdminPageSession();
     return session?.id ?? null;
   } catch {
     return null;

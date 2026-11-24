@@ -1,17 +1,18 @@
 /**
  * Nascentes do Cariri — Gerador CLI de Sessão Administrativa para Desenvolvimento
  *
- * Emite um token HMAC-SHA256 assinado com AUTH_SECRET para um administrador ativo
- * do banco de dados (ou provisiona o admin inicial caso ainda não exista) e imprime
- * o link de ativação de cookie HttpOnly para acesso ao painel /admin sem tela de login.
+ * Persiste uma sessão na tabela `sessoes` para um administrador ativo (provisionando o admin inicial
+ * se necessário) e imprime o link de ativação de cookie HttpOnly para desenvolvimento local.
  *
  * Uso: npm run auth:dev
  */
 
 import 'dotenv/config';
 import { prisma } from '../src/lib/db/prisma';
-import { createAdminSessionToken } from '../src/lib/security/admin-guard';
 import { bootstrapAdmin } from '../src/lib/security/bootstrap';
+import { authService } from '../src/modules/auth';
+
+const DEV_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 dias para desenvolvimento local
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
@@ -40,25 +41,26 @@ async function main(): Promise<void> {
       admin = seeded.user;
     }
 
-    const token = createAdminSessionToken({
+    const persisted = await authService.createPersistedSession({
       userId: admin.id,
       email: admin.email,
       role: 'ADMIN',
-      expiresInSeconds: 7 * 24 * 60 * 60, // 7 dias para desenvolvimento local
+      ttlSeconds: DEV_SESSION_TTL_SECONDS,
     });
 
     const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
-    const activationUrl = `${appUrl}/api/admin/dev-session?token=${encodeURIComponent(token)}`;
+    const activationUrl = `${appUrl}/api/admin/dev-session?token=${encodeURIComponent(persisted.token)}`;
 
     console.log('');
-    console.log('=== Sessão Administrativa de Desenvolvimento (Sprint 3) ===');
+    console.log('=== Sessão Administrativa de Desenvolvimento ===');
     console.log(`Administrador : ${admin.nome} <${admin.email}> (ID: ${admin.id})`);
+    console.log(`Sessão ID     : ${persisted.sessionId} (expira em ${persisted.expiresAt.toISOString()})`);
     console.log('');
     console.log('1) Para autenticar o navegador (grava cookie HttpOnly e redireciona para /admin/importacoes):');
     console.log(`   ${activationUrl}`);
     console.log('');
     console.log('2) Para testar endpoints diretamente via curl/Postman:');
-    console.log(`   Authorization: Bearer ${token}`);
+    console.log(`   Authorization: Bearer ${persisted.token}`);
     console.log('');
     console.log('Mantenha este token apenas no ambiente local. Nunca exponha AUTH_SECRET em produção.');
   } catch (error) {

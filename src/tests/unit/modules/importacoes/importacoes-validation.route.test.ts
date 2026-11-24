@@ -26,7 +26,9 @@ import { prisma } from '@/lib/db/prisma';
 import {
   createAdminSessionToken,
   extractAuthTokenFromRequest,
+  generateSessionId,
   getOptionalAdminSession,
+  hashSessionId,
   requireAdminSession,
   verifyAdminSessionToken,
 } from '@/lib/security/admin-guard';
@@ -52,7 +54,7 @@ import {
 
 vi.mock('@/lib/db/prisma', () => ({
   prisma: {
-    usuario: {
+    sessao: {
       findUnique: vi.fn(),
     },
     importacao: {
@@ -103,6 +105,19 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  function buildMockSessaoRecord(
+    user: { id: number; nome: string; email: string; ativo: boolean },
+    overrides?: { id?: number; expiresAt?: Date; revokedAt?: Date | null }
+  ) {
+    return {
+      id: overrides?.id ?? 501,
+      usuarioId: user.id,
+      expiresAt: overrides?.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000),
+      revokedAt: overrides?.revokedAt ?? null,
+      usuario: { ...user },
+    };
+  }
 
   function buildMultipartRequest(options?: {
     readonly files?: ReadonlyArray<{
@@ -209,25 +224,49 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
       expect(extractAuthTokenFromRequest(new Headers())).toBeNull();
     });
 
-    it('requireAdminSession deve bloquear falta de token (401), usuário inexistente (401) e conta inativa (403)', async () => {
+    it('requireAdminSession deve bloquear falta de token (401), sessão inexistente/revogada (401) e conta inativa (403)', async () => {
       // Sem token -> 401
       await expect(requireAdminSession(new Headers())).rejects.toMatchObject({
         statusCode: 401,
         code: 'UNAUTHORIZED',
       });
 
+      const ghostSid = generateSessionId();
       const token = createAdminSessionToken({
+        sid: ghostSid,
         userId: 999,
         email: 'fantasma@ufca.edu.br',
       });
 
-      // Usuário não encontrado no banco -> 401 USER_NOT_FOUND
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(null);
+      // Sessão não encontrada em `sessoes` -> 401 UNAUTHORIZED
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(null);
       await expect(
         requireAdminSession(new Headers({ authorization: `Bearer ${token}` }))
       ).rejects.toMatchObject({
         statusCode: 401,
-        code: 'USER_NOT_FOUND',
+        code: 'UNAUTHORIZED',
+      });
+      expect(prisma.sessao.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tokenHash: hashSessionId(ghostSid) },
+        })
+      );
+
+      // Sessão revogada -> 401 UNAUTHORIZED
+      const revokedToken = createAdminSessionToken({
+        userId: ACTIVE_ADMIN.id,
+        email: ACTIVE_ADMIN.email,
+      });
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(ACTIVE_ADMIN, {
+          revokedAt: new Date(),
+        }) as unknown as Awaited<ReturnType<typeof prisma.sessao.findUnique>>
+      );
+      await expect(
+        requireAdminSession(new Headers({ authorization: `Bearer ${revokedToken}` }))
+      ).rejects.toMatchObject({
+        statusCode: 401,
+        code: 'UNAUTHORIZED',
       });
 
       // Usuário inativo -> 403 FORBIDDEN_INACTIVE_USER
@@ -235,8 +274,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        INACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(INACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
       await expect(
         requireAdminSession(
@@ -252,19 +293,19 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
       // Sem token -> null sem consultar banco
       await expect(getOptionalAdminSession(null)).resolves.toBeNull();
       await expect(getOptionalAdminSession(new Headers())).resolves.toBeNull();
-      expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+      expect(prisma.sessao.findUnique).not.toHaveBeenCalled();
 
       // Token inválido/expirado -> null
       await expect(
         getOptionalAdminSession(new Headers({ authorization: 'Bearer token.invalido.hmac' }))
       ).resolves.toBeNull();
 
-      // Usuário inexistente (401) -> null
+      // Sessão inexistente (401) -> null
       const ghostToken = createAdminSessionToken({
         userId: 999,
         email: 'fantasma@ufca.edu.br',
       });
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(null);
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(null);
       await expect(getOptionalAdminSession(ghostToken)).resolves.toBeNull();
 
       // Conta inativa (403) -> null
@@ -272,23 +313,33 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        INACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(INACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
       await expect(getOptionalAdminSession(inactiveToken)).resolves.toBeNull();
 
       // Admin ativo -> retorna sessão completa
+      const activeExpiresAt = new Date('2026-12-24T12:00:00.000Z');
       const activeToken = createAdminSessionToken({
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(ACTIVE_ADMIN, {
+          id: 501,
+          expiresAt: activeExpiresAt,
+        }) as unknown as Awaited<ReturnType<typeof prisma.sessao.findUnique>>
       );
-      await expect(getOptionalAdminSession(activeToken)).resolves.toEqual(ACTIVE_ADMIN);
+      await expect(getOptionalAdminSession(activeToken)).resolves.toEqual({
+        ...ACTIVE_ADMIN,
+        sessionId: 501,
+        sessionExpiresAt: activeExpiresAt,
+      });
 
       // Erro inesperado de infraestrutura (ex: falha de conexão DB) deve ser propagado
-      vi.mocked(prisma.usuario.findUnique).mockRejectedValueOnce(new Error('DB connection lost'));
+      vi.mocked(prisma.sessao.findUnique).mockRejectedValueOnce(new Error('DB connection lost'));
       await expect(getOptionalAdminSession(activeToken)).rejects.toThrow('DB connection lost');
     });
   });
@@ -518,8 +569,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         email: INACTIVE_ADMIN.email,
       });
 
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        INACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(INACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
 
       const request = buildMultipartRequest({
@@ -542,8 +595,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValue(
-        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValue(
+        buildMockSessaoRecord(ACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
       return token;
     }
@@ -679,8 +734,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         email: ACTIVE_ADMIN.email,
       });
 
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(ACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
 
       const createdAt = new Date('2026-11-05T13:00:00.000Z');
@@ -769,8 +826,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         email: ACTIVE_ADMIN.email,
       });
 
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(ACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
 
       const createdAt = new Date('2026-11-05T13:10:00.000Z');
@@ -858,8 +917,10 @@ describe('QA Unitário — Guarda Admin, Orquestrador e Rota POST /api/admin/imp
         email: ACTIVE_ADMIN.email,
       });
 
-      vi.mocked(prisma.usuario.findUnique).mockResolvedValueOnce(
-        ACTIVE_ADMIN as unknown as Awaited<ReturnType<typeof prisma.usuario.findUnique>>
+      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(
+        buildMockSessaoRecord(ACTIVE_ADMIN) as unknown as Awaited<
+          ReturnType<typeof prisma.sessao.findUnique>
+        >
       );
 
       const createdAt = new Date('2026-11-05T13:20:00.000Z');

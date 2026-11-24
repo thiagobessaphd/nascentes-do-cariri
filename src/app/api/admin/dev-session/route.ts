@@ -4,19 +4,19 @@
  * GET /api/admin/dev-session?token=<JWT_ASSINADO>
  * DELETE /api/admin/dev-session
  *
- * Rota auxiliar exclusiva para desenvolvimento local (enquanto a tela de login
- * não está implementada). Exige token JWT válido assinado com AUTH_SECRET por meio do script
- * CLI `npm run auth:dev` e pertencente a um administrador ativo no banco de dados.
- * Retorna 404 Not Found em qualquer ambiente diferente de `development`.
+ * Rota auxiliar exclusiva para desenvolvimento local (`NODE_ENV === 'development'`),
+ * vinculada à validação de sessões persistidas em `sessoes`. Retorna 404 nos demais ambientes.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db/prisma';
-import { verifyAdminSessionToken } from '@/lib/security/admin-guard';
 import {
   serializeExpiredSessionCookie,
   serializeSessionCookie,
 } from '@/config/session-cookies';
+import { AppError, handleApiError } from '@/lib/errors';
+import { requireAdminSession } from '@/lib/security/admin-guard';
+import { sanitizeAdminRedirectPath } from '@/lib/security/admin-redirect';
+import { authService } from '@/modules/auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -32,21 +32,6 @@ function notFoundInNonDevResponse(): NextResponse {
     { error: 'Endpoint não disponível neste ambiente.', code: 'NOT_FOUND' },
     { status: 404, headers: NO_STORE_HEADERS }
   );
-}
-
-function resolveSafeAdminRedirect(rawNext: string | null): string {
-  if (!rawNext) {
-    return '/admin/importacoes';
-  }
-  const trimmed = rawNext.trim();
-  if (
-    trimmed.startsWith('/admin') &&
-    !trimmed.startsWith('//') &&
-    !trimmed.includes('\\')
-  ) {
-    return trimmed;
-  }
-  return '/admin/importacoes';
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -66,43 +51,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const payload = verifyAdminSessionToken(token);
-  if (!payload) {
-    return NextResponse.json(
-      {
-        error: 'Token de sessão inválido ou expirado.',
-        code: 'UNAUTHORIZED',
-      },
-      { status: 401, headers: NO_STORE_HEADERS }
+  let maxAgeSeconds: number;
+  try {
+    const session = await requireAdminSession(token);
+    maxAgeSeconds = Math.max(
+      1,
+      Math.floor((session.sessionExpiresAt.getTime() - Date.now()) / 1000)
     );
+  } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.statusCode, headers: NO_STORE_HEADERS }
+      );
+    }
+    return handleApiError(error);
   }
 
-  const adminUser = await prisma.usuario.findUnique({
-    where: { id: payload.userId },
-    select: { id: true, ativo: true },
-  });
-
-  if (!adminUser) {
-    return NextResponse.json(
-      {
-        error: 'Administrador associado ao token não encontrado.',
-        code: 'USER_NOT_FOUND',
-      },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (!adminUser.ativo) {
-    return NextResponse.json(
-      {
-        error: 'Conta de administrador inativa.',
-        code: 'FORBIDDEN_INACTIVE_USER',
-      },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  const redirectPath = resolveSafeAdminRedirect(
+  const redirectPath = sanitizeAdminRedirectPath(
     request.nextUrl.searchParams.get('next')
   );
   const destinationUrl = new URL(redirectPath, request.url);
@@ -113,15 +79,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   response.headers.append(
     'Set-Cookie',
-    serializeSessionCookie(token, { isProduction: false })
+    serializeSessionCookie(token, { isProduction: false, maxAgeSeconds })
   );
 
   return response;
 }
 
-export async function DELETE(): Promise<NextResponse> {
+export async function DELETE(request?: NextRequest): Promise<NextResponse> {
   if (process.env.NODE_ENV !== 'development') {
     return notFoundInNonDevResponse();
+  }
+
+  if (request) {
+    try {
+      await authService.revokeSessionByToken(request);
+    } catch {
+      // Limpeza do cookie prossegue mesmo que o banco esteja indisponível em dev
+    }
   }
 
   const response = NextResponse.json(

@@ -144,5 +144,31 @@ describe('Contrato e Configuração de Cookies de Sessão', () => {
 
       expect(token).toBeNull();
     });
+
+    it('deve tratar percent-encoding malformado sem lançar URIError', () => {
+      expect(() =>
+        extractSessionToken('__Host-nascentes.session-token=%E0%A4%A')
+      ).not.toThrow();
+      expect(extractSessionToken('__Host-nascentes.session-token=%E0%A4%A')).toBeNull();
+      expect(
+        extractSessionToken(
+          '__Host-nascentes.session-token=%E0%A4%A; nascentes.session-token=fallback-valido'
+        )
+      ).toBe('fallback-valido');
+    });
+
+    it('deve priorizar __Host- sobre o cookie de desenvolvimento e ignorar valores vazios', () => {
+      const reverseOrderHeader =
+        'nascentes.session-token=token-dev-antigo; __Host-nascentes.session-token=token-prod-atual';
+      expect(extractSessionToken(reverseOrderHeader)).toBe('token-prod-atual');
+
+      const emptyProdWithValidDev =
+        '__Host-nascentes.session-token=; nascentes.session-token=token-dev-ativo';
+      expect(extractSessionToken(emptyProdWithValidDev)).toBe('token-dev-ativo');
+
+      const emptyDevWithValidProd =
+        'nascentes.session-token=; __Host-nascentes.session-token=token-prod-ativo';
+      expect(extractSessionToken(emptyDevWithValidProd)).toBe('token-prod-ativo');
+    });
   });
 });

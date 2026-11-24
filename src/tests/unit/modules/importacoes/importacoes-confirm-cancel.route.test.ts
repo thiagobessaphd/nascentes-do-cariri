@@ -21,7 +21,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_COOKIE_NAMES } from '@/config/session-cookies';
 import { prisma } from '@/lib/db/prisma';
 import { AppError, type PublicErrorResponse } from '@/lib/errors';
-import { createAdminSessionToken } from '@/lib/security/admin-guard';
+import {
+  createAdminSessionToken,
+  hashSessionId,
+} from '@/lib/security/admin-guard';
 import {
   CANCELLED_IMPORTACAO_DEFAULT_MESSAGE,
   IMPORTACAO_COMMIT_ERROR_CODES,
@@ -47,7 +50,7 @@ import {
 
 vi.mock('@/lib/db/prisma', () => ({
   prisma: {
-    usuario: {
+    sessao: {
       findUnique: vi.fn(),
     },
   },
@@ -111,17 +114,36 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
     concluidaAt: '2026-11-15T18:05:00.000Z',
   };
 
+  const ACTIVE_SESSION_SID = '11111111-1111-4111-8111-111111111111';
+  const INACTIVE_SESSION_SID = '22222222-2222-4222-8222-222222222222';
+
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(prisma.usuario.findUnique).mockImplementation(
-      (async (args: { where?: { id?: number } }) => {
-        const id = args?.where?.id;
-        if (id === ACTIVE_ADMIN.id) {
-          return { ...ACTIVE_ADMIN };
+    const activeTokenHash = hashSessionId(ACTIVE_SESSION_SID);
+    const inactiveTokenHash = hashSessionId(INACTIVE_SESSION_SID);
+    const futureExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    vi.mocked(prisma.sessao.findUnique).mockImplementation(
+      (async (args: { where?: { tokenHash?: string } }) => {
+        const tokenHash = args?.where?.tokenHash;
+        if (tokenHash === activeTokenHash) {
+          return {
+            id: 501,
+            usuarioId: ACTIVE_ADMIN.id,
+            expiresAt: futureExpiresAt,
+            revokedAt: null,
+            usuario: { ...ACTIVE_ADMIN },
+          };
         }
-        if (id === INACTIVE_ADMIN.id) {
-          return { ...INACTIVE_ADMIN };
+        if (tokenHash === inactiveTokenHash) {
+          return {
+            id: 502,
+            usuarioId: INACTIVE_ADMIN.id,
+            expiresAt: futureExpiresAt,
+            revokedAt: null,
+            usuario: { ...INACTIVE_ADMIN },
+          };
         }
         return null;
       }) as never
@@ -190,11 +212,28 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
       const resForged = await CONFIRM_POST(reqForged, createRouteContext('42'));
       expect(resForged.status).toBe(401);
+
+      const unpersistedToken = createAdminSessionToken({
+        userId: ACTIVE_ADMIN.id,
+        email: ACTIVE_ADMIN.email,
+      });
+      const reqUnpersisted = new NextRequest(
+        'http://localhost/api/admin/importacoes/42/confirmar',
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${unpersistedToken}`,
+          },
+        }
+      );
+      const resUnpersisted = await CONFIRM_POST(reqUnpersisted, createRouteContext('42'));
+      expect(resUnpersisted.status).toBe(401);
       expect(importacaoCommitService.confirmImportacao).not.toHaveBeenCalled();
     });
 
     it('deve retornar 403 FORBIDDEN_INACTIVE_USER quando administrador estiver inativo', async () => {
       const inactiveToken = createAdminSessionToken({
+        sid: INACTIVE_SESSION_SID,
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
@@ -217,6 +256,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
       'deve rejeitar parâmetro de rota inválido (%s) com 400 INVALID_IMPORTACAO_INPUT sem chamar serviço',
       async (invalidId) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -238,6 +278,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve confirmar com sucesso (200 OK) via cookie de sessão, aplicando cabeçalhos anti-cache e omitindo paths privados', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -269,6 +310,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve aceitar autenticação via Authorization Bearer e propagar importacaoId numérico', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -318,6 +360,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
       'deve propagar erro de domínio HTTP $status ($code) do ImportacaoCommitService',
       async ({ status, code, message }) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -343,6 +386,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve mascarar exceções internas inesperadas em 500 INTERNAL_SERVER_ERROR sem vazar segredos', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -404,6 +448,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve retornar 403 FORBIDDEN_INACTIVE_USER para administrador inativo', async () => {
       const inactiveToken = createAdminSessionToken({
+        sid: INACTIVE_SESSION_SID,
         userId: INACTIVE_ADMIN.id,
         email: INACTIVE_ADMIN.email,
       });
@@ -426,6 +471,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
       'deve rejeitar parâmetro de rota inválido (%s) com 400 INVALID_IMPORTACAO_INPUT sem chamar serviço',
       async (invalidId) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -447,6 +493,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve cancelar com sucesso (200 OK) via cookie de sessão, aplicando cabeçalhos anti-cache e omitindo paths privados', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -478,6 +525,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve aceitar autenticação via Authorization Bearer no DELETE /api/admin/importacoes/[id]', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });
@@ -522,6 +570,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
       'deve propagar erro de domínio HTTP $status ($code) no cancelamento',
       async ({ status, code, message }) => {
         const token = createAdminSessionToken({
+          sid: ACTIVE_SESSION_SID,
           userId: ACTIVE_ADMIN.id,
           email: ACTIVE_ADMIN.email,
         });
@@ -547,6 +596,7 @@ describe('QA Unitário — Rotas POST /confirmar e DELETE /importacoes/[id]', ()
 
     it('deve mascarar exceção inesperada no DELETE em 500 INTERNAL_SERVER_ERROR', async () => {
       const token = createAdminSessionToken({
+        sid: ACTIVE_SESSION_SID,
         userId: ACTIVE_ADMIN.id,
         email: ACTIVE_ADMIN.email,
       });

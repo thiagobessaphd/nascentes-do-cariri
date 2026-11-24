@@ -115,18 +115,33 @@ export function serializeExpiredSessionCookie(
   return parts.join('; ');
 }
 
+function safeDecodeCookieValue(rawValue: string): string | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const decoded = decodeURIComponent(rawValue).trim();
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Extrai o token de sessão a partir do cabeçalho de cookies de uma requisição,
- * verificando tanto o nome de produção (__Host-) quanto o de desenvolvimento.
+ * Extrai o token de sessão a partir do cabeçalho Cookie, priorizando o cookie `__Host-`
+ * sobre o de desenvolvimento, ignorando valores vazios e tratando percent-encoding malformado.
  */
 export function extractSessionToken(cookieHeader: string | null | undefined): string | null {
   if (!cookieHeader) {
     return null;
   }
 
-  const cookies = cookieHeader.split(';').map((c) => c.trim());
+  let devFallback: string | null = null;
+  const cookies = cookieHeader.split(';');
 
-  for (const cookie of cookies) {
+  for (const rawCookie of cookies) {
+    const cookie = rawCookie.trim();
     const separatorIndex = cookie.indexOf('=');
     if (separatorIndex === -1) {
       continue;
@@ -135,13 +150,18 @@ export function extractSessionToken(cookieHeader: string | null | undefined): st
     const key = cookie.slice(0, separatorIndex).trim();
     const value = cookie.slice(separatorIndex + 1).trim();
 
-    if (
-      key === SESSION_COOKIE_NAMES.PRODUCTION ||
-      key === SESSION_COOKIE_NAMES.DEVELOPMENT
-    ) {
-      return decodeURIComponent(value);
+    if (key === SESSION_COOKIE_NAMES.PRODUCTION) {
+      const decodedProd = safeDecodeCookieValue(value);
+      if (decodedProd) {
+        return decodedProd;
+      }
+      continue;
+    }
+
+    if (key === SESSION_COOKIE_NAMES.DEVELOPMENT && devFallback === null) {
+      devFallback = safeDecodeCookieValue(value);
     }
   }
 
-  return null;
+  return devFallback;
 }
