@@ -103,3 +103,30 @@ export function toAdminPublicUserDto(row: {
     email: row.email,
   };
 }
+
+export const DEFAULT_RATE_LIMIT_FALLBACK_SECONDS = Math.ceil(
+  LOGIN_RATE_LIMIT_POLICY.LOCKOUT_MS / 1000
+);
+export const MAX_RETRY_AFTER_SECONDS = 24 * 60 * 60;
+export const DEFAULT_AUTH_REQUEST_TIMEOUT_MS = 15_000;
+
+export interface AuthFieldErrors {
+  readonly email?: string | undefined;
+  readonly password?: string | undefined;
+}
+
+export const authValidationIssueSchema = z
+  .object({
+    campo: z.string(),
+    mensagem: z.string(),
+  })
+  .strict();
+
+export const authPublicErrorPayloadSchema = z.object({
+  error: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  details: z.unknown().optional(),
+});
+
+export type AuthValidationIssueDto = z.infer<typeof authValidationIssueSchema>;
+export type AuthPublicErrorPayloadDto = z.infer<typeof authPublicErrorPayloadSchema>;
