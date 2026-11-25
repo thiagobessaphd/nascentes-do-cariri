@@ -1,0 +1,261 @@
+/**
+ * Nascentes do Cariri — Estilos do Formulário de Login Administrativo (UFCA)
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  width: 100%;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Banner de Erro / Rate Limit */
+.alertBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 6px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  color: #991b1b;
+}
+
+.alertBanner:focus {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
+}
+
+.alertBannerRateLimit {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  border-left-color: #b45309;
+  color: #92400e;
+}
+
+.alertIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.alertContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.alertMessage {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.cooldownTimer {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.cooldownValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Campos do Formulário */
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.425rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.65rem 0.875rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #0f172a;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: #64748b;
+  opacity: 0.85;
+}
+
+.input:hover:not(:read-only) {
+  border-color: #94a3b8;
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: #0b4f6c;
+  box-shadow: 0 0 0 3px rgba(11, 79, 108, 0.2);
+}
+
+.input:read-only {
+  background-color: #f8fafc;
+  color: #475569;
+  cursor: not-allowed;
+}
+
+.inputInvalid {
+  border-color: #dc2626;
+  background-color: #fffafa;
+}
+
+.inputInvalid:focus-visible {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.2);
+}
+
+.passwordWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.passwordInput {
+  padding-right: 3.25rem;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.passwordToggle:hover:not(:disabled) {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: -2px;
+  color: #0b4f6c;
+}
+
+.passwordToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fieldError {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #991b1b;
+  line-height: 1.35;
+}
+
+/* Botão Principal */
+.submitButton {
+  margin-top: 0.35rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid #0b4f6c;
+  border-radius: 6px;
+  background-color: #0b4f6c;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: #083b52;
+  border-color: #083b52;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 3px;
+}
+
+.submitButton:disabled {
+  background-color: #64748b;
+  border-color: #64748b;
+  color: #f8fafc;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loginSpin 0.75s linear infinite;
+}
+
+@keyframes loginSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .passwordToggle,
+  .submitButton {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}
