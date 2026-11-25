@@ -4,13 +4,13 @@
  * Módulos cobertos:
  * - src/app/not-found.tsx
  * - src/components/admin/nav/AdminNav.tsx
- * - src/app/admin/importacoes/historico/page.tsx
- * - src/app/admin/importacoes/historico/loading.tsx
- * - src/app/admin/importacoes/historico/error.tsx
- * - src/app/admin/importacoes/[id]/page.tsx
- * - src/app/admin/importacoes/[id]/loading.tsx
- * - src/app/admin/importacoes/[id]/error.tsx
- * - src/app/admin/importacoes/[id]/not-found.tsx
+ * - src/app/admin/(protected)/importacoes/historico/page.tsx
+ * - src/app/admin/(protected)/importacoes/historico/loading.tsx
+ * - src/app/admin/(protected)/importacoes/historico/error.tsx
+ * - src/app/admin/(protected)/importacoes/[id]/page.tsx
+ * - src/app/admin/(protected)/importacoes/[id]/loading.tsx
+ * - src/app/admin/(protected)/importacoes/[id]/error.tsx
+ * - src/app/admin/(protected)/importacoes/[id]/not-found.tsx
  * - src/components/admin/importacoes/status-badge/ImportStatusBadge.tsx
  * - src/components/admin/importacoes/cancel-modal/ImportCancelModal.tsx
  * - src/components/admin/importacoes/history-view/ImportacaoHistoryView.tsx
@@ -26,16 +26,16 @@ import { AdminNav } from '@/components/admin/nav';
 import ImportacoesHistoryPage, {
   dynamic as historyPageDynamic,
   metadata as historyPageMetadata,
-} from '@/app/admin/importacoes/historico/page';
-import ImportacoesHistoryLoading from '@/app/admin/importacoes/historico/loading';
-import ImportacoesHistoryError from '@/app/admin/importacoes/historico/error';
+} from '@/app/admin/(protected)/importacoes/historico/page';
+import ImportacoesHistoryLoading from '@/app/admin/(protected)/importacoes/historico/loading';
+import ImportacoesHistoryError from '@/app/admin/(protected)/importacoes/historico/error';
 import ImportacaoDetailPage, {
   dynamic as detailPageDynamic,
   metadata as detailPageMetadata,
-} from '@/app/admin/importacoes/[id]/page';
-import ImportacaoDetailLoading from '@/app/admin/importacoes/[id]/loading';
-import ImportacaoDetailError from '@/app/admin/importacoes/[id]/error';
-import ImportacaoDetailNotFound from '@/app/admin/importacoes/[id]/not-found';
+} from '@/app/admin/(protected)/importacoes/[id]/page';
+import ImportacaoDetailLoading from '@/app/admin/(protected)/importacoes/[id]/loading';
+import ImportacaoDetailError from '@/app/admin/(protected)/importacoes/[id]/error';
+import ImportacaoDetailNotFound from '@/app/admin/(protected)/importacoes/[id]/not-found';
 import {
   ImportacaoDetailView,
   ImportacaoHistoryView,
