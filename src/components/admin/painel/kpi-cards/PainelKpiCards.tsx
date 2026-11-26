@@ -17,15 +17,11 @@ export interface PainelKpiCardsProps {
 }
 
 export default function PainelKpiCards({ indicadores }: PainelKpiCardsProps) {
-  const { totalNascentesAtivas, totalImportacoes, ultimaImportacao } = indicadores;
+  const { totalNascentesAtivas, ultimaImportacao } = indicadores;
   const hasActiveSprings = totalNascentesAtivas > 0;
   const formattedSpringsCount = totalNascentesAtivas.toLocaleString('pt-BR');
   const springsUnitLabel =
     totalNascentesAtivas === 1 ? 'nascente publicada' : 'nascentes publicadas';
-  const totalLotsLabel =
-    totalImportacoes === 1
-      ? '1 lote registrado no histórico'
-      : `${totalImportacoes.toLocaleString('pt-BR')} lotes registrados no histórico`;
 
   return (
     <section
@@ -38,16 +34,13 @@ export default function PainelKpiCards({ indicadores }: PainelKpiCardsProps) {
         className={`${styles.card} ${styles.springsCard}`}
         data-testid="kpi-nascentes-ativas"
       >
-        <div className={styles.cardHeader}>
-          <div className={styles.cardHeaderText}>
-            <h2 className={styles.cardTitle}>Nascentes Ativas no Mapa</h2>
-            <span className={styles.cardMetaBadge}>{totalLotsLabel}</span>
-          </div>
+        <div className={styles.springsCardHeader}>
+          <h2 className={styles.cardTitle}>Nascentes Ativas no Mapa</h2>
 
           <span className={styles.springsIconBox} aria-hidden="true">
             <svg
-              width="20"
-              height="20"
+              width="17"
+              height="17"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -59,13 +52,16 @@ export default function PainelKpiCards({ indicadores }: PainelKpiCardsProps) {
         </div>
 
         <div className={styles.springsMetricBody}>
-          <p
-            className={hasActiveSprings ? styles.heroValueActive : styles.heroValueEmpty}
-            data-testid="kpi-nascentes-ativas-valor"
-          >
-            {formattedSpringsCount}
-          </p>
-          <span className={styles.heroUnit}>{springsUnitLabel}</span>
+          <div className={styles.heroMetricRow}>
+            <p
+              className={hasActiveSprings ? styles.heroValueActive : styles.heroValueEmpty}
+              data-testid="kpi-nascentes-ativas-valor"
+            >
+              {formattedSpringsCount}
+            </p>
+            <span className={styles.heroUnit}>{springsUnitLabel}</span>
+          </div>
+
           <p className={styles.cardDescription}>
             {hasActiveSprings
               ? 'Registros validados e disponíveis para consulta pública no mapa do Cariri.'

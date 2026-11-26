@@ -71,7 +71,7 @@ export default async function AdminDashboardPage() {
                 <rect x="14" y="12" width="7" height="9" rx="1" />
                 <rect x="3" y="16" width="7" height="5" rx="1" />
               </svg>
-              VISÃO GERAL OPERACIONAL
+              VISÃO GERAL
             </span>
             <h1 className={styles.pageTitle}>Painel Administrativo</h1>
             <p className={styles.pageSubtitle}>
