@@ -458,10 +458,19 @@ export function isAdminNavItemActive(
     return false;
   }
 
+  const pathOnly = pathname.split(/[?#]/, 1)[0] ?? '';
+  if (!pathOnly) {
+    return false;
+  }
+
   const normalizedPath =
-    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+    pathOnly.length > 1 && pathOnly.endsWith('/') ? pathOnly.slice(0, -1) : pathOnly;
   const normalizedHref =
     href.length > 1 && href.endsWith('/') ? href.slice(0, -1) : href;
+
+  if (normalizedHref === '/admin') {
+    return normalizedPath === '/admin';
+  }
 
   if (normalizedHref === '/admin/importacoes') {
     return normalizedPath === '/admin/importacoes';

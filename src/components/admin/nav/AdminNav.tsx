@@ -4,7 +4,8 @@
  * Nascentes do Cariri — Navegação Principal do Cabeçalho Administrativo
  *
  * Isola o uso de `usePathname()` na menor fronteira cliente possível, mantendo
- * AdminLayout como Server Component e destacando dinamicamente a rota ativa.
+ * AdminLayout como Server Component e destacando dinamicamente a rota ativa
+ * entre os 3 módulos operacionais do MVP.
  */
 
 import Link from 'next/link';
@@ -15,12 +16,10 @@ import styles from './AdminNav.module.css';
 interface AdminNavItem {
   readonly label: string;
   readonly href: string;
-  readonly isPlaceholder?: boolean | undefined;
 }
 
 const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
-  { label: 'Visão Geral', href: '#pagina-futura', isPlaceholder: true },
-  { label: 'Nascentes', href: '#pagina-futura', isPlaceholder: true },
+  { label: 'Visão Geral', href: '/admin' },
   { label: 'Importação de Dados', href: '/admin/importacoes' },
   { label: 'Histórico de Lotes', href: '/admin/importacoes/historico' },
 ];
@@ -30,7 +29,7 @@ export interface AdminNavProps {
 }
 
 export default function AdminNav({
-  fallbackPathname = '/admin/importacoes',
+  fallbackPathname = '/admin',
 }: AdminNavProps) {
   const pathname = usePathname();
   const activePathname = pathname ?? fallbackPathname;
@@ -38,22 +37,6 @@ export default function AdminNav({
   return (
     <ul className={styles.navMenuList}>
       {ADMIN_NAV_ITEMS.map((item) => {
-        if (item.isPlaceholder) {
-          return (
-            <li key={item.label} className={styles.navMenuItem}>
-              <a
-                href={item.href}
-                className={styles.navMenuLink}
-                aria-disabled="true"
-                title="Módulo em desenvolvimento para as próximas sprints"
-                onClick={(event) => event.preventDefault()}
-              >
-                {item.label}
-              </a>
-            </li>
-          );
-        }
-
         const isActive = isAdminNavItemActive(activePathname, item.href);
         return (
           <li key={item.href} className={styles.navMenuItem}>

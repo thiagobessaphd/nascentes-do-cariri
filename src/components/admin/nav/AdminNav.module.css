@@ -72,6 +72,12 @@
   border-radius: 2px;
 }
 
+@media (max-width: 768px) {
+  .navMenuList {
+    gap: 0.25rem 1rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .navMenuLink,
   .navMenuLinkActive {
