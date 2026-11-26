@@ -1256,6 +1256,15 @@ describe('Task-28 — Formatadores de Histórico, Navegação Dinâmica e Guards
   });
 
   describe('isAdminNavItemActive', () => {
+    it('deve destacar Visão Geral apenas em /admin (ou /admin/) sem falso positivo em subrotas', () => {
+      expect(isAdminNavItemActive('/admin', '/admin')).toBe(true);
+      expect(isAdminNavItemActive('/admin/', '/admin')).toBe(true);
+      expect(isAdminNavItemActive('/admin?tab=resumo', '/admin')).toBe(true);
+      expect(isAdminNavItemActive('/admin/importacoes', '/admin')).toBe(false);
+      expect(isAdminNavItemActive('/admin/importacoes/historico', '/admin')).toBe(false);
+      expect(isAdminNavItemActive('/admin/importacoes/42', '/admin')).toBe(false);
+    });
+
     it('deve destacar Importação de Dados apenas em /admin/importacoes sem falso positivo em subrotas', () => {
       expect(isAdminNavItemActive('/admin/importacoes', '/admin/importacoes')).toBe(true);
       expect(isAdminNavItemActive('/admin/importacoes/', '/admin/importacoes')).toBe(true);

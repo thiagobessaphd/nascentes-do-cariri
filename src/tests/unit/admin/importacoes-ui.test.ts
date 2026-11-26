@@ -187,7 +187,9 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
 
       expect(html).toContain('Tela de Login Pública');
       expect(html).not.toContain('Navegação Administrativa');
-      expect(html).not.toContain('Thiago Bessa');
+      expect(html).not.toContain('Visão Geral');
+      expect(html).not.toContain('Perfil do usuário conectado');
+      expect(html).not.toContain('admin-logout-button');
       expect(html).not.toContain('Sair');
     });
 
@@ -200,7 +202,16 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).toContain('aria-label="Área de trabalho de importação e prévia"');
     });
 
-    it('deve exigir sessão válida e renderizar AdminLayout com barra institucional UFCA, item ativo aria-current="page", links #pagina-futura e botão Sair desabilitado', async () => {
+    it('deve exigir sessão válida e renderizar AdminLayout com perfil real, skip link, marca /admin, 3 itens reais e botão Sair desabilitado', async () => {
+      vi.mocked(requireAdminPageSession).mockResolvedValueOnce({
+        id: 7,
+        nome: 'Maria de Lourdes da Silva',
+        email: 'maria.lourdes@ufca.edu.br',
+        ativo: true,
+        sessionId: 202,
+        sessionExpiresAt: new Date('2026-12-31T23:59:59.000Z'),
+      });
+
       const element = await AdminLayout({
         children: React.createElement('div', { id: 'child-content' }, 'Conteúdo Interno'),
       });
@@ -208,10 +219,22 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
 
       expect(requireAdminPageSession).toHaveBeenCalledTimes(1);
       expect(html).toContain('Universidade Federal do Cariri (UFCA)');
+      expect(html).toContain('href="#admin-main"');
+      expect(html).toContain('Pular para o conteúdo principal');
+      expect(html).toContain('href="/admin"');
       expect(html).toContain('href="/admin/importacoes"');
+      expect(html).toContain('href="/admin/importacoes/historico"');
       expect(html).toContain('aria-current="page"');
-      expect(html).toContain('href="#pagina-futura"');
+      expect(html).not.toContain('href="#pagina-futura"');
+      expect(html).not.toContain('Thiago Bessa');
+      expect(html).toContain('Maria de Lourdes da Silva');
+      expect(html).toContain('maria.lourdes@ufca.edu.br');
+      expect(html).toContain('>MS<');
+      expect(html).toContain('role="group"');
+      expect(html).toContain('data-testid="admin-logout-button"');
       expect(html).toContain('aria-disabled="true"');
+      expect(html).not.toContain('Sprint 4');
+      expect(html).not.toContain('202');
       expect(html).toContain('Conteúdo Interno');
     });
 
@@ -621,7 +644,7 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
         },
       } as unknown as Awaited<ReturnType<typeof prisma.sessao.findUnique>>);
 
-      // Testa também a proteção contra Open Redirect (next=//evil.com deve cair em /admin/importacoes)
+      // Testa também a proteção contra Open Redirect (next=//evil.com deve cair em /admin)
       const req = new NextRequest(
         `http://localhost:3000/api/admin/dev-session?token=${encodeURIComponent(validToken)}&next=//evil.com`
       );
@@ -633,7 +656,7 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
         })
       );
       expect(res.status).toBe(303);
-      expect(res.headers.get('location')).toBe('http://localhost:3000/admin/importacoes');
+      expect(res.headers.get('location')).toBe('http://localhost:3000/admin');
       expect(res.headers.get('set-cookie')).toContain('HttpOnly');
       expect(res.headers.get('set-cookie')).toContain('SameSite=Lax');
 

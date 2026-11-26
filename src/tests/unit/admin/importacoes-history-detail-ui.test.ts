@@ -143,15 +143,24 @@ function createDetailDto(
 
 describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Navegação', () => {
   describe('1. Navegação Dinâmica, App Router Pages, Boundaries e 404', () => {
-    it('AdminNav deve destacar dinamicamente a rota ativa entre Importação, Histórico e Detalhe', () => {
+    it('AdminNav deve destacar dinamicamente a rota ativa entre Visão Geral, Importação, Histórico e Detalhe sem placeholders', () => {
+      const overviewPageHtml = renderToStaticMarkup(
+        React.createElement(AdminNav, { fallbackPathname: '/admin' })
+      );
+      expect(overviewPageHtml).toMatch(
+        /<a[^>]*aria-current="page"[^>]*href="\/admin"[^>]*>Visão Geral<\/a>|<a[^>]*href="\/admin"[^>]*aria-current="page"[^>]*>Visão Geral<\/a>/
+      );
+      expect(overviewPageHtml.match(/aria-current="page"/g)).toHaveLength(1);
+
       const importPageHtml = renderToStaticMarkup(
         React.createElement(AdminNav, { fallbackPathname: '/admin/importacoes' })
       );
       expect(importPageHtml).toMatch(
         /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes"[^>]*>Importação de Dados<\/a>|<a[^>]*href="\/admin\/importacoes"[^>]*aria-current="page"[^>]*>Importação de Dados<\/a>/
       );
+      expect(importPageHtml.match(/aria-current="page"/g)).toHaveLength(1);
       expect(importPageHtml).not.toMatch(
-        /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes\/historico"/
+        /<a[^>]*aria-current="page"[^>]*href="\/admin"[^>]*>Visão Geral<\/a>/
       );
 
       const historyPageHtml = renderToStaticMarkup(
@@ -162,9 +171,7 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(historyPageHtml).toMatch(
         /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes\/historico"[^>]*>Histórico de Lotes<\/a>|<a[^>]*href="\/admin\/importacoes\/historico"[^>]*aria-current="page"[^>]*>Histórico de Lotes<\/a>/
       );
-      expect(historyPageHtml).not.toMatch(
-        /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes"[^>]*>Importação de Dados<\/a>/
-      );
+      expect(historyPageHtml.match(/aria-current="page"/g)).toHaveLength(1);
 
       const detailPageHtml = renderToStaticMarkup(
         React.createElement(AdminNav, { fallbackPathname: '/admin/importacoes/42' })
@@ -172,8 +179,10 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(detailPageHtml).toMatch(
         /<a[^>]*aria-current="page"[^>]*href="\/admin\/importacoes\/historico"[^>]*>Histórico de Lotes<\/a>|<a[^>]*href="\/admin\/importacoes\/historico"[^>]*aria-current="page"[^>]*>Histórico de Lotes<\/a>/
       );
-      expect(detailPageHtml).toContain('aria-disabled="true"');
-      expect(detailPageHtml).toContain('Módulo em desenvolvimento para as próximas sprints');
+      expect(detailPageHtml.match(/aria-current="page"/g)).toHaveLength(1);
+      expect(detailPageHtml).not.toContain('#pagina-futura');
+      expect(detailPageHtml).not.toContain('Módulo em desenvolvimento');
+      expect(detailPageHtml).not.toContain('Nascentes');
     });
 
     it('ImportacoesHistoryPage deve declarar robots noindex/nofollow, force-dynamic, <h1> único e sanitizar query params', async () => {
