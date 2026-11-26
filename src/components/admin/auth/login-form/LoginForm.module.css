@@ -98,7 +98,7 @@
   width: 100%;
   min-height: 46px;
   padding: 0.625rem 0.875rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #758599;
   border-radius: 6px;
   background-color: #ffffff;
   color: #0f172a;
@@ -109,11 +109,10 @@
 
 .input::placeholder {
   color: #64748b;
-  opacity: 0.85;
 }
 
 .input:hover:not(:read-only) {
-  border-color: #94a3b8;
+  border-color: #475569;
 }
 
 .input:focus-visible {

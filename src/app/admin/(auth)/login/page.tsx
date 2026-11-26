@@ -69,7 +69,7 @@ export default async function AdminLoginPage({
         <div className={styles.photoOverlay} aria-hidden="true" />
 
         <div className={styles.photoHeroContent}>
-          <h2 className={styles.heroProjectTitle}>Projeto <br />Nascentes do Cariri</h2>
+          <p className={styles.heroProjectTitle}>Projeto <br />Nascentes do Cariri</p>
           <div className={styles.heroAccentBar} aria-hidden="true" />
           <p className={styles.heroDescription}>
             Conhecer as nascentes é o primeiro passo para protegê-las.

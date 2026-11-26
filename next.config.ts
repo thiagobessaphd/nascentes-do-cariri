@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["@prisma/adapter-mariadb", "mariadb"],
   poweredByHeader: false,
+  images: {
+    qualities: [75, 90],
+  },
   allowedDevOrigins: getLocalDevOrigins(),
   async headers() {
     return getSecurityHeaders();

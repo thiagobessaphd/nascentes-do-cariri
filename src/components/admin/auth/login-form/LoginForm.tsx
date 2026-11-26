@@ -207,6 +207,7 @@ export function LoginFormView({
         {fieldErrors.email ? (
           <p
             id="admin-login-email-error"
+            aria-live="polite"
             className={styles.fieldError}
             data-testid="login-email-error"
           >
@@ -307,6 +308,7 @@ export function LoginFormView({
         {fieldErrors.password ? (
           <p
             id="admin-login-password-error"
+            aria-live="polite"
             className={styles.fieldError}
             data-testid="login-password-error"
           >
@@ -381,6 +383,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
   const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
   const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState(0);
   const [alertFocusTick, setAlertFocusTick] = useState(0);
+  const [fieldErrorFocusTick, setFieldErrorFocusTick] = useState(0);
 
   const isSubmittingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -399,6 +402,18 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
       alertRef.current?.focus();
     }
   }, [alertFocusTick, globalAlert]);
+
+  useEffect(() => {
+    if (fieldErrorFocusTick <= 0) {
+      return;
+    }
+
+    if (fieldErrors.email) {
+      emailInputRef.current?.focus();
+    } else if (fieldErrors.password) {
+      passwordInputRef.current?.focus();
+    }
+  }, [fieldErrorFocusTick, fieldErrors]);
 
   useEffect(() => {
     if (cooldownUntilMs === null) {
@@ -423,14 +438,6 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
     };
   }, [cooldownUntilMs]);
 
-  const focusFirstFieldError = (errors: AuthFieldErrors): void => {
-    if (errors.email) {
-      emailInputRef.current?.focus();
-    } else if (errors.password) {
-      passwordInputRef.current?.focus();
-    }
-  };
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
@@ -454,7 +461,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
       setFieldErrors(validation.fieldErrors);
       setGlobalAlert(null);
       setStatusAnnouncement(null);
-      focusFirstFieldError(validation.fieldErrors);
+      setFieldErrorFocusTick((prev) => prev + 1);
       return;
     }
 
@@ -489,7 +496,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
 
       if (error instanceof AuthClientError && error.statusCode === 400 && error.fieldErrors) {
         setFieldErrors(error.fieldErrors);
-        focusFirstFieldError(error.fieldErrors);
+        setFieldErrorFocusTick((prev) => prev + 1);
         return;
       }
 
