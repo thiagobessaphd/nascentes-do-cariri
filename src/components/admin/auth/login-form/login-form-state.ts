@@ -213,5 +213,5 @@ export function getSubmitButtonLabel(params: {
     return `Aguarde ${formatCooldownRemainingPtBr(params.cooldownRemainingSeconds)}`;
   }
 
-  return 'Entrar no Painel';
+  return 'Entrar';
 }

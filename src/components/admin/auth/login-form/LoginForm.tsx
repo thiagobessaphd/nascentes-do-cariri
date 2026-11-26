@@ -7,7 +7,14 @@
  * foco e leitores de tela, proteção contra envios duplicados e cooldown anti-abuso.
  */
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type RefObject,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DEFAULT_ADMIN_REDIRECT_PATH,
@@ -32,184 +39,49 @@ export interface LoginFormProps {
   readonly redirectTo?: string | undefined;
 }
 
-export default function LoginForm({ redirectTo }: LoginFormProps) {
-  const router = useRouter();
-  const safeRedirectTo = sanitizeAdminRedirectPath(
-    redirectTo,
-    DEFAULT_ADMIN_REDIRECT_PATH
-  );
+export interface LoginFormViewProps {
+  readonly email: string;
+  readonly password: string;
+  readonly showPassword: boolean;
+  readonly fieldErrors: AuthFieldErrors;
+  readonly globalAlert: LoginGlobalAlert | null;
+  readonly statusAnnouncement: string | null;
+  readonly isSubmitting: boolean;
+  readonly isRedirecting: boolean;
+  readonly cooldownRemainingSeconds: number;
+  readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  readonly onEmailChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  readonly onPasswordChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  readonly onTogglePassword: () => void;
+  readonly emailInputRef?: RefObject<HTMLInputElement | null> | undefined;
+  readonly passwordInputRef?: RefObject<HTMLInputElement | null> | undefined;
+  readonly alertRef?: RefObject<HTMLDivElement | null> | undefined;
+}
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
-  const [globalAlert, setGlobalAlert] = useState<LoginGlobalAlert | null>(null);
-  const [statusAnnouncement, setStatusAnnouncement] = useState<string | null>(null);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
-  const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
-  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState(0);
-  const [alertFocusTick, setAlertFocusTick] = useState(0);
-
-  const isSubmittingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const emailInputRef = useRef<HTMLInputElement | null>(null);
-  const passwordInputRef = useRef<HTMLInputElement | null>(null);
-  const alertRef = useRef<HTMLDivElement | null>(null);
-
-  // Aborta requisição em andamento se o componente desmontar
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
-
-  // Move foco acessível para o alerta global quando erro de autenticação/rate-limit ocorre
-  useEffect(() => {
-    if (alertFocusTick > 0 && globalAlert !== null) {
-      alertRef.current?.focus();
-    }
-  }, [alertFocusTick, globalAlert]);
-
-  // Atualiza contagem regressiva sem usar setState síncrono no corpo do efeito
-  useEffect(() => {
-    if (cooldownUntilMs === null) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      const remaining = getCooldownRemainingSeconds(cooldownUntilMs, Date.now());
-      setCooldownRemainingSeconds(remaining);
-
-      if (remaining <= 0) {
-        clearInterval(intervalId);
-        setCooldownUntilMs(null);
-        setStatusAnnouncement(
-          'Bloqueio temporário encerrado. Você já pode tentar entrar novamente.'
-        );
-      }
-    }, 500);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [cooldownUntilMs]);
-
+/**
+ * Camada de apresentação pura e acessível do formulário de login administrativo.
+ */
+export function LoginFormView({
+  email,
+  password,
+  showPassword,
+  fieldErrors,
+  globalAlert,
+  statusAnnouncement,
+  isSubmitting,
+  isRedirecting,
+  cooldownRemainingSeconds,
+  onSubmit,
+  onEmailChange,
+  onPasswordChange,
+  onTogglePassword,
+  emailInputRef,
+  passwordInputRef,
+  alertRef,
+}: LoginFormViewProps) {
   const isCooldownActive = cooldownRemainingSeconds > 0;
   const isBusy = isSubmitting || isRedirecting;
   const isSubmitDisabled = isBusy || isCooldownActive;
-
-  const focusFirstFieldError = (errors: AuthFieldErrors): void => {
-    if (errors.email) {
-      emailInputRef.current?.focus();
-    } else if (errors.password) {
-      passwordInputRef.current?.focus();
-    }
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-
-    if (isSubmittingRef.current || isRedirecting) {
-      return;
-    }
-
-    if (cooldownUntilMs !== null) {
-      const remainingNow = getCooldownRemainingSeconds(cooldownUntilMs, Date.now());
-      if (remainingNow > 0) {
-        setCooldownRemainingSeconds(remainingNow);
-        setAlertFocusTick((prev) => prev + 1);
-        return;
-      }
-      setCooldownUntilMs(null);
-      setCooldownRemainingSeconds(0);
-    }
-
-    const validation = validateLoginInput({ email, password });
-    if (!validation.success) {
-      setFieldErrors(validation.fieldErrors);
-      setGlobalAlert(null);
-      setStatusAnnouncement(null);
-      focusFirstFieldError(validation.fieldErrors);
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
-    setFieldErrors({});
-    setGlobalAlert(null);
-    setStatusAnnouncement(null);
-
-    abortControllerRef.current?.abort();
-    const requestController = new AbortController();
-    abortControllerRef.current = requestController;
-
-    try {
-      await loginAdmin(validation.data, { signal: requestController.signal });
-
-      // Limpa credencial sensível da memória local após autenticação
-      setPassword('');
-      setConsecutiveFailures(0);
-      setCooldownUntilMs(null);
-      setCooldownRemainingSeconds(0);
-      setIsRedirecting(true);
-      setStatusAnnouncement(
-        'Autenticação realizada com sucesso. Redirecionando para o painel administrativo...'
-      );
-
-      router.replace(safeRedirectTo);
-      router.refresh();
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-
-      if (error instanceof AuthClientError && error.statusCode === 400 && error.fieldErrors) {
-        setFieldErrors(error.fieldErrors);
-        focusFirstFieldError(error.fieldErrors);
-        return;
-      }
-
-      const nowMs = Date.now();
-      const failureDetails =
-        error instanceof AuthClientError
-          ? {
-              statusCode: error.statusCode,
-              code: error.code,
-              message: error.message,
-              retryAfterSeconds: error.retryAfterSeconds,
-              isNetworkError: error.isNetworkError,
-              isTimeout: error.isTimeout,
-            }
-          : {
-              message: 'Não foi possível concluir o acesso. Tente novamente.',
-            };
-
-      const nextFailureState = resolveLoginFailureState({
-        ...failureDetails,
-        previousConsecutiveFailures: consecutiveFailures,
-        previousCooldownUntilMs: cooldownUntilMs,
-        nowMs,
-      });
-
-      setConsecutiveFailures(nextFailureState.consecutiveAuthFailures);
-      setCooldownUntilMs(nextFailureState.cooldownUntilMs);
-      setCooldownRemainingSeconds(
-        getCooldownRemainingSeconds(nextFailureState.cooldownUntilMs, nowMs)
-      );
-      setGlobalAlert(nextFailureState.alert);
-      setAlertFocusTick((prev) => prev + 1);
-    } finally {
-      if (abortControllerRef.current === requestController) {
-        abortControllerRef.current = null;
-      }
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
-    }
-  };
 
   const buttonLabel = getSubmitButtonLabel({
     isSubmitting,
@@ -220,7 +92,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
   return (
     <form
       method="post"
-      onSubmit={handleSubmit}
+      onSubmit={onSubmit}
       noValidate
       className={styles.form}
       data-testid="admin-login-form"
@@ -291,7 +163,12 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
       ) : null}
 
       {/* Anúncio discreto para transição de sucesso ou fim de bloqueio */}
-      <div role="status" aria-live="polite" className={styles.srOnly} data-testid="login-status-live">
+      <div
+        role="status"
+        aria-live="polite"
+        className={styles.srOnly}
+        data-testid="login-status-live"
+      >
         {statusAnnouncement ?? ''}
       </div>
 
@@ -318,12 +195,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
           }
           readOnly={isBusy}
           value={email}
-          onChange={(event) => {
-            setEmail(event.target.value);
-            if (fieldErrors.email) {
-              setFieldErrors((prev) => ({ password: prev.password }));
-            }
-          }}
+          onChange={onEmailChange}
           placeholder="nome.sobrenome@ufca.edu.br"
           className={
             fieldErrors.email
@@ -376,12 +248,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
             }
             readOnly={isBusy}
             value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              if (fieldErrors.password) {
-                setFieldErrors((prev) => ({ email: prev.email }));
-              }
-            }}
+            onChange={onPasswordChange}
             placeholder="Digite sua senha de acesso"
             className={
               fieldErrors.password
@@ -394,7 +261,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
           <button
             type="button"
             className={styles.passwordToggle}
-            onClick={() => setShowPassword((prev) => !prev)}
+            onClick={onTogglePassword}
             disabled={isBusy}
             aria-pressed={showPassword}
             aria-label={
@@ -490,5 +357,208 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
         <span>{buttonLabel}</span>
       </button>
     </form>
+  );
+}
+
+export default function LoginForm({ redirectTo }: LoginFormProps) {
+  const router = useRouter();
+  const safeRedirectTo = sanitizeAdminRedirectPath(
+    redirectTo,
+    DEFAULT_ADMIN_REDIRECT_PATH
+  );
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
+  const [globalAlert, setGlobalAlert] = useState<LoginGlobalAlert | null>(null);
+  const [statusAnnouncement, setStatusAnnouncement] = useState<string | null>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
+  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState(0);
+  const [alertFocusTick, setAlertFocusTick] = useState(0);
+
+  const isSubmittingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const alertRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (alertFocusTick > 0 && globalAlert !== null) {
+      alertRef.current?.focus();
+    }
+  }, [alertFocusTick, globalAlert]);
+
+  useEffect(() => {
+    if (cooldownUntilMs === null) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      const remaining = getCooldownRemainingSeconds(cooldownUntilMs, Date.now());
+      setCooldownRemainingSeconds(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(intervalId);
+        setCooldownUntilMs(null);
+        setStatusAnnouncement(
+          'Bloqueio temporário encerrado. Você já pode tentar entrar novamente.'
+        );
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [cooldownUntilMs]);
+
+  const focusFirstFieldError = (errors: AuthFieldErrors): void => {
+    if (errors.email) {
+      emailInputRef.current?.focus();
+    } else if (errors.password) {
+      passwordInputRef.current?.focus();
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+
+    if (isSubmittingRef.current || isRedirecting) {
+      return;
+    }
+
+    if (cooldownUntilMs !== null) {
+      const remainingNow = getCooldownRemainingSeconds(cooldownUntilMs, Date.now());
+      if (remainingNow > 0) {
+        setCooldownRemainingSeconds(remainingNow);
+        setAlertFocusTick((prev) => prev + 1);
+        return;
+      }
+      setCooldownUntilMs(null);
+      setCooldownRemainingSeconds(0);
+    }
+
+    const validation = validateLoginInput({ email, password });
+    if (!validation.success) {
+      setFieldErrors(validation.fieldErrors);
+      setGlobalAlert(null);
+      setStatusAnnouncement(null);
+      focusFirstFieldError(validation.fieldErrors);
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setFieldErrors({});
+    setGlobalAlert(null);
+    setStatusAnnouncement(null);
+
+    abortControllerRef.current?.abort();
+    const requestController = new AbortController();
+    abortControllerRef.current = requestController;
+
+    try {
+      await loginAdmin(validation.data, { signal: requestController.signal });
+
+      setPassword('');
+      setConsecutiveFailures(0);
+      setCooldownUntilMs(null);
+      setCooldownRemainingSeconds(0);
+      setIsRedirecting(true);
+      setStatusAnnouncement(
+        'Autenticação realizada com sucesso. Redirecionando para o painel administrativo...'
+      );
+
+      router.replace(safeRedirectTo);
+      router.refresh();
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+
+      if (error instanceof AuthClientError && error.statusCode === 400 && error.fieldErrors) {
+        setFieldErrors(error.fieldErrors);
+        focusFirstFieldError(error.fieldErrors);
+        return;
+      }
+
+      const nowMs = Date.now();
+      const failureDetails =
+        error instanceof AuthClientError
+          ? {
+              statusCode: error.statusCode,
+              code: error.code,
+              message: error.message,
+              retryAfterSeconds: error.retryAfterSeconds,
+              isNetworkError: error.isNetworkError,
+              isTimeout: error.isTimeout,
+            }
+          : {
+              message: 'Não foi possível concluir o acesso. Tente novamente.',
+            };
+
+      const nextFailureState = resolveLoginFailureState({
+        ...failureDetails,
+        previousConsecutiveFailures: consecutiveFailures,
+        previousCooldownUntilMs: cooldownUntilMs,
+        nowMs,
+      });
+
+      setConsecutiveFailures(nextFailureState.consecutiveAuthFailures);
+      setCooldownUntilMs(nextFailureState.cooldownUntilMs);
+      setCooldownRemainingSeconds(
+        getCooldownRemainingSeconds(nextFailureState.cooldownUntilMs, nowMs)
+      );
+      setGlobalAlert(nextFailureState.alert);
+      setAlertFocusTick((prev) => prev + 1);
+    } finally {
+      if (abortControllerRef.current === requestController) {
+        abortControllerRef.current = null;
+      }
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <LoginFormView
+      email={email}
+      password={password}
+      showPassword={showPassword}
+      fieldErrors={fieldErrors}
+      globalAlert={globalAlert}
+      statusAnnouncement={statusAnnouncement}
+      isSubmitting={isSubmitting}
+      isRedirecting={isRedirecting}
+      cooldownRemainingSeconds={cooldownRemainingSeconds}
+      onSubmit={handleSubmit}
+      onEmailChange={(event) => {
+        setEmail(event.target.value);
+        if (fieldErrors.email) {
+          setFieldErrors((prev) => ({ password: prev.password }));
+        }
+      }}
+      onPasswordChange={(event) => {
+        setPassword(event.target.value);
+        if (fieldErrors.password) {
+          setFieldErrors((prev) => ({ email: prev.email }));
+        }
+      }}
+      onTogglePassword={() => setShowPassword((prev) => !prev)}
+      emailInputRef={emailInputRef}
+      passwordInputRef={passwordInputRef}
+      alertRef={alertRef}
+    />
   );
 }
