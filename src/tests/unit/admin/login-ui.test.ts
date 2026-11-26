@@ -117,6 +117,12 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
 
       expect(cspHeader?.value).toBe(FRAMING_POLICIES.RESTRICTED_NONE);
       expect(xfoHeader?.value).toBe('DENY');
+
+      const nextConfigSource = fs.readFileSync(
+        path.resolve(process.cwd(), 'next.config.ts'),
+        'utf-8'
+      );
+      expect(nextConfigSource).toMatch(/qualities:\s*\[\s*75\s*,\s*90\s*\]/);
     });
 
     it('deve renderizar AdminLoginPage para visitante não autenticado sem vazar navegação ou perfil do painel interno', async () => {
@@ -125,6 +131,7 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
 
       expect(html).toContain('<main id="login-main"');
       expect(html).toContain('<h1 id="admin-login-heading"');
+      expect(html).not.toContain('<h2');
       expect(html).toContain('Administrativo');
       expect(html).toContain('Nascentes do Cariri');
       expect(html).toContain('href="/mapa"');
@@ -293,6 +300,7 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
         /id="admin-login-email"[^>]*aria-invalid="true"[^>]*aria-describedby="admin-login-email-error"/
       );
       expect(html).toContain('id="admin-login-email-error"');
+      expect(html).toContain('aria-live="polite"');
       expect(html).toContain('Informe um e-mail válido.');
 
       expect(html).toMatch(
