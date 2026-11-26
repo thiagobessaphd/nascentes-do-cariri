@@ -14,3 +14,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Reserva espaço fixo da barra de rolagem nas rotas do painel administrativo,
+   evitando deslocamento horizontal ao alternar entre páginas curtas e longas. */
+html:has([data-admin-shell]) {
+  scrollbar-gutter: stable;
+}

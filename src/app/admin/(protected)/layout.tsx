@@ -28,7 +28,7 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
   const profile = toAdminProfileView(session);
 
   return (
-    <div className={styles.adminShell}>
+    <div className={styles.adminShell} data-admin-shell="true">
       {/* Atalho de acessibilidade por teclado para o conteúdo principal */}
       <a href="#admin-main" className={styles.skipLink}>
         Pular para o conteúdo principal
