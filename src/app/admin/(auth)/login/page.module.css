@@ -1,314 +1,282 @@
 /**
- * Nascentes do Cariri — Estilos da Página de Login Administrativo (/admin/login)
+ * Nascentes do Cariri — Estilos Split-Screen da Página de Login (/admin/login)
  */
 
-.loginShell {
+.splitShell {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #f4f6f8;
-  background-image: radial-gradient(
-    ellipse at top center,
-    rgba(82, 195, 208, 0.12) 0%,
-    rgba(11, 79, 108, 0.04) 40%,
-    transparent 72%
-  );
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(420px, 52%) 1fr;
+  background-color: #ffffff;
   color: #1e293b;
 }
 
-/* Cabeçalho Superior Institucional */
-.topHeader {
-  width: 100%;
-}
-
-.institutionalTopBar {
-  background-color: #261006;
-  color: #f8fafc;
-  font-size: 0.75rem;
-  border-bottom: 1px solid #3b180b;
-}
-
-.topBarContainer {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0.5rem 1.5rem;
+/* Metade Esquerda: Fotografia + Overlay + Nome do Projeto */
+.photoPane {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: #0b221e;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.875rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 3.5rem 3.25rem;
+  border-right: 1px solid rgba(15, 23, 42, 0.12);
 }
 
-.topBarInstitution {
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #f1f5f9;
-  font-size: 0.71875rem;
+.photoImage {
+  object-fit: cover;
+  object-position: center 46%;
+  transform: scale(1.015);
+  filter: blur(0.35px) saturate(1.05) contrast(1.02);
 }
 
-.topBarMeta {
+.photoOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 18, 24, 0) 0%,
+    rgba(6, 18, 24, 0) 45%,
+    rgba(6, 18, 24, 0.35) 64%,
+    rgba(6, 18, 24, 0.72) 82%,
+    rgba(6, 18, 24, 0.9) 100%
+  );
+  background:
+    linear-gradient(
+      90deg,
+      rgba(6, 18, 24, 0) 0%,
+      rgba(6, 18, 24, 0.16) 50%,
+      rgba(6, 18, 24, 0.82) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(6, 18, 24, 0) 0%,
+      rgba(6, 18, 24, 0) 45%,
+      rgba(6, 18, 24, 0.4) 64%,
+      rgba(6, 18, 24, 0.85) 82%,
+      rgba(6, 18, 24, 0.9) 100%
+    );
+}
+
+.photoHeroContent {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.restrictedBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: #e2e8f0;
-  font-weight: 600;
-  font-size: 0.6875rem;
-  letter-spacing: 0.03em;
-}
-
-.topBarDivider {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 0.6875rem;
-  user-select: none;
-}
-
-.topBarMapLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 36px;
-  color: #f8fafc;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: none;
-  padding: 0.3rem 0.75rem;
-  border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.topBarMapLink:hover {
-  background-color: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.32);
   color: #ffffff;
 }
 
-.topBarMapLink:focus-visible {
-  outline: 2px solid #52c3d0;
-  outline-offset: 2px;
+.heroProjectTitle {
+  margin: 0;
+  font-size: clamp(2rem, 2.8vw, 2.625rem);
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
 }
 
-.ufcaAccentStrip {
-  height: 3px;
-  width: 100%;
+.heroAccentBar {
+  width: 84px;
+  height: 4px;
+  border-radius: 2px;
   background: linear-gradient(
     90deg,
-    #331509 0%,
-    #331509 25%,
-    #f17d42 25%,
-    #f17d42 45%,
-    #f9c23c 45%,
-    #f9c23c 62%,
-    #7bc142 62%,
-    #7bc142 80%,
-    #52c3d0 80%,
-    #52c3d0 100%
+    #16a34a 0%,
+    #22c55e 36%,
+    #0ea5e9 64%,
+    #0284c7 100%
   );
 }
 
-/* Área Central e Cartão */
-.loginMain {
+.heroDescription {
+  margin: 0.125rem 0 0;
+  font-size: 1.03125rem;
+  font-weight: 500;
+  color: rgba(241, 245, 249, 0.94);
+  line-height: 1.55;
+  max-width: 42ch;
+}
+
+/* Metade Direita: Área de Autenticação */
+.authPane {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+}
+
+.paneAccentStrip {
+  height: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    #166534 0%,
+    #22c55e 36%,
+    #0ea5e9 64%,
+    #0b4f6c 100%
+  );
+}
+
+.authContentWrapper {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.25rem;
+  gap: 0.75rem;
+  padding: 2.5rem 2rem 1.5rem;
+}
+
+.loginMain {
+  width: 100%;
+  max-width: 448px;
 }
 
 .loginMain:focus {
   outline: none;
 }
 
-.loginCard {
+.loginSection {
   width: 100%;
-  max-width: 456px;
-  background-color: #ffffff;
-  border: 1px solid #d8dee9;
-  border-top: 4px solid #0b4f6c;
-  border-radius: 8px;
-  padding: 2rem 2rem 1.625rem;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.875rem;
 }
 
-.cardHeader {
+.headerBlock {
+  text-align: center;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.45rem;
 }
 
-.brandRow {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0.35rem;
-}
-
-.brandLogo {
-  height: 34px;
-  width: auto;
-  object-fit: contain;
-  display: block;
-  mix-blend-mode: multiply;
-}
-
-.projectOverline {
-  font-size: 0.6875rem;
-  font-weight: 700;
+/* Exibido no mobile quando o painel fotográfico da esquerda fica oculto */
+.mobileProjectOverline {
+  display: none;
+  font-size: 0.9375rem;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #0b4f6c;
 }
 
-.cardTitle {
+.pageTitle {
   margin: 0;
-  font-size: 1.4375rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #0f172a;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
-.cardSubtitle {
-  margin: 0.15rem 0 0;
-  font-size: 0.875rem;
-  color: #475569;
-  line-height: 1.5;
-}
-
-.cardFooterNotice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
-  font-size: 0.75rem;
-  color: #475569;
+.pageSubtitle {
+  margin: 0.125rem 0 0;
+  font-size: 1rem;
+  color: #64748b;
   line-height: 1.45;
 }
 
-.cardFooterNotice svg {
-  flex-shrink: 0;
-  margin-top: 0.1rem;
+.backLinkRow {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.backToMapLink {
+  min-height: 44px;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  text-decoration: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.backToMapLink:hover {
   color: #0b4f6c;
+  background-color: #f8fafc;
 }
 
-/* Rodapé Institucional */
-.loginFooter {
-  background-color: #ffffff;
-  border-top: 1px solid #d8dee9;
+.backToMapLink:focus-visible {
+  outline: 2px solid #0b4f6c;
+  outline-offset: 2px;
 }
 
-.footerContainer {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0.75rem 1.5rem;
+/* Logos Institucionais Centralizadas Abaixo do Formulário */
+.logosFooter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
 }
 
-.footerLogoWrapper {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-shrink: 0;
-}
-
-.footerLogoDivider {
-  width: 1px;
-  height: 34px;
-  background-color: #cbd5e1;
-}
-
-.footerLogoImg {
-  width: 88px;
-  height: 88px;
+.partnerLogo {
+  width: 112px;
+  height: 112px;
   object-fit: contain;
   flex-shrink: 0;
   mix-blend-mode: multiply;
+  opacity: 0.95;
 }
 
-.footerInfoArea {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  gap: 0.125rem;
+.logoDivider {
+  width: 1px;
+  height: 40px;
+  background-color: #cbd5e1;
 }
 
-.footerUniversityName {
-  font-size: 0.78125rem;
-  font-weight: 700;
-  color: #331509;
-  margin: 0;
-  letter-spacing: 0.02em;
-}
-
-.footerProjectName {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0;
-}
-
-.footerDepartment {
-  font-size: 0.6875rem;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.35;
-}
-
-@media (max-width: 640px) {
-  .topBarContainer {
-    padding: 0.5rem 1rem;
+@media (max-width: 960px) {
+  .splitShell {
+    grid-template-columns: 1fr;
   }
 
-  .topBarDivider,
-  .restrictedBadge {
+  .photoPane {
     display: none;
   }
 
-  .loginMain {
-    padding: 1.5rem 0.875rem;
-    align-items: flex-start;
+  .mobileProjectOverline {
+    display: inline-block;
+  }
+}
+
+@media (max-width: 480px) {
+  .authContentWrapper {
+    padding: 1.75rem 1.25rem 1.25rem;
   }
 
-  .loginCard {
-    padding: 1.5rem 1.25rem 1.375rem;
+  .loginSection {
+    gap: 1.375rem;
   }
 
-  .cardTitle {
-    font-size: 1.25rem;
+  .pageTitle {
+    font-size: 1.3125rem;
   }
 
-  .footerContainer {
-    padding: 1.125rem 1rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.875rem;
+  .logosFooter {
+    gap: 1rem;
   }
 
-  .footerInfoArea {
-    align-items: flex-start;
-    text-align: left;
+  .partnerLogo {
+    width: 84px;
+    height: 84px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .topBarMapLink {
+  .backToMapLink {
     transition: none;
   }
 }
