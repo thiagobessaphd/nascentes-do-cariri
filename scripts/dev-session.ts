@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     console.log(`Administrador : ${admin.nome} <${admin.email}> (ID: ${admin.id})`);
     console.log(`Sessão ID     : ${persisted.sessionId} (expira em ${persisted.expiresAt.toISOString()})`);
     console.log('');
-    console.log('1) Para autenticar o navegador (grava cookie HttpOnly e redireciona para /admin/importacoes):');
+    console.log('1) Para autenticar o navegador (grava cookie HttpOnly e redireciona para /admin):');
     console.log(`   ${activationUrl}`);
     console.log('');
     console.log('2) Para testar endpoints diretamente via curl/Postman:');
