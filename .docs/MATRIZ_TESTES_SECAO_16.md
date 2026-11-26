@@ -271,6 +271,29 @@ A matriz estabelece para cada requisito:
     - Validação local antecipada sem exposição de senha em erros ou `Web Storage`, mascaramento de falhas `5xx`, controle de timeout (`REQUEST_TIMEOUT`) e propagação de `AbortError`.
     - Mensagem genérica idêntica (`E-mail ou senha inválidos.`) para e-mail inexistente, senha incorreta ou conta inativa, controle de envios simultâneos, *backoff* progressivo a partir da 3ª falha consecutiva (`3s`, `6s`, `10s`) e *cooldown* com contagem regressiva (`aria-live="off"`) sincronizado ao cabeçalho `Retry-After` em respostas `429 RATE_LIMITED`.
 
+### 3.16. Shell Administrativo Responsivo e Resumo Operacional do Painel (`US-16` / `Task-31` / `RNF06` / `CT-BE-02`)
+* **Arquivos:**
+  - `src/tests/unit/modules/painel/painel.service.test.ts`
+  - `src/tests/unit/modules/painel/painel.route.test.ts`
+  - `src/tests/unit/services/painel-client.test.ts`
+  - `src/tests/unit/admin/dashboard-ui.test.ts`
+  - `src/tests/integration/dashboard/admin-dashboard.test.ts`
+  - `src/tests/integration/auth/admin-guard.test.ts`
+  - `src/tests/unit/security/framing-headers.test.ts`
+  - `src/tests/unit/security/proxy.test.ts`
+  - `src/tests/unit/services/importacoes-client.test.ts`
+* **Regras Verificadas:**
+  - **Serviço de Resumo, API Protegida e Contrato Zod v4 `.strict()` (`GET /api/admin/resumo`):**
+    - Consultas paralelas no MySQL (`Promise.all`) contabilizando estritamente `nascentes` com `ativo = true` (ignorando inativas), limitando o histórico recente a 5 lotes ordenados por `(createdAt DESC, id DESC)` com *tie-breaker* determinístico e derivando `ultimaImportacao` do primeiro lote sem query adicional.
+    - Projeção fechada (`ADMIN_RESUMO_IMPORTACAO_SELECT`) e validação `z.iso.datetime()` + `.strict()` impedindo vazamento de `caminhoPrivadoArquivo`, `hashArquivo`, `mensagemErro`, `passwordHash`, `tokenHash` e `usuario.email`.
+    - Proteção `401` (sem sessão/revogada), `403` (conta inativa), `405 Method Not Allowed` (`Allow: GET`) e mascaramento `500`, todos com `Cache-Control: no-store, no-cache, must-revalidate, private` e `Pragma: no-cache`.
+  - **Defesa em Profundidade, Framing e Roteamento (`/admin` e `/api/admin/resumo`):**
+    - Execução autoritativa de `requireAdminPageSession({ nextPath: '/admin' })` também em `src/app/admin/(protected)/page.tsx` antes da consulta ao banco (protegendo *soft navigation* no App Router), `DEFAULT_ADMIN_REDIRECT_PATH = '/admin'`, cobertura `frame-ancestors 'none'` + `X-Frame-Options: DENY` em `/admin` e `/api/admin/resumo`, e interceptação de borda em `src/proxy.ts`.
+  - **Shell Responsivo, Navegação Ativa, 4 Estados de UI e Acessibilidade (`RNF06`):**
+    - Identidade real do administrador conectado (`nome`, `email`, iniciais Unicode/`pt-BR` e truncamento seguro) sem vazar `sessionId`, *skip link* (`#admin-main`), `<nav>` separado de `role="group"`, marca unificada `/admin`, botão `Sair` preservado em `aria-disabled="true"` (fronteira `Task-32`) e `scrollbar-gutter: stable` isolado ao shell administrativo.
+    - `AdminNav` restrito aos 3 módulos do MVP (`Visão Geral`, `Importação de Dados`, `Histórico de Lotes`) com correspondência exata em `/admin` (exatamente 1 `aria-current="page"` por rota).
+    - Cobertura SSR dos estados **carregamento** (skeletons CSS suaves sem spinners), **populado** (KPIs com `tabular-nums`, `ImportStatusBadge`, data `America/Fortaleza`, tabela desktop + cards mobile `360px`), **vazio** (total e parciais com CTA para primeira importação) e **erro** (`role="alert"`, retry recuperável e variante de sessão expirada sem detalhes técnicos).
+
 ---
 
 ## 4. Scripts Automatizados
