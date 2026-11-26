@@ -121,8 +121,8 @@ export default async function AdminLoginPage({
             <Image
               src={logoUfcaFull}
               alt="Universidade Federal do Cariri (UFCA)"
-              width={112}
-              height={112}
+              width={88}
+              height={88}
               className={styles.partnerLogo}
               priority
             />
@@ -130,8 +130,8 @@ export default async function AdminLoginPage({
             <Image
               src={logoCnpq}
               alt="CNPq — Conselho Nacional de Desenvolvimento Científico e Tecnológico"
-              width={112}
-              height={112}
+              width={88}
+              height={88}
               className={styles.partnerLogo}
               priority
             />
