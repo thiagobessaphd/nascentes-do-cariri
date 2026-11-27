@@ -15,7 +15,6 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '@/lib/db/prisma';
 import { AppError } from '@/lib/errors';
 import {
-  ADMIN_RECENT_IMPORTACOES_LIMIT,
   PAINEL_ERROR_CODES,
   type AdminResumoImportacaoItemDto,
   type AdminResumoResponseDto,
@@ -98,7 +97,7 @@ export class PainelService implements IPainelService {
       );
     }
 
-    const recentLimit = parsedOptions.data.recentLimit ?? ADMIN_RECENT_IMPORTACOES_LIMIT;
+    const { recentLimit } = parsedOptions.data;
     const now = options?.now ?? new Date();
 
     const [totalNascentesAtivas, recentRows, totalImportacoes] = await Promise.all([

@@ -69,7 +69,7 @@ export const adminResumoIndicadoresSchema = z
 
 export const adminResumoMetaSchema = z
   .object({
-    recentLimit: z.number().int().positive(),
+    recentLimit: z.number().int().positive().max(MAX_ADMIN_RECENT_IMPORTACOES_LIMIT),
     generatedAt: z.iso.datetime(),
   })
   .strict();
@@ -151,7 +151,11 @@ function sanitizeDisplayText(rawValue: string | null | undefined): string {
     return '';
   }
 
-  return rawValue.replace(CONTROL_CHARS_REGEX, ' ').replace(/\s+/g, ' ').trim();
+  return rawValue
+    .normalize('NFC')
+    .replace(CONTROL_CHARS_REGEX, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function extractLeadingChars(token: string, count: number): string {

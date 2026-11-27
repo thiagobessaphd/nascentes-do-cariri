@@ -186,6 +186,7 @@ export default function PainelKpiCards({ indicadores }: PainelKpiCardsProps) {
               <Link
                 href={`/admin/importacoes/${ultimaImportacao.id}`}
                 className={styles.cardActionLink}
+                aria-label={`Ver detalhes do lote #${ultimaImportacao.id} (${ultimaImportacao.nomeArquivo})`}
               >
                 <span>Ver detalhes do lote</span>
                 <span aria-hidden="true">→</span>

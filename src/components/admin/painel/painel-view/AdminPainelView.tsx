@@ -58,75 +58,68 @@ export default function AdminPainelView({
     buildInitialState({ initialData, initialError, initialAuthError })
   );
 
-  const shouldSkipInitialFetchRef = useRef<boolean>(
-    initialData !== undefined || initialError !== undefined
-  );
+  const hasInitialPayload = initialData !== undefined || initialError !== undefined;
   const inFlightRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const errorAlertRef = useRef<HTMLDivElement | null>(null);
+  const errorAlertRef = useRef<HTMLElement | null>(null);
   const shouldFocusErrorRef = useRef<boolean>(false);
 
-  const loadResumo = useCallback(async (focusOnError: boolean) => {
-    if (inFlightRef.current) {
-      return;
-    }
+  const applyFetchError = useCallback((error: unknown, focusOnError: boolean) => {
+    shouldFocusErrorRef.current = focusOnError;
 
-    inFlightRef.current = true;
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setState({ status: 'loading' });
-
-    try {
-      const resumo = await fetchAdminResumo({ signal: controller.signal });
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      setState(deriveAdminDashboardState(resumo));
-    } catch (error: unknown) {
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      shouldFocusErrorRef.current = focusOnError;
-
-      if (error instanceof PainelClientError) {
-        setState({
-          status: 'error',
-          message: error.message,
-          retryable: true,
-          isAuthError: error.isAuthError,
-        });
-      } else {
-        setState({
-          status: 'error',
-          message: GENERIC_PAINEL_LOAD_ERROR_MESSAGE,
-          retryable: true,
-          isAuthError: false,
-        });
-      }
-    } finally {
-      if (abortControllerRef.current === controller) {
-        inFlightRef.current = false;
-      }
+    if (error instanceof PainelClientError) {
+      setState({
+        status: 'error',
+        message: error.message,
+        retryable: true,
+        isAuthError: error.isAuthError,
+      });
+    } else {
+      setState({
+        status: 'error',
+        message: GENERIC_PAINEL_LOAD_ERROR_MESSAGE,
+        retryable: true,
+        isAuthError: false,
+      });
     }
   }, []);
 
   useEffect(() => {
-    if (shouldSkipInitialFetchRef.current) {
-      shouldSkipInitialFetchRef.current = false;
-      return;
+    if (hasInitialPayload) {
+      return () => {
+        abortControllerRef.current?.abort();
+        inFlightRef.current = false;
+      };
     }
 
-    void loadResumo(false);
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    inFlightRef.current = true;
+
+    void fetchAdminResumo({ signal: controller.signal })
+      .then((resumo) => {
+        if (!controller.signal.aborted) {
+          setState(deriveAdminDashboardState(resumo));
+        }
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          applyFetchError(error, false);
+        }
+      })
+      .finally(() => {
+        if (abortControllerRef.current === controller) {
+          inFlightRef.current = false;
+        }
+      });
 
     return () => {
+      controller.abort();
       abortControllerRef.current?.abort();
       inFlightRef.current = false;
     };
-  }, [loadResumo]);
+  }, [hasInitialPayload, applyFetchError]);
 
   useEffect(() => {
     if (state.status === 'error' && shouldFocusErrorRef.current) {
@@ -136,7 +129,32 @@ export default function AdminPainelView({
   }, [state]);
 
   const handleRetry = (): void => {
-    void loadResumo(true);
+    if (inFlightRef.current) {
+      return;
+    }
+
+    inFlightRef.current = true;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setState({ status: 'loading' });
+
+    void fetchAdminResumo({ signal: controller.signal })
+      .then((resumo) => {
+        if (!controller.signal.aborted) {
+          setState(deriveAdminDashboardState(resumo));
+        }
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          applyFetchError(error, true);
+        }
+      })
+      .finally(() => {
+        if (abortControllerRef.current === controller) {
+          inFlightRef.current = false;
+        }
+      });
   };
 
   if (state.status === 'loading') {
@@ -281,12 +299,10 @@ export default function AdminPainelView({
 
         <section
           className={styles.emptyCard}
-          role="status"
-          aria-live="polite"
           aria-labelledby="dashboard-empty-heading"
           data-testid="dashboard-empty-state"
         >
-          <div className={styles.emptyHeader}>
+          <div className={styles.emptyHeader} role="status" aria-live="polite">
             <span className={styles.emptyIconBox} aria-hidden="true">
               <svg
                 width="22"

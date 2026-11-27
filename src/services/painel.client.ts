@@ -152,6 +152,10 @@ export async function fetchAdminResumo(
     try {
       rawPayload = await response.json();
     } catch (parseError: unknown) {
+      if (didTimeout || isAbortError(parseError) || options?.signal?.aborted) {
+        throw parseError;
+      }
+
       throw new PainelClientError(GENERIC_PAINEL_LOAD_ERROR_MESSAGE, {
         statusCode: response.status,
         code: PAINEL_ERROR_CODES.INVALID_SERVER_RESPONSE,

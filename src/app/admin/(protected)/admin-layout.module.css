@@ -448,7 +448,7 @@
   line-height: 1.35;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1200px) {
   .headerContainer {
     flex-wrap: wrap;
     gap: 1rem;
@@ -475,6 +475,11 @@
   .topBarContainer {
     padding: 0.45rem 1rem;
     justify-content: space-between;
+  }
+
+  .topBarMapLink {
+    min-height: 44px;
+    padding: 0.35rem 0.75rem;
   }
 
   .headerContainer {
