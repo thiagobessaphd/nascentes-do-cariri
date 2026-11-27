@@ -10,6 +10,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { GET as meGET } from '@/app/api/admin/auth/me/route';
 import { GET as importacoesGET } from '@/app/api/admin/importacoes/route';
 import { POST as importacoesValidarPOST } from '@/app/api/admin/importacoes/validar/route';
+import { GET as resumoGET } from '@/app/api/admin/resumo/route';
 import { SESSION_COOKIE_NAMES } from '@/config/session-cookies';
 import { prisma } from '@/lib/db/prisma';
 import {
@@ -65,13 +66,22 @@ describe('CT-BE-02 — Integração Guarda Administrativa, Sessões Persistidas 
         method: 'POST',
       })
     );
+    const resumoRes = await resumoGET(
+      new NextRequest('http://localhost:3000/api/admin/resumo')
+    );
 
-    for (const res of [meRes, listRes, validarRes]) {
+    for (const res of [meRes, listRes, validarRes, resumoRes]) {
       expect(res.status).toBe(401);
       expect(res.headers.get('cache-control')).toContain('no-store');
       const body = (await res.json()) as { code: string };
       expect(body.code).toBe(AUTH_ERROR_CODES.UNAUTHORIZED);
     }
+
+    const proxyDashboardRes = proxy(new NextRequest('http://localhost:3000/admin'));
+    expect(proxyDashboardRes.status).toBe(307);
+    expect(proxyDashboardRes.headers.get('location')).toBe(
+      'http://localhost:3000/admin/login?next=%2Fadmin'
+    );
 
     const proxyPageRes = proxy(new NextRequest('http://localhost:3000/admin/importacoes'));
     expect(proxyPageRes.status).toBe(307);
@@ -280,7 +290,7 @@ describe('CT-BE-02 — Integração Guarda Administrativa, Sessões Persistidas 
       data: { ativo: false },
     });
 
-    const [meRes, listRes, validarRes] = await Promise.all([
+    const [meRes, listRes, validarRes, resumoRes] = await Promise.all([
       meGET(
         new NextRequest('http://localhost:3000/api/admin/auth/me', {
           headers: { cookie: `${SESSION_COOKIE_NAMES.PRODUCTION}=${persisted.token}` },
@@ -297,9 +307,14 @@ describe('CT-BE-02 — Integração Guarda Administrativa, Sessões Persistidas 
           headers: { authorization: `Bearer ${persisted.token}` },
         })
       ),
+      resumoGET(
+        new NextRequest('http://localhost:3000/api/admin/resumo', {
+          headers: { cookie: `${SESSION_COOKIE_NAMES.PRODUCTION}=${persisted.token}` },
+        })
+      ),
     ]);
 
-    for (const res of [meRes, listRes, validarRes]) {
+    for (const res of [meRes, listRes, validarRes, resumoRes]) {
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code: string };
       expect(body.code).toBe(AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER);

@@ -5,7 +5,7 @@
  */
 
 export const ADMIN_LOGIN_PATH = '/admin/login' as const;
-export const DEFAULT_ADMIN_REDIRECT_PATH = '/admin/importacoes' as const;
+export const DEFAULT_ADMIN_REDIRECT_PATH = '/admin' as const;
 
 const CONTROL_CHARS_REGEX = /[\u0000-\u001F\u007F]/;
 

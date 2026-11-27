@@ -115,16 +115,21 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
         SESSION_COOKIE_NAMES.DEVELOPMENT,
         SESSION_COOKIE_NAMES.PRODUCTION,
       ]) {
-        const req = new NextRequest('http://localhost:3000/admin/importacoes', {
-          headers: {
-            cookie: `${cookieName}=${validToken}`,
-          },
-        });
-        const res = proxy(req);
+        for (const adminUrl of [
+          'http://localhost:3000/admin',
+          'http://localhost:3000/admin/importacoes',
+        ]) {
+          const req = new NextRequest(adminUrl, {
+            headers: {
+              cookie: `${cookieName}=${validToken}`,
+            },
+          });
+          const res = proxy(req);
 
-        expect(res.status).toBe(200);
-        expect(res.headers.get('location')).toBeNull();
-        expect(res.headers.get('x-middleware-next')).toBe('1');
+          expect(res.status).toBe(200);
+          expect(res.headers.get('location')).toBeNull();
+          expect(res.headers.get('x-middleware-next')).toBe('1');
+        }
       }
     });
 
@@ -223,6 +228,12 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
       expect(missingBody.code).toBe('UNAUTHORIZED');
       expect(missingRes.headers.get('cache-control')).toContain('no-store');
 
+      const missingResumoRes = proxy(new NextRequest('http://localhost:3000/api/admin/resumo'));
+      const missingResumoBody = (await missingResumoRes.json()) as { code: string };
+      expect(missingResumoRes.status).toBe(401);
+      expect(missingResumoBody.code).toBe('UNAUTHORIZED');
+      expect(missingResumoRes.headers.get('cache-control')).toContain('no-store');
+
       const legacyRes = proxy(
         new NextRequest('http://localhost:3000/api/admin/importacoes', {
           headers: {
@@ -267,6 +278,16 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
       );
       expect(bearerRes.status).toBe(200);
       expect(bearerRes.headers.get('x-middleware-next')).toBe('1');
+
+      const resumoCookieRes = proxy(
+        new NextRequest('http://localhost:3000/api/admin/resumo', {
+          headers: {
+            cookie: `${SESSION_COOKIE_NAMES.DEVELOPMENT}=${validToken}`,
+          },
+        })
+      );
+      expect(resumoCookieRes.status).toBe(200);
+      expect(resumoCookieRes.headers.get('x-middleware-next')).toBe('1');
     });
   });
 

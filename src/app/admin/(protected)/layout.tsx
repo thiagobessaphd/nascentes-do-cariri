@@ -7,6 +7,7 @@ import logoUfcaFull from '@/assets/images/logo_ufca-full.png';
 import logoCnpq from '@/assets/images/logo_cnpq.png';
 import { AdminNav } from '@/components/admin/nav';
 import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
+import { toAdminProfileView } from '@/modules/painel/painel.contracts';
 import styles from './admin-layout.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -23,11 +24,17 @@ export interface AdminLayoutProps {
 }
 
 export default async function AdminLayout({ children }: Readonly<AdminLayoutProps>) {
-  await requireAdminPageSession();
+  const session = await requireAdminPageSession();
+  const profile = toAdminProfileView(session);
 
   return (
-    <div className={styles.adminShell}>
-      {/* Conjunto do Cabeçalho Fixo (Barra Superior + Filete + Navegação Principal) */}
+    <div className={styles.adminShell} data-admin-shell="true">
+      {/* Atalho de acessibilidade por teclado para o conteúdo principal */}
+      <a href="#admin-main" className={styles.skipLink}>
+        Pular para o conteúdo principal
+      </a>
+
+      {/* Conjunto do Cabeçalho (Barra Superior + Filete + Navegação Principal) */}
       <div className={styles.headerWrapper}>
         {/* Barra Institucional Superior Resumida */}
         <div
@@ -98,55 +105,64 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
           <div className={styles.headerContainer}>
             <div className={styles.brandGroup}>
               <Link
-                href="/admin/importacoes"
-                className={styles.logoLink}
-                aria-label="Universidade Federal do Cariri — Página inicial da administração"
+                href="/admin"
+                className={styles.brandLink}
+                aria-label="Projeto Nascentes do Cariri — Visão Geral do Painel Administrativo"
               >
                 <Image
                   src={logoUfcaSymbol}
-                  alt="Símbolo da Universidade Federal do Cariri (UFCA)"
+                  alt=""
                   width={112}
                   height={40}
                   className={styles.headerLogoImg}
                   priority
                 />
-              </Link>
 
-              <div className={styles.brandDivider} aria-hidden="true" />
+                <span className={styles.brandDivider} aria-hidden="true" />
 
-              <div className={styles.systemIdentity}>
-                <Link href="/admin/importacoes" className={styles.systemTitleLink}>
-                  Projeto Nascentes do Cariri
-                </Link>
-                <span className={styles.systemSubtitle}>
-                  Ciência, Território e Conservação dos Recursos Hídricos
+                <span className={styles.systemIdentity}>
+                  <span className={styles.systemTitle}>Projeto Nascentes do Cariri</span>
+                  <span className={styles.systemSubtitle}>
+                    Ciência, Território e Conservação dos Recursos Hídricos
+                  </span>
                 </span>
-              </div>
+              </Link>
             </div>
 
-            {/* Menu de Navegação Formal + Ação de Destaque para o Mapa */}
-            <nav aria-label="Navegação Administrativa" className={styles.adminNav}>
-              <AdminNav />
+            {/* Navegação Principal e Identidade do Administrador Autenticado */}
+            <div className={styles.headerControls}>
+              <nav aria-label="Navegação Administrativa" className={styles.adminNav}>
+                <AdminNav />
+              </nav>
 
               <div className={styles.navDivider} aria-hidden="true" />
 
-              {/* Placeholder de Perfil do Usuário Administrativo */}
-              <div className={styles.userProfileArea} aria-label="Perfil do usuário conectado">
+              {/* Perfil do Usuário Autenticado + Gancho Reservado de Logout (Task-32) */}
+              <div
+                className={styles.userProfileArea}
+                role="group"
+                aria-label="Perfil do usuário conectado"
+              >
                 <div className={styles.userAvatar} aria-hidden="true">
-                  TB
+                  {profile.iniciais}
                 </div>
 
                 <div className={styles.userInfo}>
-                  <span className={styles.userName}>Thiago Bessa</span>
-                  <span className={styles.userEmail}>thiago.bessa@ufca.edu.br</span>
+                  <span className={styles.userName} title={profile.nome}>
+                    {profile.nome}
+                  </span>
+                  <span className={styles.userEmail} title={profile.email}>
+                    {profile.email}
+                  </span>
                 </div>
 
                 <button
                   type="button"
                   className={styles.logoutButton}
+                  data-testid="admin-logout-button"
                   aria-disabled="true"
-                  title="Encerramento de sessão será habilitado na Sprint 4"
-                  aria-label="Sair da conta administrativa (disponível na Sprint 4)"
+                  title="Encerramento de sessão disponível em breve"
+                  aria-label="Sair da conta administrativa (indisponível temporariamente)"
                 >
                   <svg
                     width="15"
@@ -164,7 +180,7 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
                   <span className={styles.logoutLabel}>Sair</span>
                 </button>
               </div>
-            </nav>
+            </div>
           </div>
         </header>
       </div>

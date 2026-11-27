@@ -1,0 +1,277 @@
+/**
+ * Nascentes do Cariri — Skeleton de Carregamento (loading.tsx) do Painel (/admin)
+ *
+ * Política visual: apenas placeholders estruturais com pulso suave (sem spinners).
+ */
+
+.container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes dashboardRoutePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.38;
+  }
+}
+
+.skeletonLine {
+  display: block;
+  border-radius: 5px;
+  background-color: #dbe3ed;
+  animation: dashboardRoutePulse 1.35s ease-in-out infinite;
+}
+
+.headerCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #331509;
+  border-radius: 6px;
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.headerTextGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1 1 320px;
+  max-width: 780px;
+}
+
+.overlineBar {
+  height: 12px;
+  width: 185px;
+}
+
+.titleBar {
+  height: 28px;
+  width: 280px;
+  max-width: 100%;
+}
+
+.subtitleBar {
+  height: 14px;
+  width: 86%;
+}
+
+.subtitleShortBar {
+  height: 14px;
+  width: 58%;
+}
+
+.ctaButtonBar {
+  height: 44px;
+  width: 196px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: minmax(290px, 1fr) minmax(0, 1.55fr);
+  gap: 1.25rem;
+}
+
+.kpiCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  padding: 1.375rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.springsCard {
+  border-top: 3px solid #166534;
+}
+
+.lastImportCard {
+  border-top: 3px solid #331509;
+}
+
+.cardTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cardOverlineBar {
+  height: 12px;
+  width: 160px;
+}
+
+.heroNumBar {
+  height: 44px;
+  width: 112px;
+}
+
+.cardDescBar {
+  height: 14px;
+  width: 84%;
+}
+
+.footerLinkBar {
+  height: 16px;
+  width: 145px;
+  margin-top: 0.5rem;
+}
+
+.fileBar {
+  height: 18px;
+  width: 68%;
+}
+
+.metaRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.metaBar {
+  height: 30px;
+  width: 100%;
+}
+
+.countsRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.countBar {
+  height: 42px;
+  width: 100%;
+}
+
+.pillBar {
+  height: 24px;
+  width: 110px;
+  border-radius: 9999px;
+}
+
+.tableCard {
+  background-color: #ffffff;
+  border: 1px solid #d8dee9;
+  border-top: 3px solid #0b4f6c;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.tableHeader {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sectionTitleBar {
+  height: 20px;
+  width: 170px;
+}
+
+.viewAllBar {
+  height: 44px;
+  width: 180px;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 1.8fr 1.2fr 1.1fr 120px;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.cellWide {
+  height: 15px;
+  width: 82%;
+}
+
+.cellMedium {
+  height: 15px;
+  width: 72%;
+}
+
+@media (max-width: 960px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem 1rem 2rem;
+    gap: 1.125rem;
+  }
+
+  .headerCard {
+    padding: 1.25rem;
+  }
+
+  .ctaButtonBar,
+  .viewAllBar {
+    width: 100%;
+  }
+
+  .tableRow {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .metaRow {
+    grid-template-columns: 1fr;
+  }
+
+  .countsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine {
+    animation: none;
+  }
+}

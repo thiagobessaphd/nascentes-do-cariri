@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
 import {
   FRAMING_POLICIES,
   MAPA_SECURITY_HEADERS,
@@ -115,6 +116,30 @@ describe('Políticas de Segurança e Framing', () => {
         expect(csp?.value).toBe("frame-ancestors 'none'");
         expect(xFrame?.value).toBe('DENY');
       }
+    });
+
+    it('deve casar rotas exatas /admin, /admin/, /admin/login e /api/admin/resumo nas regras restritivas do Next.js', () => {
+      const adminRule = rules.find((r) => r.source === '/admin/:path*');
+      const apiAdminRule = rules.find((r) => r.source === '/api/admin/:path*');
+
+      expect(adminRule).toBeDefined();
+      expect(apiAdminRule).toBeDefined();
+      if (!adminRule || !apiAdminRule) {
+        throw new Error('Regras /admin/:path* e /api/admin/:path* não encontradas.');
+      }
+
+      const matchAdmin = getPathMatch(adminRule.source);
+      const matchApiAdmin = getPathMatch(apiAdminRule.source);
+
+      expect(matchAdmin('/admin')).not.toBe(false);
+      expect(matchAdmin('/admin/')).not.toBe(false);
+      expect(matchAdmin('/admin/login')).not.toBe(false);
+      expect(matchAdmin('/admin/importacoes')).not.toBe(false);
+      expect(matchAdmin('/mapa')).toBe(false);
+
+      expect(matchApiAdmin('/api/admin/resumo')).not.toBe(false);
+      expect(matchApiAdmin('/api/admin/auth/me')).not.toBe(false);
+      expect(matchApiAdmin('/api/public/nascentes')).toBe(false);
     });
   });
 

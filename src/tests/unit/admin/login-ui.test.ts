@@ -141,9 +141,11 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
 
       // Isolamento estrito contra vazamento da casca protegida
       expect(html).not.toContain('Navegação Administrativa');
+      expect(html).not.toContain('Visão Geral');
       expect(html).not.toContain('Importação de Dados');
       expect(html).not.toContain('Histórico de Lotes');
-      expect(html).not.toContain('Thiago Bessa');
+      expect(html).not.toContain('Perfil do usuário conectado');
+      expect(html).not.toContain('admin-logout-button');
       expect(html).not.toContain('Sair da conta administrativa');
     });
 
@@ -159,11 +161,9 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
 
       vi.mocked(getOptionalAdminPageSession).mockResolvedValue(activeSession);
 
-      // Sem ?next= -> fallback padrão /admin/importacoes
-      await expect(AdminLoginPage({})).rejects.toThrow(
-        'NEXT_REDIRECT:/admin/importacoes'
-      );
-      expect(mockRedirect).toHaveBeenLastCalledWith('/admin/importacoes');
+      // Sem ?next= -> fallback padrão /admin
+      await expect(AdminLoginPage({})).rejects.toThrow('NEXT_REDIRECT:/admin');
+      expect(mockRedirect).toHaveBeenLastCalledWith('/admin');
 
       // Com ?next= interno válido (/admin/importacoes/historico e /admin)
       await expect(
@@ -191,7 +191,7 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
           AdminLoginPage({
             searchParams: Promise.resolve({ next: hostileNext }),
           })
-        ).rejects.toThrow('NEXT_REDIRECT:/admin/importacoes');
+        ).rejects.toThrow('NEXT_REDIRECT:/admin');
       }
     });
 
