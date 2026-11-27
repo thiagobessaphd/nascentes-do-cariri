@@ -3,9 +3,10 @@
  *
  * Módulos cobertos:
  * - src/app/admin/layout.tsx
- * - src/app/admin/importacoes/page.tsx
- * - src/app/admin/importacoes/loading.tsx
- * - src/app/admin/importacoes/error.tsx
+ * - src/app/admin/(protected)/layout.tsx
+ * - src/app/admin/(protected)/importacoes/page.tsx
+ * - src/app/admin/(protected)/importacoes/loading.tsx
+ * - src/app/admin/(protected)/importacoes/error.tsx
  * - src/components/admin/importacoes/summary-cards/ImportSummaryCards.tsx
  * - src/components/admin/importacoes/errors-list/ImportErrorsList.tsx
  * - src/components/admin/importacoes/preview-table/ImportPreviewTable.tsx
@@ -20,10 +21,16 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import AdminLayout, { metadata as adminLayoutMetadata } from '@/app/admin/layout';
-import ImportacoesAdminPage, { metadata as importacoesPageMetadata } from '@/app/admin/importacoes/page';
-import ImportacoesLoading from '@/app/admin/importacoes/loading';
-import ImportacoesError from '@/app/admin/importacoes/error';
+import AdminRootLayout, { metadata as adminRootLayoutMetadata } from '@/app/admin/layout';
+import AdminLayout, {
+  dynamic as adminLayoutDynamic,
+  metadata as adminLayoutMetadata,
+} from '@/app/admin/(protected)/layout';
+import ImportacoesAdminPage, {
+  metadata as importacoesPageMetadata,
+} from '@/app/admin/(protected)/importacoes/page';
+import ImportacoesLoading from '@/app/admin/(protected)/importacoes/loading';
+import ImportacoesError from '@/app/admin/(protected)/importacoes/error';
 import ImportSummaryCards from '@/components/admin/importacoes/summary-cards/ImportSummaryCards';
 import ImportErrorsList from '@/components/admin/importacoes/errors-list/ImportErrorsList';
 import ImportPreviewTable from '@/components/admin/importacoes/preview-table/ImportPreviewTable';
@@ -47,8 +54,13 @@ import {
   generateSessionId,
   hashSessionId,
 } from '@/lib/security/admin-guard';
+import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import { prisma } from '@/lib/db/prisma';
 import { GET as devSessionGET, DELETE as devSessionDELETE } from '@/app/api/admin/dev-session/route';
+
+vi.mock('@/lib/security/admin-page-guard', () => ({
+  requireAdminPageSession: vi.fn(),
+}));
 
 vi.mock('@/lib/db/prisma', () => ({
   prisma: {
@@ -136,7 +148,24 @@ const MOCK_ERRORS: readonly ImportRowError[] = [
 
 describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erros de Importação', () => {
   describe('1. Páginas, Layout Institucional e Boundaries do App Router (/admin/importacoes)', () => {
-    it('deve declarar robots noindex/nofollow em AdminLayout e ImportacoesAdminPage', () => {
+    beforeEach(() => {
+      vi.mocked(requireAdminPageSession).mockReset();
+      vi.mocked(requireAdminPageSession).mockResolvedValue({
+        id: 1,
+        nome: 'Thiago Bessa',
+        email: 'thiago.bessa@ufca.edu.br',
+        ativo: true,
+        sessionId: 101,
+        sessionExpiresAt: new Date('2026-12-31T23:59:59.000Z'),
+      });
+    });
+
+    it('deve declarar robots noindex/nofollow em AdminRootLayout, AdminLayout (force-dynamic) e ImportacoesAdminPage', () => {
+      expect(adminRootLayoutMetadata.robots).toEqual({
+        index: false,
+        follow: false,
+      });
+      expect(adminLayoutDynamic).toBe('force-dynamic');
       expect(adminLayoutMetadata.robots).toEqual({
         index: false,
         follow: false,
@@ -145,6 +174,21 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
         index: false,
         follow: false,
       });
+    });
+
+    it('AdminRootLayout deve encapsular children sem vazar casca administrativa autenticada', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(
+          AdminRootLayout,
+          null,
+          React.createElement('div', { id: 'auth-slot' }, 'Tela de Login Pública')
+        )
+      );
+
+      expect(html).toContain('Tela de Login Pública');
+      expect(html).not.toContain('Navegação Administrativa');
+      expect(html).not.toContain('Thiago Bessa');
+      expect(html).not.toContain('Sair');
     });
 
     it('deve renderizar ImportacoesAdminPage com cabeçalho semântico único <h1> e landmark de workspace', () => {
@@ -156,21 +200,31 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).toContain('aria-label="Área de trabalho de importação e prévia"');
     });
 
-    it('deve renderizar AdminLayout com barra institucional UFCA, item ativo aria-current="page", links #pagina-futura e botão Sair desabilitado', () => {
-      const html = renderToStaticMarkup(
-        React.createElement(
-          AdminLayout,
-          null,
-          React.createElement('div', { id: 'child-content' }, 'Conteúdo Interno')
-        )
-      );
+    it('deve exigir sessão válida e renderizar AdminLayout com barra institucional UFCA, item ativo aria-current="page", links #pagina-futura e botão Sair desabilitado', async () => {
+      const element = await AdminLayout({
+        children: React.createElement('div', { id: 'child-content' }, 'Conteúdo Interno'),
+      });
+      const html = renderToStaticMarkup(element);
 
+      expect(requireAdminPageSession).toHaveBeenCalledTimes(1);
       expect(html).toContain('Universidade Federal do Cariri (UFCA)');
       expect(html).toContain('href="/admin/importacoes"');
       expect(html).toContain('aria-current="page"');
       expect(html).toContain('href="#pagina-futura"');
       expect(html).toContain('aria-disabled="true"');
       expect(html).toContain('Conteúdo Interno');
+    });
+
+    it('AdminLayout deve propagar redirecionamento de requireAdminPageSession sem renderizar conteúdo protegido', async () => {
+      const redirectError = new Error('NEXT_REDIRECT');
+      vi.mocked(requireAdminPageSession).mockRejectedValueOnce(redirectError);
+
+      await expect(
+        AdminLayout({
+          children: React.createElement('div', { id: 'child-content' }, 'Conteúdo Interno'),
+        })
+      ).rejects.toThrow('NEXT_REDIRECT');
+      expect(requireAdminPageSession).toHaveBeenCalledTimes(1);
     });
 
     it('deve renderizar ImportacoesLoading com semântica acessível role="status", aria-live="polite" e aria-busy="true"', () => {

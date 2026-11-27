@@ -255,6 +255,22 @@ A matriz estabelece para cada requisito:
     - Proxy oficial do Next.js `16.3.1` (`src/proxy.ts`) interceptando `/admin`, `/admin/:path*` e `/api/admin/:path*`: redirecionamento `307` sanitizado para `/admin/login?next=...` (proteção contra *Open Redirect* e loops) e bloqueio `401 JSON` em APIs sem token válido, mantendo `/mapa` e `/api/public/*` livres.
     - Verificação autoritativa no MySQL (`requireAdminSession` / `requireAdminPageSession`): bloqueio `401 UNAUTHORIZED` para sessão ausente, não persistida, expirada ou revogada (`revokedAt !== null`) — com suporte a revogação individual e em lote — e `403 FORBIDDEN_INACTIVE_USER` imediato para usuário desativado.
 
+### 3.15. Tela de Login Acessível, Isolamento de Route Groups e Proteção Anti-Abuso (`US-15` / `Task-30` / `RF01` / `RNF01` / `RNF06`)
+* **Arquivos:**
+  - `src/tests/unit/admin/login-ui.test.ts`
+  - `src/tests/unit/services/auth-client.test.ts`
+  - `src/tests/unit/admin/importacoes-ui.test.ts`
+* **Regras Verificadas:**
+  - **Isolamento de Route Groups e Guarda Server-Side (`(auth)/login` vs. `(protected)`):**
+    - Layout raiz transparente em `src/app/admin/layout.tsx` (`robots: noindex, nofollow`) sem vazamento de `AdminNav`, perfil administrativo ou botão `Sair` para visitantes em `/admin/login`.
+    - Execução autoritativa de `requireAdminPageSession()` no layout protegido `src/app/admin/(protected)/layout.tsx` (`force-dynamic`), propagando redirecionamento em sessões ausentes, revogadas ou de contas inativas.
+    - Redirecionamento automático no servidor em `/admin/login` (`getOptionalAdminPageSession`) para administradores já autenticados, respeitando `?next=` interno válido e bloqueando tentativas de *Open Redirect* ou loop para `/admin/login`.
+  - **Acessibilidade, Navegação por Teclado e Feedback de Carregamento (`RNF06`):**
+    - Associação explícita `<label htmlFor>` nos campos de e-mail (`type="email"`, `autocomplete="username"`) e senha (`type="password"`, `autocomplete="current-password"`), alternância acessível de visibilidade da senha (`aria-pressed`, alvo mínimo `44x44px`), submissão exclusiva via `POST`, erros vinculados por `aria-invalid` e `aria-describedby`, banner global focável (`role="alert"`, `tabIndex={-1}`) e estados acessíveis de envio (`"Entrando..."`) e redirecionamento (`"Redirecionando..."`) com travamento do botão (`aria-busy="true"`).
+  - **Cliente HTTP Tipado, Anti-Enumeração e Proteção contra Abuso (`auth.client.ts` / `login-form-state.ts`):**
+    - Validação local antecipada sem exposição de senha em erros ou `Web Storage`, mascaramento de falhas `5xx`, controle de timeout (`REQUEST_TIMEOUT`) e propagação de `AbortError`.
+    - Mensagem genérica idêntica (`E-mail ou senha inválidos.`) para e-mail inexistente, senha incorreta ou conta inativa, controle de envios simultâneos, *backoff* progressivo a partir da 3ª falha consecutiva (`3s`, `6s`, `10s`) e *cooldown* com contagem regressiva (`aria-live="off"`) sincronizado ao cabeçalho `Retry-After` em respostas `429 RATE_LIMITED`.
+
 ---
 
 ## 4. Scripts Automatizados
