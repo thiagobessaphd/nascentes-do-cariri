@@ -124,9 +124,12 @@ describe('Políticas de Segurança e Framing', () => {
 
       expect(adminRule).toBeDefined();
       expect(apiAdminRule).toBeDefined();
+      if (!adminRule || !apiAdminRule) {
+        throw new Error('Regras /admin/:path* e /api/admin/:path* não encontradas.');
+      }
 
-      const matchAdmin = getPathMatch(adminRule!.source);
-      const matchApiAdmin = getPathMatch(apiAdminRule!.source);
+      const matchAdmin = getPathMatch(adminRule.source);
+      const matchApiAdmin = getPathMatch(apiAdminRule.source);
 
       expect(matchAdmin('/admin')).not.toBe(false);
       expect(matchAdmin('/admin/')).not.toBe(false);

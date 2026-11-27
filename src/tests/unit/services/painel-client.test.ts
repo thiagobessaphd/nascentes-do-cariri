@@ -253,4 +253,38 @@ describe('Cliente HTTP fetchAdminResumo (Task-31 / Etapa 1)', () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('deve propagar AbortError quando o AbortSignal externo cancelar a requisição em voo ou durante response.json()', async () => {
+    const inFlightController = new AbortController();
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            const abortError = new Error('Cancelled in flight');
+            abortError.name = 'AbortError';
+            reject(abortError);
+          });
+        })
+    );
+
+    const inFlightPromise = fetchAdminResumo({ signal: inFlightController.signal });
+    inFlightController.abort();
+    await expect(inFlightPromise).rejects.toMatchObject({ name: 'AbortError' });
+
+    const jsonAbortController = new AbortController();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => {
+        jsonAbortController.abort();
+        const abortError = new Error('Aborted during JSON parse');
+        abortError.name = 'AbortError';
+        throw abortError;
+      },
+    } as unknown as Response);
+
+    await expect(
+      fetchAdminResumo({ signal: jsonAbortController.signal })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });

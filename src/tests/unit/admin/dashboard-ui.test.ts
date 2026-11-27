@@ -405,9 +405,14 @@ describe('US-16 / Task-31 — Shell Responsivo e Resumo Operacional do Painel (/
         const html = renderToStaticMarkup(
           React.createElement(AdminNav, { fallbackPathname: pathname })
         );
+        const escapedHref = expectedActiveHref.replace(/\//g, '\\/');
+        const activeAnchorPattern = new RegExp(
+          `<a[^>]*aria-current="page"[^>]*href="${escapedHref}"[^>]*>|<a[^>]*href="${escapedHref}"[^>]*aria-current="page"[^>]*>`
+        );
+
         expect(html.match(/<li\b/g)).toHaveLength(3);
         expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-        expect(html).toContain(`href="${expectedActiveHref}"`);
+        expect(html).toMatch(activeAnchorPattern);
         expect(html).not.toContain('#pagina-futura');
       }
     });

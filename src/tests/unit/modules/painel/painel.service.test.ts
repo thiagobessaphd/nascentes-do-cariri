@@ -55,6 +55,7 @@ describe('PainelService e contratos do painel administrativo (Task-31 / Etapa 1)
       expect(deriveAdminInitials('Maria de Lourdes da Silva')).toBe('MS');
       expect(deriveAdminInitials('  José    da   Silva  ')).toBe('JS');
       expect(deriveAdminInitials('Érica Óscar')).toBe('ÉÓ');
+      expect(deriveAdminInitials('E\u0301rica O\u0301scar')).toBe('ÉÓ');
       expect(deriveAdminInitials('Álvaro')).toBe('ÁL');
       expect(deriveAdminInitials('Admin')).toBe('AD');
       expect(deriveAdminInitials('A')).toBe('A');

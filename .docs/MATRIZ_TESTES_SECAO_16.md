@@ -277,6 +277,9 @@ A matriz estabelece para cada requisito:
   - `src/tests/unit/modules/painel/painel.route.test.ts`
   - `src/tests/unit/services/painel-client.test.ts`
   - `src/tests/unit/admin/dashboard-ui.test.ts`
+  - `src/tests/unit/admin/importacoes-ui.test.ts`
+  - `src/tests/unit/admin/importacoes-history-detail-ui.test.ts`
+  - `src/tests/unit/admin/login-ui.test.ts`
   - `src/tests/integration/dashboard/admin-dashboard.test.ts`
   - `src/tests/integration/auth/admin-guard.test.ts`
   - `src/tests/unit/security/framing-headers.test.ts`
