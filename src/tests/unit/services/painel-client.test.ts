@@ -19,6 +19,10 @@ import {
   PainelClientError,
   fetchAdminResumo,
 } from '@/services/painel.client';
+import {
+  resetAdminSessionEventsState,
+  subscribeAdminSessionEvents,
+} from '@/services/admin-session-events';
 
 const VALID_RESUMO_PAYLOAD: AdminResumoResponseDto = {
   indicadores: {
@@ -72,6 +76,7 @@ function createJsonResponse(body: unknown, status = 200): Response {
 
 describe('Cliente HTTP fetchAdminResumo (Task-31 / Etapa 1)', () => {
   afterEach(() => {
+    resetAdminSessionEventsState();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -286,5 +291,34 @@ describe('Cliente HTTP fetchAdminResumo (Task-31 / Etapa 1)', () => {
     await expect(
       fetchAdminResumo({ signal: jsonAbortController.signal })
     ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('deve emitir evento de sessão expirada em 401 e 403, e NÃO emitir em 5xx ou erro de rede', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeAdminSessionEvents(listener);
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      createJsonResponse({ error: 'Sessão expirada', code: 'UNAUTHORIZED' }, 401)
+    );
+    await expect(fetchAdminResumo()).rejects.toMatchObject({ statusCode: 401 });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      createJsonResponse({ error: 'Conta inativa', code: 'FORBIDDEN_INACTIVE_USER' }, 403)
+    );
+    await expect(fetchAdminResumo()).rejects.toMatchObject({ statusCode: 403 });
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      createJsonResponse({ error: 'Internal error' }, 503)
+    );
+    await expect(fetchAdminResumo()).rejects.toMatchObject({ statusCode: 503 });
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(fetchAdminResumo()).rejects.toMatchObject({ isNetworkError: true });
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
   });
 });

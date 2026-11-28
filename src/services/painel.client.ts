@@ -14,6 +14,7 @@ import {
   adminResumoResponseSchema,
   type AdminResumoResponseDto,
 } from '@/modules/painel/painel.contracts';
+import { notifyAdminSessionExpired } from './admin-session-events';
 
 export interface FetchAdminResumoOptions {
   readonly signal?: AbortSignal | undefined;
@@ -145,7 +146,11 @@ export async function fetchAdminResumo(
     });
 
     if (!response.ok) {
-      throw buildHttpErrorFromResponse(response);
+      const httpError = buildHttpErrorFromResponse(response);
+      if (httpError.isAuthError) {
+        notifyAdminSessionExpired();
+      }
+      throw httpError;
     }
 
     let rawPayload: unknown;

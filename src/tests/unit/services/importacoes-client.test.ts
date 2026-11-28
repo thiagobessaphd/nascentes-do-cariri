@@ -49,6 +49,11 @@ import {
   type ImportacaoHistoryListResponseDto,
   type ImportacaoValidationResponseDto,
 } from '@/modules/importacoes/importacoes.types';
+import { AUTH_ERROR_CODES } from '@/modules/auth/auth.contracts';
+import {
+  resetAdminSessionEventsState,
+  subscribeAdminSessionEvents,
+} from '@/services/admin-session-events';
 
 describe('Formatadores e Lógica Pura de Prévia (src/services/importacoes.client.ts)', () => {
   describe('formatVazaoMedia', () => {
@@ -1394,6 +1399,118 @@ describe('Task-28 — Formatadores de Histórico, Navegação Dinâmica e Guards
       // Cancelar o próprio lote (50) deve limpar a sessão
       clearPreviewSessionIfId(50);
       expect(loadPreviewSession()).toBeNull();
+    });
+  });
+
+  describe('Task-32 — cache no-store e emissão seletiva de sessão expirada', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      resetAdminSessionEventsState();
+      globalThis.fetch = originalFetch;
+      vi.restoreAllMocks();
+    });
+
+    it('deve enviar cache: no-store nas chamadas administrativas de importação', async () => {
+      const fetchMock = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          data: [],
+          meta: {
+            page: 1,
+            pageSize: 10,
+            totalItems: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+        }),
+      });
+      globalThis.fetch = fetchMock;
+
+      await fetchImportacoesHistory();
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/admin/importacoes',
+        expect.objectContaining({
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        })
+      );
+    });
+
+    it('deve emitir sessão expirada em 401 e 403 FORBIDDEN_INACTIVE_USER, mas NÃO em 403 IMPORTACAO_OWNERSHIP_FORBIDDEN, 500 ou com authToken explícito', async () => {
+      const listener = vi.fn();
+      const unsubscribe = subscribeAdminSessionEvents(listener);
+
+      // 401 -> emite
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: vi.fn().mockResolvedValue({
+          error: 'Sessão expirada.',
+          code: AUTH_ERROR_CODES.UNAUTHORIZED,
+        }),
+      });
+      await expect(fetchImportacoesHistory()).rejects.toMatchObject({ statusCode: 401 });
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      // 403 FORBIDDEN_INACTIVE_USER -> emite
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: vi.fn().mockResolvedValue({
+          error: 'Conta inativa.',
+          code: AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER,
+        }),
+      });
+      await expect(fetchImportacaoDetailById(10)).rejects.toMatchObject({
+        statusCode: 403,
+        code: AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER,
+      });
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      // 403 IMPORTACAO_OWNERSHIP_FORBIDDEN -> NÃO emite (usuário segue logado)
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: vi.fn().mockResolvedValue({
+          error: 'Apenas o administrador autor pode confirmar este lote.',
+          code: 'IMPORTACAO_OWNERSHIP_FORBIDDEN',
+        }),
+      });
+      await expect(confirmImportacaoById(10)).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'IMPORTACAO_OWNERSHIP_FORBIDDEN',
+      });
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      // 401 com authToken explícito (chamada programática) -> NÃO emite
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: vi.fn().mockResolvedValue({
+          error: 'Token inválido.',
+          code: AUTH_ERROR_CODES.UNAUTHORIZED,
+        }),
+      });
+      await expect(
+        cancelImportacaoById(10, { authToken: 'explicit-bearer-token' })
+      ).rejects.toMatchObject({ statusCode: 401 });
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      // 500 -> NÃO emite
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: vi.fn().mockResolvedValue({ error: 'Erro interno' }),
+      });
+      await expect(fetchImportacoesHistory()).rejects.toMatchObject({ statusCode: 500 });
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      unsubscribe();
     });
   });
 });

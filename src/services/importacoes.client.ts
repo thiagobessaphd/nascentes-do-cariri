@@ -20,6 +20,7 @@ import type {
   ImportacaoValidationResponseDto,
   TxtParseSummary,
 } from '@/modules/importacoes/importacoes.contracts';
+import { AUTH_ERROR_CODES } from '@/modules/auth/auth.contracts';
 import {
   DUPLICATE_REASONS,
   EXPECTED_TXT_HEADER_COLUMNS,
@@ -29,6 +30,13 @@ import {
   MAX_UPLOAD_SIZE_BYTES_CLIENT,
   UNIDADE_VAZAO_PADRAO,
 } from '@/modules/importacoes/importacoes.contracts';
+import {
+  IMPORTACAO_PREVIEW_STORAGE_KEY,
+  clearPreviewSession,
+  notifyAdminSessionExpired,
+} from './admin-session-events';
+
+export { IMPORTACAO_PREVIEW_STORAGE_KEY, clearPreviewSession };
 
 
 // CONTRATOS E MODELOS DE ESTADO DO CLIENTE
@@ -987,6 +995,7 @@ async function executeImportacaoRequest<T>(params: {
     method: params.method,
     headers,
     credentials: 'same-origin',
+    cache: 'no-store',
   };
 
   if (params.body !== undefined) {
@@ -1001,7 +1010,17 @@ async function executeImportacaoRequest<T>(params: {
     const response = await fetch(params.url, requestInit);
 
     if (!response.ok) {
-      throw await parseImportacaoErrorResponse(response, params.operation);
+      const parsedError = await parseImportacaoErrorResponse(response, params.operation);
+      const isSessionTerminationError =
+        parsedError.statusCode === 401 ||
+        (parsedError.statusCode === 403 &&
+          parsedError.code === AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER);
+
+      if (isSessionTerminationError && !params.options?.authToken) {
+        notifyAdminSessionExpired();
+      }
+
+      throw parsedError;
     }
 
     let rawPayload: unknown;
@@ -1315,9 +1334,6 @@ export async function fetchImportacaoDetailById(
 
 // PERSISTÊNCIA TEMPORÁRIA DA PRÉVIA NA SESSÃO
 
-export const IMPORTACAO_PREVIEW_STORAGE_KEY =
-  'nascentes_cariri:admin_importacao_preview_v1';
-
 const RECOVERABLE_PREVIEW_STATUSES = new Set<string>([
   'AGUARDANDO_CONFIRMACAO',
   'FALHOU',
@@ -1348,22 +1364,6 @@ export function savePreviewSession(dto: ImportacaoValidationResponseDto): void {
     storage.setItem(IMPORTACAO_PREVIEW_STORAGE_KEY, JSON.stringify(dto));
   } catch {
     // QuotaExceededError ou restrição de privacidade não devem interromper o fluxo principal
-  }
-}
-
-/**
- * Remove a prévia salva da sessão do navegador.
- */
-export function clearPreviewSession(): void {
-  const storage = getBrowserSessionStorage();
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.removeItem(IMPORTACAO_PREVIEW_STORAGE_KEY);
-  } catch {
-    // Ignora falhas de acesso ao storage em ambientes restritos
   }
 }
 
