@@ -15,7 +15,9 @@ import {
 } from '@/modules/auth/auth.contracts';
 import {
   AuthClientError,
+  fetchAdminSessionMe,
   loginAdmin,
+  logoutAdmin,
   parseRetryAfterSeconds,
   validateLoginInput,
 } from '@/services/auth.client';
@@ -404,6 +406,162 @@ describe('Cliente HTTP de Autenticação (src/services/auth.client.ts)', () => {
 
       await vi.advanceTimersByTimeAsync(2500);
       await assertion;
+    });
+  });
+
+  describe('5. logoutAdmin()', () => {
+    it('deve enviar POST /api/admin/auth/logout com no-store e same-origin e retornar { loggedOut: true }', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ loggedOut: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      globalThis.fetch = fetchMock;
+
+      const result = await logoutAdmin();
+
+      expect(result).toEqual({ loggedOut: true });
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/admin/auth/logout',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        })
+      );
+    });
+
+    it('deve rejeitar 5xx, rede, timeout e 403 FORBIDDEN_CROSS_ORIGIN sem fingir sucesso nem mapear para INVALID_CREDENTIALS', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: 'Origem não autorizada.',
+            code: AUTH_ERROR_CODES.FORBIDDEN_CROSS_ORIGIN,
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(logoutAdmin()).rejects.toMatchObject({
+        statusCode: 403,
+        code: AUTH_ERROR_CODES.FORBIDDEN_CROSS_ORIGIN,
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'ECONNREFUSED mysql internal' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await logoutAdmin();
+        expect.unreachable('Deveria lançar erro em 503');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AuthClientError);
+        const authErr = error as AuthClientError;
+        expect(authErr.statusCode).toBe(503);
+        expect(authErr.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(authErr.message).not.toContain('ECONNREFUSED');
+      }
+
+      globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      await expect(logoutAdmin()).rejects.toMatchObject({
+        isNetworkError: true,
+        isTimeout: false,
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ loggedOut: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      await expect(logoutAdmin()).rejects.toMatchObject({
+        code: 'INVALID_SERVER_RESPONSE',
+      });
+    });
+  });
+
+  describe('6. fetchAdminSessionMe()', () => {
+    it('deve consultar GET /api/admin/auth/me com no-store e validar DTO da sessão ativa', async () => {
+      const validMe: LoginResponseDto = {
+        user: {
+          id: 1,
+          nome: 'Administrador UFCA',
+          email: 'admin@ufca.edu.br',
+        },
+        session: {
+          expiresAt: '2026-12-31T23:59:59.000Z',
+        },
+      };
+
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(validMe), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      globalThis.fetch = fetchMock;
+
+      const result = await fetchAdminSessionMe();
+
+      expect(result).toEqual(validMe);
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/admin/auth/me',
+        expect.objectContaining({
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        })
+      );
+    });
+
+    it('deve preservar 401 UNAUTHORIZED e 403 FORBIDDEN_INACTIVE_USER sem converter para INVALID_CREDENTIALS', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: 'Sessão expirada', code: AUTH_ERROR_CODES.UNAUTHORIZED }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(fetchAdminSessionMe()).rejects.toMatchObject({
+        statusCode: 401,
+        code: AUTH_ERROR_CODES.UNAUTHORIZED,
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: 'Conta inativa',
+            code: AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER,
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      await expect(fetchAdminSessionMe()).rejects.toMatchObject({
+        statusCode: 403,
+        code: AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER,
+      });
+    });
+
+    it('deve classificar 5xx e erro de rede sem status 401/403 (evitando falso logout em background)', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'DB offline' }), { status: 500 })
+      );
+
+      await expect(fetchAdminSessionMe()).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+
+      globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      await expect(fetchAdminSessionMe()).rejects.toMatchObject({
+        statusCode: undefined,
+        isNetworkError: true,
+      });
     });
   });
 });

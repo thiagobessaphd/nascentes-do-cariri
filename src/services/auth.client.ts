@@ -1,8 +1,8 @@
 /**
  * Nascentes do Cariri — Cliente HTTP Frontend de Autenticação Administrativa
  *
- * Consome POST /api/admin/auth/login com validação Zod em runtime,
- * controle de timeout/AbortSignal, leitura de Retry-After e anti-enumeração.
+ * Consome POST /api/admin/auth/login, POST /api/admin/auth/logout e GET /api/admin/auth/me
+ * com validação Zod em runtime, controle de timeout/AbortSignal, leitura de Retry-After e anti-enumeração.
  */
 
 import {
@@ -12,13 +12,17 @@ import {
   GENERIC_INVALID_CREDENTIALS_MESSAGE,
   MAX_RETRY_AFTER_SECONDS,
   RATE_LIMITED_LOGIN_MESSAGE,
+  authMeResponseSchema,
   authPublicErrorPayloadSchema,
   authValidationIssueSchema,
   loginRequestSchema,
   loginResponseSchema,
+  logoutResponseSchema,
   type AuthFieldErrors,
+  type AuthMeResponseDto,
   type LoginRequestDto,
   type LoginResponseDto,
+  type LogoutResponseDto,
 } from '@/modules/auth/auth.contracts';
 
 export interface LoginCredentialsInput {
@@ -78,6 +82,8 @@ export class AuthClientError extends Error {
 }
 
 const LOGIN_API_PATH = '/api/admin/auth/login';
+const LOGOUT_API_PATH = '/api/admin/auth/logout';
+const SESSION_ME_API_PATH = '/api/admin/auth/me';
 const STRICT_POSITIVE_DIGITS_REGEX = /^\d+$/;
 
 function isAbortError(error: unknown): boolean {
@@ -276,37 +282,103 @@ async function buildHttpErrorFromResponse(response: Response): Promise<AuthClien
   );
 }
 
-/**
- * Autentica um administrador via POST /api/admin/auth/login.
- */
-export async function loginAdmin(
-  credentials: LoginCredentialsInput,
-  options?: AuthRequestOptions
-): Promise<LoginResponseDto> {
-  const validation = validateLoginInput(credentials);
-  if (!validation.success) {
-    throw new AuthClientError(validation.message, {
-      statusCode: 400,
-      code: AUTH_ERROR_CODES.VALIDATION_ERROR,
-      fieldErrors: validation.fieldErrors,
+type SessionAuthOperation = 'logout' | 'session_me';
+
+async function buildSessionHttpErrorFromResponse(
+  response: Response,
+  operation: SessionAuthOperation
+): Promise<AuthClientError> {
+  let parsedCode: string | undefined;
+
+  try {
+    const rawErrorBody: unknown = await response.json();
+    const parsedBody = authPublicErrorPayloadSchema.safeParse(rawErrorBody);
+    if (parsedBody.success) {
+      parsedCode = parsedBody.data.code;
+    }
+  } catch {
+    // Resposta sem JSON válido (ex.: proxy/HTML 502)
+  }
+
+  if (response.status === 401) {
+    return new AuthClientError(
+      'Sua sessão administrativa expirou ou não é mais válida.',
+      {
+        statusCode: 401,
+        code: AUTH_ERROR_CODES.UNAUTHORIZED,
+      }
+    );
+  }
+
+  if (response.status === 403) {
+    if (parsedCode === AUTH_ERROR_CODES.FORBIDDEN_CROSS_ORIGIN) {
+      return new AuthClientError(
+        'Origem da requisição não autorizada para encerrar a sessão.',
+        {
+          statusCode: 403,
+          code: AUTH_ERROR_CODES.FORBIDDEN_CROSS_ORIGIN,
+        }
+      );
+    }
+
+    return new AuthClientError(
+      'Sua conta administrativa não possui permissão ativa.',
+      {
+        statusCode: 403,
+        code: parsedCode ?? AUTH_ERROR_CODES.FORBIDDEN_INACTIVE_USER,
+      }
+    );
+  }
+
+  if (response.status >= 500) {
+    const message =
+      operation === 'logout'
+        ? 'Não foi possível encerrar sua sessão agora. Verifique a conexão e tente novamente.'
+        : 'Não foi possível verificar sua sessão administrativa no momento.';
+
+    return new AuthClientError(message, {
+      statusCode: response.status,
+      code: 'INTERNAL_SERVER_ERROR',
     });
   }
 
-  if (options?.signal?.aborted) {
-    throw createAbortError(options.signal.reason);
+  const fallbackMessage =
+    operation === 'logout'
+      ? 'Não foi possível encerrar sua sessão agora. Tente novamente.'
+      : 'Não foi possível verificar sua sessão administrativa no momento.';
+
+  return new AuthClientError(fallbackMessage, {
+    statusCode: response.status,
+    code: parsedCode,
+  });
+}
+
+async function executeAuthRequest<T>(params: {
+  readonly url: string;
+  readonly method: 'GET' | 'POST';
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body?: string | undefined;
+  readonly options?: AuthRequestOptions | undefined;
+  readonly buildHttpError: (response: Response) => Promise<AuthClientError>;
+  readonly parsePayload: (rawPayload: unknown) =>
+    | { readonly success: true; readonly data: T }
+    | { readonly success: false };
+}): Promise<T> {
+  if (params.options?.signal?.aborted) {
+    throw createAbortError(params.options.signal.reason);
   }
 
   const controller = new AbortController();
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_AUTH_REQUEST_TIMEOUT_MS;
+  const timeoutMs = params.options?.timeoutMs ?? DEFAULT_AUTH_REQUEST_TIMEOUT_MS;
   let didTimeout = false;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const onExternalAbort = (): void => {
-    controller.abort(options?.signal?.reason);
+    controller.abort(params.options?.signal?.reason);
   };
 
-  if (options?.signal) {
-    options.signal.addEventListener('abort', onExternalAbort, { once: true });
+  if (params.options?.signal) {
+    params.options.signal.addEventListener('abort', onExternalAbort, { once: true });
   }
 
   if (timeoutMs > 0 && Number.isFinite(timeoutMs)) {
@@ -317,26 +389,32 @@ export async function loginAdmin(
   }
 
   try {
-    const response = await fetch(LOGIN_API_PATH, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+    const requestInit: RequestInit = {
+      method: params.method,
+      headers: params.headers,
       credentials: 'same-origin',
       cache: 'no-store',
-      body: JSON.stringify(validation.data),
       signal: controller.signal,
-    });
+    };
+
+    if (params.body !== undefined) {
+      requestInit.body = params.body;
+    }
+
+    const response = await fetch(params.url, requestInit);
 
     if (!response.ok) {
-      throw await buildHttpErrorFromResponse(response);
+      throw await params.buildHttpError(response);
     }
 
     let rawPayload: unknown;
     try {
       rawPayload = await response.json();
     } catch (parseError: unknown) {
+      if (didTimeout || isAbortError(parseError) || params.options?.signal?.aborted) {
+        throw parseError;
+      }
+
       throw new AuthClientError(
         'Formato inesperado na resposta do servidor de autenticação.',
         {
@@ -347,7 +425,7 @@ export async function loginAdmin(
       );
     }
 
-    const parsedPayload = loginResponseSchema.safeParse(rawPayload);
+    const parsedPayload = params.parsePayload(rawPayload);
     if (!parsedPayload.success) {
       throw new AuthClientError(
         'Formato inesperado na resposta do servidor de autenticação.',
@@ -376,7 +454,7 @@ export async function loginAdmin(
       );
     }
 
-    if (isAbortError(error) || options?.signal?.aborted) {
+    if (isAbortError(error) || params.options?.signal?.aborted) {
       throw error;
     }
 
@@ -392,8 +470,77 @@ export async function loginAdmin(
     if (timeoutId !== undefined) {
       clearTimeout(timeoutId);
     }
-    if (options?.signal) {
-      options.signal.removeEventListener('abort', onExternalAbort);
+    if (params.options?.signal) {
+      params.options.signal.removeEventListener('abort', onExternalAbort);
     }
   }
+}
+
+/**
+ * Autentica um administrador via POST /api/admin/auth/login.
+ */
+export async function loginAdmin(
+  credentials: LoginCredentialsInput,
+  options?: AuthRequestOptions
+): Promise<LoginResponseDto> {
+  const validation = validateLoginInput(credentials);
+  if (!validation.success) {
+    throw new AuthClientError(validation.message, {
+      statusCode: 400,
+      code: AUTH_ERROR_CODES.VALIDATION_ERROR,
+      fieldErrors: validation.fieldErrors,
+    });
+  }
+
+  return executeAuthRequest({
+    url: LOGIN_API_PATH,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(validation.data),
+    options,
+    buildHttpError: buildHttpErrorFromResponse,
+    parsePayload: (rawPayload) => loginResponseSchema.safeParse(rawPayload),
+  });
+}
+
+/**
+ * Encerra a sessão administrativa atual via POST /api/admin/auth/logout.
+ * Nunca simula sucesso em falhas de rede ou 5xx.
+ */
+export async function logoutAdmin(
+  options?: AuthRequestOptions
+): Promise<LogoutResponseDto> {
+  return executeAuthRequest({
+    url: LOGOUT_API_PATH,
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
+    options,
+    buildHttpError: (response) => buildSessionHttpErrorFromResponse(response, 'logout'),
+    parsePayload: (rawPayload) => logoutResponseSchema.safeParse(rawPayload),
+  });
+}
+
+/**
+ * Revalida a sessão administrativa atual via GET /api/admin/auth/me (sempre no-store).
+ * Preserva 401 UNAUTHORIZED e 403 FORBIDDEN_INACTIVE_USER separadamente de erros 5xx/rede.
+ */
+export async function fetchAdminSessionMe(
+  options?: AuthRequestOptions
+): Promise<AuthMeResponseDto> {
+  return executeAuthRequest({
+    url: SESSION_ME_API_PATH,
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+    options,
+    buildHttpError: (response) =>
+      buildSessionHttpErrorFromResponse(response, 'session_me'),
+    parsePayload: (rawPayload) => authMeResponseSchema.safeParse(rawPayload),
+  });
 }
