@@ -18,6 +18,11 @@ export const ADMIN_SESSION_CHANNEL_NAME = 'nascentes-admin-auth' as const;
 export const IMPORTACAO_PREVIEW_STORAGE_KEY =
   'nascentes_cariri:admin_importacao_preview_v1' as const;
 
+export const LOGIN_SUCCESS_TOAST_STORAGE_KEY =
+  'nascentes_cariri:admin_login_success_toast_v1' as const;
+
+export const LOGIN_SUCCESS_TOAST_MAX_AGE_MS = 60_000 as const;
+
 export type AdminSessionTerminationReason = AdminLoginReason;
 
 export interface AdminSessionEvent {
@@ -58,8 +63,56 @@ export function clearPreviewSession(): void {
 
   try {
     storage.removeItem(IMPORTACAO_PREVIEW_STORAGE_KEY);
+    storage.removeItem(LOGIN_SUCCESS_TOAST_STORAGE_KEY);
   } catch {
     // Ignora falhas de acesso ao storage em ambientes restritos
+  }
+}
+
+/**
+ * Sinaliza em sessionStorage (com validade curta de 60s) que o administrador acabou
+ * de autenticar-se, permitindo exibir o toast de sucesso após o redirect para `/admin`.
+ */
+export function markAdminLoginSuccessToast(nowMs: number = Date.now()): void {
+  const storage = getBrowserSessionStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(LOGIN_SUCCESS_TOAST_STORAGE_KEY, String(nowMs));
+  } catch {
+    // Ignora falhas de acesso ao storage em ambientes restritos
+  }
+}
+
+/**
+ * Consome de forma única e atômica o sinal de login recém-realizado.
+ */
+export function consumeAdminLoginSuccessToast(
+  nowMs: number = Date.now(),
+  maxAgeMs: number = LOGIN_SUCCESS_TOAST_MAX_AGE_MS
+): boolean {
+  const storage = getBrowserSessionStorage();
+  if (!storage) {
+    return false;
+  }
+
+  try {
+    const rawValue = storage.getItem(LOGIN_SUCCESS_TOAST_STORAGE_KEY);
+    if (!rawValue) {
+      return false;
+    }
+
+    storage.removeItem(LOGIN_SUCCESS_TOAST_STORAGE_KEY);
+    const markedAtMs = Number(rawValue);
+    if (!Number.isFinite(markedAtMs) || markedAtMs <= 0) {
+      return false;
+    }
+
+    return nowMs >= markedAtMs && nowMs - markedAtMs <= maxAgeMs;
+  } catch {
+    return false;
   }
 }
 

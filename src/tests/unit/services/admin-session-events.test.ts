@@ -8,8 +8,12 @@ import { ADMIN_LOGIN_REASONS } from '@/modules/auth/auth.contracts';
 import {
   ADMIN_SESSION_CHANNEL_NAME,
   IMPORTACAO_PREVIEW_STORAGE_KEY,
+  LOGIN_SUCCESS_TOAST_STORAGE_KEY,
+  LOGIN_SUCCESS_TOAST_MAX_AGE_MS,
   broadcastAdminSessionEvent,
   clearPreviewSession,
+  consumeAdminLoginSuccessToast,
+  markAdminLoginSuccessToast,
   notifyAdminSessionExpired,
   resetAdminSessionEventsState,
   subscribeAdminSessionBroadcast,
@@ -220,5 +224,36 @@ describe('Barramento de Eventos e Multi-Aba Administrativo (src/services/admin-s
 
   it('clearPreviewSession deve ser seguro mesmo quando window ou sessionStorage não existirem', () => {
     expect(() => clearPreviewSession()).not.toThrow();
+  });
+
+  it('markAdminLoginSuccessToast e consumeAdminLoginSuccessToast devem ser de leitura única e respeitar TTL de 60s', () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      sessionStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          store.set(k, v);
+        },
+        removeItem: (k: string) => {
+          store.delete(k);
+        },
+      },
+    });
+
+    markAdminLoginSuccessToast(1_000);
+    expect(store.has(LOGIN_SUCCESS_TOAST_STORAGE_KEY)).toBe(true);
+    expect(consumeAdminLoginSuccessToast(5_000)).toBe(true);
+    expect(consumeAdminLoginSuccessToast(5_500)).toBe(false);
+
+    // Expirado após 60s
+    markAdminLoginSuccessToast(10_000);
+    expect(
+      consumeAdminLoginSuccessToast(10_000 + LOGIN_SUCCESS_TOAST_MAX_AGE_MS + 1)
+    ).toBe(false);
+
+    // clearPreviewSession limpa pendência de toast de login também
+    markAdminLoginSuccessToast(20_000);
+    clearPreviewSession();
+    expect(consumeAdminLoginSuccessToast(21_000)).toBe(false);
   });
 });
