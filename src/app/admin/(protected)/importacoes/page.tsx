@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { ImportacaoWorkspace } from '@/components/admin/importacoes';
+import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import styles from './page.module.css';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Importação e Validação de Nascentes | Painel Administrativo — UFCA',
@@ -12,7 +15,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ImportacoesAdminPage() {
+export default async function ImportacoesAdminPage() {
+  await requireAdminPageSession({ nextPath: '/admin/importacoes' });
+
   return (
     <div className={styles.pageContainer}>
       {/* Cabeçalho Semântico da Página (Único H1 do Documento) */}

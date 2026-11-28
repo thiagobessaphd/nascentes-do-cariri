@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ImportacaoDetailView } from '@/components/admin/importacoes';
+import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,13 @@ export default async function ImportacaoDetailPage({
 }: ImportacaoDetailPageProps) {
   const { id } = await params;
   const importacaoId = parseDetailRouteId(id);
+
+  await requireAdminPageSession({
+    nextPath:
+      importacaoId !== null
+        ? `/admin/importacoes/${importacaoId}`
+        : '/admin/importacoes/historico',
+  });
 
   if (importacaoId === null) {
     notFound();

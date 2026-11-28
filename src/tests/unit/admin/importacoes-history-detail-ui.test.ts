@@ -21,6 +21,7 @@ import 'dotenv/config';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import GlobalNotFound from '@/app/not-found';
 import { AdminNav } from '@/components/admin/nav';
 import ImportacoesHistoryPage, {
@@ -52,6 +53,19 @@ import {
 } from '@/modules/importacoes/importacoes.contracts';
 
 const FULL_SHA256 = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+
+vi.mock('@/lib/security/admin-page-guard', () => ({
+  requireAdminPageSession: vi.fn(),
+}));
+
+const MOCK_ADMIN_SESSION = {
+  id: 10,
+  nome: 'Administrador UFCA',
+  email: 'admin@ufca.edu.br',
+  ativo: true,
+  sessionId: 701,
+  sessionExpiresAt: new Date('2026-12-31T23:59:59.000Z'),
+};
 
 function createHistoryItem(
   overrides?: Partial<ImportacaoHistoryItemDto>
@@ -185,7 +199,9 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(detailPageHtml).not.toContain('Nascentes');
     });
 
-    it('ImportacoesHistoryPage deve declarar robots noindex/nofollow, force-dynamic, <h1> único e sanitizar query params', async () => {
+    it('ImportacoesHistoryPage deve declarar robots noindex/nofollow, force-dynamic, exigir sessão, <h1> único e sanitizar query params', async () => {
+      vi.mocked(requireAdminPageSession).mockResolvedValue(MOCK_ADMIN_SESSION);
+
       expect(historyPageDynamic).toBe('force-dynamic');
       expect(historyPageMetadata.robots).toEqual({
         index: false,
@@ -200,6 +216,10 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
         }),
       });
       const validHtml = renderToStaticMarkup(validPageElement);
+
+      expect(requireAdminPageSession).toHaveBeenCalledWith({
+        nextPath: '/admin/importacoes/historico',
+      });
 
       expect(validHtml).toContain('<h1');
       expect(validHtml).toContain('Histórico de Importações');
@@ -230,7 +250,10 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
       expect(invalidHtml).not.toContain('data-testid="history-clear-filter"');
     });
 
-    it('ImportacaoDetailPage deve declarar noindex/force-dynamic, aceitar ID positivo e invocar notFound() para IDs inválidos', async () => {
+    it('ImportacaoDetailPage deve declarar noindex/force-dynamic, exigir sessão antes de notFound(), aceitar ID positivo e invocar notFound() para IDs inválidos', async () => {
+      vi.mocked(requireAdminPageSession).mockReset();
+      vi.mocked(requireAdminPageSession).mockResolvedValue(MOCK_ADMIN_SESSION);
+
       expect(detailPageDynamic).toBe('force-dynamic');
       expect(detailPageMetadata.robots).toEqual({
         index: false,
@@ -241,6 +264,9 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
         params: Promise.resolve({ id: '42' }),
       });
       const validHtml = renderToStaticMarkup(validElement);
+      expect(requireAdminPageSession).toHaveBeenCalledWith({
+        nextPath: '/admin/importacoes/42',
+      });
       expect(validHtml).toContain('data-testid="importacao-detail-loading"');
       expect(validHtml).toContain('Carregando detalhes do lote #42...');
 
@@ -258,6 +284,18 @@ describe('US-14 / Task-28 — Telas Administrativas de Histórico, Detalhe e Nav
         const message = (caughtError as Error).message ?? '';
         expect(`${digest} ${message}`).toMatch(/NEXT_HTTP_ERROR_FALLBACK;404|NEXT_NOT_FOUND/);
       }
+
+      // Garante que visitante não autenticado recebe redirect antes de notFound() (anti-oráculo de IDs)
+      const redirectError = new Error('NEXT_REDIRECT');
+      vi.mocked(requireAdminPageSession).mockRejectedValueOnce(redirectError);
+      await expect(
+        ImportacaoDetailPage({
+          params: Promise.resolve({ id: 'nao-existe' }),
+        })
+      ).rejects.toBe(redirectError);
+      expect(requireAdminPageSession).toHaveBeenLastCalledWith({
+        nextPath: '/admin/importacoes/historico',
+      });
     });
 
     it('Boundaries de Loading (/historico e /[id]) devem expor Skeleton com role="status", aria-live="polite" e aria-busy="true"', () => {

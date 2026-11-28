@@ -13,20 +13,19 @@
  * - src/components/admin/importacoes/action-bar/ImportActionBar.tsx
  * - src/components/admin/importacoes/upload-form/ImportUploadForm.tsx
  * - src/components/admin/importacoes/workspace/ImportacaoWorkspace.tsx
- * - src/app/api/admin/dev-session/route.ts
  */
 
 import 'dotenv/config';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NextRequest } from 'next/server';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminRootLayout, { metadata as adminRootLayoutMetadata } from '@/app/admin/layout';
 import AdminLayout, {
   dynamic as adminLayoutDynamic,
   metadata as adminLayoutMetadata,
 } from '@/app/admin/(protected)/layout';
 import ImportacoesAdminPage, {
+  dynamic as importacoesPageDynamic,
   metadata as importacoesPageMetadata,
 } from '@/app/admin/(protected)/importacoes/page';
 import ImportacoesLoading from '@/app/admin/(protected)/importacoes/loading';
@@ -49,26 +48,10 @@ import {
   type ValidTxtPreviewRow,
 } from '@/modules/importacoes/importacoes.contracts';
 import { parseTxtLine } from '@/modules/importacoes/txt-parser';
-import {
-  createAdminSessionToken,
-  generateSessionId,
-  hashSessionId,
-} from '@/lib/security/admin-guard';
 import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
-import { prisma } from '@/lib/db/prisma';
-import { GET as devSessionGET, DELETE as devSessionDELETE } from '@/app/api/admin/dev-session/route';
 
 vi.mock('@/lib/security/admin-page-guard', () => ({
   requireAdminPageSession: vi.fn(),
-}));
-
-vi.mock('@/lib/db/prisma', () => ({
-  prisma: {
-    sessao: {
-      findUnique: vi.fn(),
-      updateMany: vi.fn(),
-    },
-  },
 }));
 
 const MOCK_VALID_ROWS: readonly ValidTxtPreviewRow[] = [
@@ -193,9 +176,23 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).not.toContain('Sair');
     });
 
-    it('deve renderizar ImportacoesAdminPage com cabeçalho semântico único <h1> e landmark de workspace', () => {
-      const html = renderToStaticMarkup(React.createElement(ImportacoesAdminPage));
+    it('deve declarar force-dynamic, exigir sessão válida e renderizar ImportacoesAdminPage com cabeçalho semântico único <h1> e landmark de workspace', async () => {
+      expect(importacoesPageDynamic).toBe('force-dynamic');
+      vi.mocked(requireAdminPageSession).mockResolvedValueOnce({
+        id: 7,
+        nome: 'Maria de Lourdes da Silva',
+        email: 'maria.lourdes@ufca.edu.br',
+        ativo: true,
+        sessionId: 201,
+        sessionExpiresAt: new Date('2026-12-31T23:59:59.000Z'),
+      });
 
+      const element = await ImportacoesAdminPage();
+      const html = renderToStaticMarkup(element);
+
+      expect(requireAdminPageSession).toHaveBeenCalledWith({
+        nextPath: '/admin/importacoes',
+      });
       expect(html).toContain('<h1');
       expect(html).toContain('Importação e Validação de Nascentes');
       expect(html).toContain('GESTÃO DA BASE CARTOGRÁFICA');
@@ -566,108 +563,6 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).toContain('role="alert"');
       expect(html).toContain('aria-live="assertive"');
       expect(html).toContain('O arquivo enviado excede o limite máximo permitido (5 MB).');
-    });
-  });
-
-  describe('7. Segurança da Sessão de Desenvolvimento (/api/admin/dev-session)', () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
-      if (originalNodeEnv !== undefined) {
-        vi.stubEnv('NODE_ENV', originalNodeEnv);
-      }
-    });
-
-    it('deve retornar 404 Not Found em GET e DELETE quando NODE_ENV não for development', async () => {
-      vi.stubEnv('NODE_ENV', 'production');
-
-      const getReq = new NextRequest('http://localhost:3000/api/admin/dev-session?token=abc');
-      const getRes = await devSessionGET(getReq);
-      expect(getRes.status).toBe(404);
-
-      const delReq = new NextRequest('http://localhost:3000/api/admin/dev-session', {
-        method: 'DELETE',
-      });
-      const delRes = await devSessionDELETE();
-      expect(delRes.status).toBe(404);
-      expect(delReq.method).toBe('DELETE');
-    });
-
-    it('deve retornar 400 MISSING_DEV_TOKEN quando o parâmetro token estiver ausente em development', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-
-      const req = new NextRequest('http://localhost:3000/api/admin/dev-session');
-      const res = await devSessionGET(req);
-      const body = (await res.json()) as { code: string };
-
-      expect(res.status).toBe(400);
-      expect(body.code).toBe('MISSING_DEV_TOKEN');
-    });
-
-    it('deve retornar 401 UNAUTHORIZED quando o token for inválido ou adulterado em development', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-
-      const req = new NextRequest('http://localhost:3000/api/admin/dev-session?token=token.invalido.assinatura');
-      const res = await devSessionGET(req);
-      const body = (await res.json()) as { code: string };
-
-      expect(res.status).toBe(401);
-      expect(body.code).toBe('UNAUTHORIZED');
-    });
-
-    it('deve emitir cookie HttpOnly e redirecionar 303 para rota administrativa segura quando a sessão persistida pertencer a admin ativo em development', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-
-      const sid = generateSessionId();
-      const validToken = createAdminSessionToken({
-        sid,
-        userId: 10,
-        email: 'admin@ufca.edu.br',
-      });
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce({
-        id: 77,
-        usuarioId: 10,
-        expiresAt,
-        revokedAt: null,
-        usuario: {
-          id: 10,
-          nome: 'Administrador UFCA',
-          email: 'admin@ufca.edu.br',
-          ativo: true,
-        },
-      } as unknown as Awaited<ReturnType<typeof prisma.sessao.findUnique>>);
-
-      // Testa também a proteção contra Open Redirect (next=//evil.com deve cair em /admin)
-      const req = new NextRequest(
-        `http://localhost:3000/api/admin/dev-session?token=${encodeURIComponent(validToken)}&next=//evil.com`
-      );
-      const res = await devSessionGET(req);
-
-      expect(prisma.sessao.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { tokenHash: hashSessionId(sid) },
-        })
-      );
-      expect(res.status).toBe(303);
-      expect(res.headers.get('location')).toBe('http://localhost:3000/admin');
-      expect(res.headers.get('set-cookie')).toContain('HttpOnly');
-      expect(res.headers.get('set-cookie')).toContain('SameSite=Lax');
-
-      // Sessão ausente/revogada no banco deve ser rejeitada com 401
-      vi.mocked(prisma.sessao.findUnique).mockResolvedValueOnce(null);
-      const revokedRes = await devSessionGET(
-        new NextRequest(
-          `http://localhost:3000/api/admin/dev-session?token=${encodeURIComponent(validToken)}`
-        )
-      );
-      expect(revokedRes.status).toBe(401);
     });
   });
 

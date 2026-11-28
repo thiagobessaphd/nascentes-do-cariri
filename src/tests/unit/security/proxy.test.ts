@@ -81,7 +81,7 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
         const res = proxy(req);
         expect(res.status).toBe(307);
         expect(res.headers.get('location')).toBe(
-          'http://localhost:3000/admin/login?next=%2Fadmin%2Fimportacoes'
+          'http://localhost:3000/admin/login?next=%2Fadmin%2Fimportacoes&motivo=sessao_expirada'
         );
       }
     });
@@ -129,6 +129,8 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
           expect(res.status).toBe(200);
           expect(res.headers.get('location')).toBeNull();
           expect(res.headers.get('x-middleware-next')).toBe('1');
+          expect(res.headers.get('cache-control')).toContain('no-store');
+          expect(res.headers.get('pragma')).toBe('no-cache');
         }
       }
     });
@@ -200,15 +202,29 @@ describe('Proxy de Proteção Administrativa (src/proxy.ts)', () => {
       expect(res.headers.get('x-middleware-next')).toBe('1');
     });
 
-    it('deve liberar /api/admin/dev-session apenas em development e bloquear nos demais ambientes', async () => {
-      vi.stubEnv('NODE_ENV', 'development');
-      const devRes = proxy(
-        new NextRequest('http://localhost:3000/api/admin/dev-session?token=abc')
-      );
-      expect(devRes.status).toBe(200);
-      expect(devRes.headers.get('x-middleware-next')).toBe('1');
+    it('deve liberar /api/admin/auth/logout mesmo sem cookie ou com token vencido para permitir limpeza de cookies', () => {
+      const expiredToken = createAdminSessionToken({
+        userId: 1,
+        email: 'admin@ufca.edu.br',
+        expiresInSeconds: -120,
+      });
 
-      for (const envName of ['production', 'test'] as const) {
+      for (const req of [
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', { method: 'POST' }),
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: { cookie: `${SESSION_COOKIE_NAMES.DEVELOPMENT}=${expiredToken}` },
+        }),
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', { method: 'GET' }),
+      ]) {
+        const res = proxy(req);
+        expect(res.status).toBe(200);
+        expect(res.headers.get('x-middleware-next')).toBe('1');
+      }
+    });
+
+    it('deve bloquear rota legada /api/admin/dev-session removida em todos os ambientes', async () => {
+      for (const envName of ['development', 'production', 'test'] as const) {
         vi.stubEnv('NODE_ENV', envName);
         const blockedRes = proxy(
           new NextRequest('http://localhost:3000/api/admin/dev-session?token=abc')

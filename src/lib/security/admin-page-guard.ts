@@ -14,7 +14,7 @@ import {
   type AdminUserSession,
   type RequireAdminSessionOptions,
 } from './admin-guard';
-import { buildAdminLoginRedirectUrl } from './admin-redirect';
+import { ADMIN_LOGIN_REASONS, buildAdminLoginRedirectUrl } from './admin-redirect';
 
 export interface CookieReader {
   get(name: string): { readonly value: string } | undefined;
@@ -55,7 +55,11 @@ export async function requireAdminPageSession(
     });
   } catch (error: unknown) {
     if (error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {
-      return redirect(buildAdminLoginRedirectUrl(options?.nextPath));
+      return redirect(
+        buildAdminLoginRedirectUrl(options?.nextPath, {
+          reason: token ? ADMIN_LOGIN_REASONS.SESSION_EXPIRED : undefined,
+        })
+      );
     }
     throw error;
   }

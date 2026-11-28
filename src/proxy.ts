@@ -8,7 +8,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE_NAMES, extractSessionToken } from '@/config/session-cookies';
-import { ADMIN_LOGIN_PATH, buildAdminLoginRedirectUrl } from '@/lib/security/admin-redirect';
+import {
+  ADMIN_LOGIN_PATH,
+  ADMIN_LOGIN_REASONS,
+  buildAdminLoginRedirectUrl,
+} from '@/lib/security/admin-redirect';
 import {
   extractAuthTokenFromRequest,
   verifyAdminSessionToken,
@@ -21,7 +25,7 @@ const NO_STORE_HEADERS = {
 
 const ADMIN_API_PREFIX = '/api/admin';
 const ADMIN_LOGIN_API_PATH = '/api/admin/auth/login';
-const ADMIN_DEV_SESSION_API_PATH = '/api/admin/dev-session';
+const ADMIN_LOGOUT_API_PATH = '/api/admin/auth/logout';
 
 function isAdminLoginPage(pathname: string): boolean {
   return pathname === ADMIN_LOGIN_PATH || pathname.startsWith(`${ADMIN_LOGIN_PATH}/`);
@@ -36,18 +40,12 @@ function isAdminPageRoute(pathname: string): boolean {
 }
 
 function isExemptAdminApiRoute(pathname: string): boolean {
-  if (pathname === ADMIN_LOGIN_API_PATH || pathname === `${ADMIN_LOGIN_API_PATH}/`) {
-    return true;
-  }
-
-  if (
-    process.env.NODE_ENV === 'development' &&
-    (pathname === ADMIN_DEV_SESSION_API_PATH || pathname === `${ADMIN_DEV_SESSION_API_PATH}/`)
-  ) {
-    return true;
-  }
-
-  return false;
+  return (
+    pathname === ADMIN_LOGIN_API_PATH ||
+    pathname === `${ADMIN_LOGIN_API_PATH}/` ||
+    pathname === ADMIN_LOGOUT_API_PATH ||
+    pathname === `${ADMIN_LOGOUT_API_PATH}/`
+  );
 }
 
 function safeDecodeCookieCandidate(rawValue: string | undefined): string | null {
@@ -107,7 +105,9 @@ export function proxy(request: NextRequest): NextResponse {
 
     const cookieToken = extractCookieSessionToken(request);
     if (!cookieToken || !verifyAdminSessionToken(cookieToken)) {
-      const loginPath = buildAdminLoginRedirectUrl(`${pathname}${search}`);
+      const loginPath = buildAdminLoginRedirectUrl(`${pathname}${search}`, {
+        reason: cookieToken ? ADMIN_LOGIN_REASONS.SESSION_EXPIRED : undefined,
+      });
       const destinationUrl = new URL(loginPath, request.url);
       return NextResponse.redirect(destinationUrl, {
         status: 307,
@@ -115,7 +115,10 @@ export function proxy(request: NextRequest): NextResponse {
       });
     }
 
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
+    response.headers.set('Pragma', NO_STORE_HEADERS.Pragma);
+    return response;
   }
 
   return NextResponse.next();

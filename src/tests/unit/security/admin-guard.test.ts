@@ -73,8 +73,10 @@ import {
 } from '@/lib/security/admin-page-guard';
 import {
   ADMIN_LOGIN_PATH,
+  ADMIN_LOGIN_REASONS,
   DEFAULT_ADMIN_REDIRECT_PATH,
   buildAdminLoginRedirectUrl,
+  resolveAdminLoginReason,
   sanitizeAdminRedirectPath,
 } from '@/lib/security/admin-redirect';
 
@@ -625,7 +627,7 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         })
       ).rejects.toBeInstanceOf(RedirectSignal);
       expect(mockRedirect).toHaveBeenLastCalledWith(
-        '/admin/login?next=%2Fadmin%2Fimportacoes%2F15'
+        '/admin/login?next=%2Fadmin%2Fimportacoes%2F15&motivo=sessao_expirada'
       );
 
       const inactiveToken = createAdminSessionToken({
@@ -646,7 +648,7 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
           nextPath: 'https://evil.com',
         })
       ).rejects.toBeInstanceOf(RedirectSignal);
-      expect(mockRedirect).toHaveBeenLastCalledWith('/admin/login');
+      expect(mockRedirect).toHaveBeenLastCalledWith('/admin/login?motivo=sessao_expirada');
 
       const activeToken = createAdminSessionToken({
         userId: ACTIVE_USER.id,
@@ -724,6 +726,36 @@ describe('Camada de Guarda Administrativa (Etapa 2)', () => {
         sessionExpiresAt: expiresAt,
       });
     });
+  });
+
+  it('resolveAdminLoginReason e buildAdminLoginRedirectUrl devem aplicar allowlist estrita de motivos sem abrir Open Redirect', () => {
+    expect(resolveAdminLoginReason('logout')).toBe(ADMIN_LOGIN_REASONS.LOGOUT);
+    expect(resolveAdminLoginReason('  SESSAO_EXPIRADA ')).toBe(
+      ADMIN_LOGIN_REASONS.SESSION_EXPIRED
+    );
+    expect(resolveAdminLoginReason(['logout', 'outro'])).toBe(ADMIN_LOGIN_REASONS.LOGOUT);
+    expect(resolveAdminLoginReason('phishing_texto_arbitrario')).toBeNull();
+    expect(resolveAdminLoginReason('')).toBeNull();
+    expect(resolveAdminLoginReason(undefined)).toBeNull();
+
+    expect(
+      buildAdminLoginRedirectUrl(null, { reason: ADMIN_LOGIN_REASONS.LOGOUT })
+    ).toBe('/admin/login?motivo=logout');
+    expect(
+      buildAdminLoginRedirectUrl('/admin/importacoes/historico', {
+        reason: ADMIN_LOGIN_REASONS.SESSION_EXPIRED,
+      })
+    ).toBe('/admin/login?next=%2Fadmin%2Fimportacoes%2Fhistorico&motivo=sessao_expirada');
+    expect(
+      buildAdminLoginRedirectUrl('https://evil.example', {
+        reason: ADMIN_LOGIN_REASONS.SESSION_EXPIRED,
+      })
+    ).toBe('/admin/login?motivo=sessao_expirada');
+    expect(
+      buildAdminLoginRedirectUrl('/admin/importacoes', {
+        reason: 'invalido' as never,
+      })
+    ).toBe('/admin/login?next=%2Fadmin%2Fimportacoes');
   });
 
   it('AppError deve manter instância em falhas de guarda', async () => {

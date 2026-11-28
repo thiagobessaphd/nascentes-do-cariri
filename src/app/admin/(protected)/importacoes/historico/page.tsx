@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getOptionalAdminPageSession } from '@/lib/security/admin-page-guard';
+import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import {
   DEFAULT_HISTORY_PAGE,
   IMPORTACAO_STATUS_VALUES,
@@ -72,18 +72,12 @@ function parseOptionalStatusParam(
     : undefined;
 }
 
-async function resolveOptionalCurrentUserId(): Promise<number | null> {
-  try {
-    const session = await getOptionalAdminPageSession();
-    return session?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function ImportacoesHistoryPage({
   searchParams,
 }: ImportacoesHistoryPageProps) {
+  const session = await requireAdminPageSession({
+    nextPath: '/admin/importacoes/historico',
+  });
   const resolvedParams = searchParams ? await searchParams : undefined;
   const initialPage = parseOptionalPageParam(resolvedParams?.page);
   const initialPageSize = parseOptionalPageSizeParam(
@@ -91,7 +85,7 @@ export default async function ImportacoesHistoryPage({
     resolvedParams?.limit
   );
   const initialStatus = parseOptionalStatusParam(resolvedParams?.status);
-  const currentUserId = await resolveOptionalCurrentUserId();
+  const currentUserId = session.id;
 
   return (
     <div className={styles.pageContainer}>
