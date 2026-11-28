@@ -199,7 +199,7 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).toContain('aria-label="Área de trabalho de importação e prévia"');
     });
 
-    it('deve exigir sessão válida e renderizar AdminLayout com perfil real, skip link, marca /admin, 3 itens reais e botão Sair desabilitado', async () => {
+    it('deve exigir sessão válida e renderizar AdminLayout com perfil real, skip link, marca /admin, 3 itens reais e botão Sair ativo', async () => {
       vi.mocked(requireAdminPageSession).mockResolvedValueOnce({
         id: 7,
         nome: 'Maria de Lourdes da Silva',
@@ -229,7 +229,8 @@ describe('US-12 / Task-24 — Interface Administrativa de Prévia, Resumo e Erro
       expect(html).toContain('>MS<');
       expect(html).toContain('role="group"');
       expect(html).toContain('data-testid="admin-logout-button"');
-      expect(html).toContain('aria-disabled="true"');
+      expect(html).toContain('aria-label="Sair da conta administrativa"');
+      expect(html).not.toContain('aria-disabled="true"');
       expect(html).not.toContain('Sprint 4');
       expect(html).not.toContain('202');
       expect(html).toContain('Conteúdo Interno');

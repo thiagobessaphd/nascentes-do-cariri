@@ -381,7 +381,8 @@ describe('US-16 / Task-31 — Shell Responsivo e Resumo Operacional do Painel (/
       expect(html).toContain('role="group"');
       expect(html).toContain('aria-label="Perfil do usuário conectado"');
       expect(html).toContain('data-testid="admin-logout-button"');
-      expect(html).toContain('aria-disabled="true"');
+      expect(html).toContain('aria-label="Sair da conta administrativa"');
+      expect(html).not.toContain('aria-disabled="true"');
       expect(html).not.toContain('Thiago Bessa');
       expect(html).not.toContain('888');
       expect(html).not.toContain('Sprint 4');

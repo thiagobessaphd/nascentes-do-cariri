@@ -329,28 +329,31 @@
   align-items: center;
   gap: 0.3rem;
   background: transparent;
-  border: 1px solid #d8dee9;
-  color: #64748b;
+  border: 1px solid #cbd5e1;
+  color: #475569;
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
   font-size: 0.71875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   min-height: 44px;
   min-width: 44px;
   margin-left: 0.25rem;
   flex-shrink: 0;
 }
 
-.logoutButton:not([aria-disabled='true']):hover {
+.logoutButton:not(:disabled):not([aria-disabled='true']):hover {
   background-color: #fef2f2;
   border-color: #fca5a5;
   color: #b91c1c;
 }
 
+.logoutButton:disabled,
 .logoutButton[aria-disabled='true'] {
-  opacity: 0.55;
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
   cursor: not-allowed;
 }
 

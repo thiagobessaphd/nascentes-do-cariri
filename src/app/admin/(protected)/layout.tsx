@@ -6,6 +6,12 @@ import logoUfcaSymbol from '@/assets/images/logo_ufca.png';
 import logoUfcaFull from '@/assets/images/logo_ufca-full.png';
 import logoCnpq from '@/assets/images/logo_cnpq.png';
 import { AdminNav } from '@/components/admin/nav';
+import {
+  AdminLogoutErrorBanner,
+  AdminSessionGuard,
+  AdminSessionProvider,
+  LogoutButton,
+} from '@/components/admin/session';
 import { requireAdminPageSession } from '@/lib/security/admin-page-guard';
 import { toAdminProfileView } from '@/modules/painel/painel.contracts';
 import styles from './admin-layout.module.css';
@@ -28,8 +34,11 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
   const profile = toAdminProfileView(session);
 
   return (
-    <div className={styles.adminShell} data-admin-shell="true">
-      {/* Atalho de acessibilidade por teclado para o conteúdo principal */}
+    <AdminSessionProvider>
+      <div className={styles.adminShell} data-admin-shell="true">
+        <AdminSessionGuard />
+
+        {/* Atalho de acessibilidade por teclado para o conteúdo principal */}
       <a href="#admin-main" className={styles.skipLink}>
         Pular para o conteúdo principal
       </a>
@@ -156,34 +165,19 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
                   </span>
                 </div>
 
-                <button
-                  type="button"
+                {/* Botão funcional de encerramento de sessão (Task-32) */}
+                <LogoutButton
                   className={styles.logoutButton}
-                  data-testid="admin-logout-button"
-                  aria-disabled="true"
-                  title="Encerramento de sessão disponível em breve"
-                  aria-label="Sair da conta administrativa (indisponível temporariamente)"
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                  <span className={styles.logoutLabel}>Sair</span>
-                </button>
+                  labelClassName={styles.logoutLabel}
+                />
               </div>
             </div>
           </div>
         </header>
       </div>
+
+      {/* Alerta discreto de falha no logout (exibido sob o header apenas em rede/5xx) */}
+      <AdminLogoutErrorBanner />
 
       {/* Região Principal */}
       <main id="admin-main" className={styles.adminMain} tabIndex={-1}>
@@ -224,6 +218,7 @@ export default async function AdminLayout({ children }: Readonly<AdminLayoutProp
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </AdminSessionProvider>
   );
 }
