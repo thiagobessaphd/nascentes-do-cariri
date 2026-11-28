@@ -115,6 +115,20 @@ export function serializeExpiredSessionCookie(
   return parts.join('; ');
 }
 
+/**
+ * Constrói os cabeçalhos Set-Cookie de expiração imediata para ambos os nomes
+ * de cookie de sessão (`__Host-` e desenvolvimento), eliminando cookies residuais
+ * em transições de ambiente local/produção.
+ */
+export function serializeAllExpiredSessionCookies(): string[] {
+  const candidates = [
+    serializeExpiredSessionCookie({ isProduction: true }),
+    serializeExpiredSessionCookie({ isProduction: false }),
+  ];
+
+  return Array.from(new Set(candidates));
+}
+
 function safeDecodeCookieValue(rawValue: string): string | null {
   if (!rawValue) {
     return null;

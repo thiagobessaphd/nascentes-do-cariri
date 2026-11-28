@@ -7,16 +7,30 @@
 import { z } from 'zod';
 import {
   ADMIN_LOGIN_PATH,
+  ADMIN_LOGIN_REASONS,
   DEFAULT_ADMIN_REDIRECT_PATH,
   buildAdminLoginRedirectUrl,
+  resolveAdminLoginReason,
   sanitizeAdminRedirectPath,
+  type AdminLoginReason,
+  type BuildAdminLoginRedirectUrlOptions,
 } from '@/lib/security/admin-redirect';
 
 export {
   ADMIN_LOGIN_PATH,
+  ADMIN_LOGIN_REASONS,
   DEFAULT_ADMIN_REDIRECT_PATH,
   buildAdminLoginRedirectUrl,
+  resolveAdminLoginReason,
   sanitizeAdminRedirectPath,
+  type AdminLoginReason,
+  type BuildAdminLoginRedirectUrlOptions,
+};
+
+export const ADMIN_LOGIN_NOTICE_BY_REASON: Readonly<Record<AdminLoginReason, string>> = {
+  [ADMIN_LOGIN_REASONS.LOGOUT]: 'Sua sessão administrativa foi encerrada com segurança.',
+  [ADMIN_LOGIN_REASONS.SESSION_EXPIRED]:
+    'Sua sessão expirou ou foi encerrada. Faça login novamente para continuar.',
 };
 
 // 30 dias (alinhado ao cookie de sessão)
@@ -35,6 +49,7 @@ export const AUTH_ERROR_CODES = {
   RATE_LIMITED: 'RATE_LIMITED',
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN_INACTIVE_USER: 'FORBIDDEN_INACTIVE_USER',
+  FORBIDDEN_CROSS_ORIGIN: 'FORBIDDEN_CROSS_ORIGIN',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
 } as const;
 
@@ -85,12 +100,19 @@ export const authSessionResponseSchema = z
 export const loginResponseSchema = authSessionResponseSchema;
 export const authMeResponseSchema = authSessionResponseSchema;
 
+export const logoutResponseSchema = z
+  .object({
+    loggedOut: z.literal(true),
+  })
+  .strict();
+
 export type LoginRequestDto = z.infer<typeof loginRequestSchema>;
 export type AdminPublicUserDto = z.infer<typeof adminPublicUserSchema>;
 export type AuthSessionMetaDto = z.infer<typeof authSessionMetaSchema>;
 export type AuthSessionResponseDto = z.infer<typeof authSessionResponseSchema>;
 export type LoginResponseDto = AuthSessionResponseDto;
 export type AuthMeResponseDto = AuthSessionResponseDto;
+export type LogoutResponseDto = z.infer<typeof logoutResponseSchema>;
 
 export function toAdminPublicUserDto(row: {
   readonly id: number;

@@ -16,11 +16,13 @@ import {
   LoginRateLimitError,
   authMeResponseSchema,
   loginResponseSchema,
+  logoutResponseSchema,
 } from '@/modules/auth';
 
 const hoistedMocks = vi.hoisted(() => ({
   authenticateAdmin: vi.fn(),
   getAuthenticatedAdmin: vi.fn(),
+  revokeSessionByToken: vi.fn(),
   requireAdminSession: vi.fn(),
   loggerError: vi.fn(),
 }));
@@ -33,6 +35,7 @@ vi.mock('@/modules/auth', async (importOriginal) => {
       ...actual.authService,
       authenticateAdmin: hoistedMocks.authenticateAdmin,
       getAuthenticatedAdmin: hoistedMocks.getAuthenticatedAdmin,
+      revokeSessionByToken: hoistedMocks.revokeSessionByToken,
     },
   };
 });
@@ -74,6 +77,15 @@ import {
   dynamic as meDynamic,
   runtime as meRuntime,
 } from '@/app/api/admin/auth/me/route';
+import {
+  DELETE as logoutDELETE,
+  GET as logoutGET,
+  PATCH as logoutPATCH,
+  POST as logoutPOST,
+  PUT as logoutPUT,
+  dynamic as logoutDynamic,
+  runtime as logoutRuntime,
+} from '@/app/api/admin/auth/logout/route';
 
 function makeLoginRequest(
   body: string | Record<string, unknown>,
@@ -422,6 +434,150 @@ describe('Rotas HTTP de Autenticação Administrativa (/api/admin/auth/*)', () =
         expect(body.code).toBe('METHOD_NOT_ALLOWED');
         expect(res.headers.get('allow')).toBe('GET');
         expect(res.headers.get('cache-control')).toContain('no-store');
+      }
+    });
+  });
+
+  describe('POST /api/admin/auth/logout', () => {
+    it('deve declarar dynamic=force-dynamic e runtime=nodejs', () => {
+      expect(logoutDynamic).toBe('force-dynamic');
+      expect(logoutRuntime).toBe('nodejs');
+    });
+
+    it('deve revogar sessão, expirar ambos os cookies (__Host- e dev), aplicar no-store e retornar 200 { loggedOut: true }', async () => {
+      hoistedMocks.revokeSessionByToken.mockResolvedValueOnce(true);
+
+      const req = new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost:3000',
+          'sec-fetch-site': 'same-origin',
+          cookie: `${SESSION_COOKIE_NAMES.DEVELOPMENT}=valid.jwt.token`,
+        },
+      });
+
+      const res = await logoutPOST(req);
+      const body = (await res.json()) as Record<string, unknown>;
+      const setCookies = res.headers.getSetCookie();
+
+      expect(res.status).toBe(200);
+      expect(logoutResponseSchema.safeParse(body).success).toBe(true);
+      expect(body).toEqual({ loggedOut: true });
+      expect(hoistedMocks.revokeSessionByToken).toHaveBeenCalledWith(req);
+      expect(setCookies).toHaveLength(2);
+      expect(
+        setCookies.some(
+          (cookie) =>
+            cookie.startsWith(`${SESSION_COOKIE_NAMES.PRODUCTION}=`) &&
+            cookie.includes('Max-Age=0') &&
+            cookie.includes('Secure')
+        )
+      ).toBe(true);
+      expect(
+        setCookies.some(
+          (cookie) =>
+            cookie.startsWith(`${SESSION_COOKIE_NAMES.DEVELOPMENT}=`) &&
+            cookie.includes('Max-Age=0') &&
+            !cookie.includes('Secure')
+        )
+      ).toBe(true);
+      expect(res.headers.get('cache-control')).toContain('no-store');
+      expect(res.headers.get('pragma')).toBe('no-cache');
+      expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    });
+
+    it('deve ser idempotente e expirar cookies mesmo quando não houver sessão ativa ou o banco falhar (best-effort)', async () => {
+      hoistedMocks.revokeSessionByToken.mockResolvedValueOnce(false);
+      const noCookieRes = await logoutPOST(
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+        })
+      );
+      expect(noCookieRes.status).toBe(200);
+      expect(await noCookieRes.json()).toEqual({ loggedOut: true });
+      expect(noCookieRes.headers.getSetCookie()).toHaveLength(2);
+
+      hoistedMocks.revokeSessionByToken.mockRejectedValueOnce(
+        new Error('Transient DB connection refused with secret=token123')
+      );
+      const dbErrorRes = await logoutPOST(
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: {
+            cookie: `${SESSION_COOKIE_NAMES.DEVELOPMENT}=stale.token`,
+          },
+        })
+      );
+      expect(dbErrorRes.status).toBe(200);
+      expect(await dbErrorRes.json()).toEqual({ loggedOut: true });
+      expect(dbErrorRes.headers.getSetCookie()).toHaveLength(2);
+      expect(hoistedMocks.loggerError).toHaveBeenCalledTimes(1);
+      const loggedMeta = JSON.stringify(hoistedMocks.loggerError.mock.calls[0]);
+      expect(loggedMeta).not.toContain('secret=token123');
+      expect(loggedMeta).not.toContain('stale.token');
+    });
+
+    it('deve aceitar requisição atrás de proxy reverso quando Origin corresponder a x-forwarded-host/proto', async () => {
+      hoistedMocks.revokeSessionByToken.mockResolvedValueOnce(true);
+
+      const req = new NextRequest('http://127.0.0.1:3000/api/admin/auth/logout', {
+        method: 'POST',
+        headers: {
+          origin: 'https://nascentes.ufca.edu.br',
+          'x-forwarded-host': 'nascentes.ufca.edu.br',
+          'x-forwarded-proto': 'https',
+          'sec-fetch-site': 'same-origin',
+        },
+      });
+
+      const res = await logoutPOST(req);
+      expect(res.status).toBe(200);
+      expect(hoistedMocks.revokeSessionByToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve rejeitar com 403 FORBIDDEN_CROSS_ORIGIN sem revogar sessão nem limpar cookies em origem externa ou malformada', async () => {
+      const hostileRequests = [
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: { 'sec-fetch-site': 'cross-site' },
+        }),
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: { origin: 'https://evil.example' },
+        }),
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: { origin: 'null' },
+        }),
+        new NextRequest('http://localhost:3000/api/admin/auth/logout', {
+          method: 'POST',
+          headers: { origin: 'not-a-valid-url' },
+        }),
+      ];
+
+      for (const req of hostileRequests) {
+        const res = await logoutPOST(req);
+        const body = (await res.json()) as { code: string };
+
+        expect(res.status).toBe(403);
+        expect(body.code).toBe(AUTH_ERROR_CODES.FORBIDDEN_CROSS_ORIGIN);
+        expect(res.headers.getSetCookie()).toHaveLength(0);
+        expect(res.headers.get('cache-control')).toContain('no-store');
+      }
+
+      expect(hoistedMocks.revokeSessionByToken).not.toHaveBeenCalled();
+    });
+
+    it('deve retornar 405 METHOD_NOT_ALLOWED com Allow=POST para métodos não suportados', async () => {
+      for (const handler of [logoutGET, logoutPUT, logoutDELETE, logoutPATCH]) {
+        const res = await handler();
+        const body = (await res.json()) as { code: string };
+
+        expect(res.status).toBe(405);
+        expect(body.code).toBe('METHOD_NOT_ALLOWED');
+        expect(res.headers.get('allow')).toBe('POST');
+        expect(res.headers.get('cache-control')).toContain('no-store');
+        expect(res.headers.get('referrer-policy')).toBe('no-referrer');
       }
     });
   });

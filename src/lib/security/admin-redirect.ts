@@ -7,6 +7,18 @@
 export const ADMIN_LOGIN_PATH = '/admin/login' as const;
 export const DEFAULT_ADMIN_REDIRECT_PATH = '/admin' as const;
 
+export const ADMIN_LOGIN_REASONS = {
+  LOGOUT: 'logout',
+  SESSION_EXPIRED: 'sessao_expirada',
+} as const;
+
+export type AdminLoginReason =
+  (typeof ADMIN_LOGIN_REASONS)[keyof typeof ADMIN_LOGIN_REASONS];
+
+export interface BuildAdminLoginRedirectUrlOptions {
+  readonly reason?: AdminLoginReason | null | undefined;
+}
+
 const CONTROL_CHARS_REGEX = /[\u0000-\u001F\u007F]/;
 
 function parseValidAdminRedirectPath(rawNext: string | null | undefined): string | null {
@@ -49,11 +61,42 @@ export function sanitizeAdminRedirectPath(
   return parseValidAdminRedirectPath(rawNext) ?? fallback;
 }
 
-export function buildAdminLoginRedirectUrl(rawNext?: string | null | undefined): string {
+// Valida estritamente o motivo de redirecionamento em allowlist fechada.
+export function resolveAdminLoginReason(rawReason: unknown): AdminLoginReason | null {
+  const candidate = Array.isArray(rawReason) ? rawReason[0] : rawReason;
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+
+  const normalized = candidate.trim().toLowerCase();
+  if (normalized === ADMIN_LOGIN_REASONS.LOGOUT) {
+    return ADMIN_LOGIN_REASONS.LOGOUT;
+  }
+  if (normalized === ADMIN_LOGIN_REASONS.SESSION_EXPIRED) {
+    return ADMIN_LOGIN_REASONS.SESSION_EXPIRED;
+  }
+
+  return null;
+}
+
+export function buildAdminLoginRedirectUrl(
+  rawNext?: string | null | undefined,
+  options?: BuildAdminLoginRedirectUrlOptions
+): string {
   const validPath = parseValidAdminRedirectPath(rawNext);
-  if (!validPath) {
+  const validReason = resolveAdminLoginReason(options?.reason);
+
+  const queryParts: string[] = [];
+  if (validPath) {
+    queryParts.push(`next=${encodeURIComponent(validPath)}`);
+  }
+  if (validReason) {
+    queryParts.push(`motivo=${encodeURIComponent(validReason)}`);
+  }
+
+  if (queryParts.length === 0) {
     return ADMIN_LOGIN_PATH;
   }
 
-  return `${ADMIN_LOGIN_PATH}?next=${encodeURIComponent(validPath)}`;
+  return `${ADMIN_LOGIN_PATH}?${queryParts.join('&')}`;
 }

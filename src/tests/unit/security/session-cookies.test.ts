@@ -4,6 +4,7 @@ import {
   SESSION_COOKIE_NAMES,
   extractSessionToken,
   getSessionCookieConfig,
+  serializeAllExpiredSessionCookies,
   serializeExpiredSessionCookie,
   serializeSessionCookie,
 } from '@/config/session-cookies';
@@ -98,6 +99,26 @@ describe('Contrato e Configuração de Cookies de Sessão', () => {
       expect(expiredString).not.toContain('Secure');
       expect(expiredString).toContain('Max-Age=0');
       expect(expiredString).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    });
+  });
+
+  describe('serializeAllExpiredSessionCookies()', () => {
+    it('deve expirar ambos os cookies (__Host- e desenvolvimento) sem duplicatas', () => {
+      const cookies = serializeAllExpiredSessionCookies();
+
+      expect(cookies).toHaveLength(2);
+      const prodCookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE_NAMES.PRODUCTION}=`));
+      const devCookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE_NAMES.DEVELOPMENT}=`));
+
+      expect(prodCookie).toBeDefined();
+      expect(prodCookie).toContain('Max-Age=0');
+      expect(prodCookie).toContain('HttpOnly');
+      expect(prodCookie).toContain('Secure');
+
+      expect(devCookie).toBeDefined();
+      expect(devCookie).toContain('Max-Age=0');
+      expect(devCookie).toContain('HttpOnly');
+      expect(devCookie).not.toContain('Secure');
     });
   });
 
