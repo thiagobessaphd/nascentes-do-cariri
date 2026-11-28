@@ -17,8 +17,12 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  ADMIN_LOGIN_NOTICE_BY_REASON,
+  ADMIN_LOGIN_REASONS,
   DEFAULT_ADMIN_REDIRECT_PATH,
+  resolveAdminLoginReason,
   sanitizeAdminRedirectPath,
+  type AdminLoginReason,
   type AuthFieldErrors,
 } from '@/modules/auth/auth.contracts';
 import {
@@ -26,6 +30,8 @@ import {
   loginAdmin,
   validateLoginInput,
 } from '@/services/auth.client';
+import { markAdminLoginSuccessToast } from '@/services/admin-session-events';
+import { AdminToast } from '@/components/admin/toast';
 import {
   formatCooldownRemainingPtBr,
   getCooldownRemainingSeconds,
@@ -35,8 +41,14 @@ import {
 } from './login-form-state';
 import styles from './LoginForm.module.css';
 
+export interface LoginNotice {
+  readonly reason: AdminLoginReason;
+  readonly message: string;
+}
+
 export interface LoginFormProps {
   readonly redirectTo?: string | undefined;
+  readonly initialNoticeReason?: AdminLoginReason | null | undefined;
 }
 
 export interface LoginFormViewProps {
@@ -45,6 +57,7 @@ export interface LoginFormViewProps {
   readonly showPassword: boolean;
   readonly fieldErrors: AuthFieldErrors;
   readonly globalAlert: LoginGlobalAlert | null;
+  readonly loginNotice?: LoginNotice | null | undefined;
   readonly statusAnnouncement: string | null;
   readonly isSubmitting: boolean;
   readonly isRedirecting: boolean;
@@ -67,6 +80,7 @@ export function LoginFormView({
   showPassword,
   fieldErrors,
   globalAlert,
+  loginNotice,
   statusAnnouncement,
   isSubmitting,
   isRedirecting,
@@ -97,6 +111,53 @@ export function LoginFormView({
       className={styles.form}
       data-testid="admin-login-form"
     >
+      {loginNotice != null && globalAlert === null ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={
+            loginNotice.reason === ADMIN_LOGIN_REASONS.SESSION_EXPIRED
+              ? `${styles.noticeBanner} ${styles.noticeBannerWarning}`
+              : styles.noticeBanner
+          }
+          data-testid="admin-login-notice"
+          data-reason={loginNotice.reason}
+        >
+          <span className={styles.noticeIcon} aria-hidden="true">
+            {loginNotice.reason === ADMIN_LOGIN_REASONS.SESSION_EXPIRED ? (
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            ) : (
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            )}
+          </span>
+          <p className={styles.noticeMessage}>{loginNotice.message}</p>
+        </div>
+      ) : null}
+
       {globalAlert !== null ? (
         <div
           ref={alertRef}
@@ -362,12 +423,16 @@ export function LoginFormView({
   );
 }
 
-export default function LoginForm({ redirectTo }: LoginFormProps) {
+export default function LoginForm({
+  redirectTo,
+  initialNoticeReason,
+}: LoginFormProps) {
   const router = useRouter();
   const safeRedirectTo = sanitizeAdminRedirectPath(
     redirectTo,
     DEFAULT_ADMIN_REDIRECT_PATH
   );
+  const resolvedInitialReason = resolveAdminLoginReason(initialNoticeReason);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -375,6 +440,14 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
 
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [globalAlert, setGlobalAlert] = useState<LoginGlobalAlert | null>(null);
+  const [activeNoticeReason, setActiveNoticeReason] = useState<AdminLoginReason | null>(
+    resolvedInitialReason === ADMIN_LOGIN_REASONS.SESSION_EXPIRED
+      ? ADMIN_LOGIN_REASONS.SESSION_EXPIRED
+      : null
+  );
+  const [logoutToastOpen, setLogoutToastOpen] = useState<boolean>(
+    resolvedInitialReason === ADMIN_LOGIN_REASONS.LOGOUT
+  );
   const [statusAnnouncement, setStatusAnnouncement] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -390,6 +463,22 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
   const alertRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (
+      resolvedInitialReason === ADMIN_LOGIN_REASONS.LOGOUT &&
+      typeof window !== 'undefined' &&
+      window.location &&
+      typeof window.history?.replaceState === 'function'
+    ) {
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.get('motivo') === ADMIN_LOGIN_REASONS.LOGOUT) {
+        currentUrl.searchParams.delete('motivo');
+        const nextRelativeUrl = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+        window.history.replaceState(null, '', nextRelativeUrl);
+      }
+    }
+  }, [resolvedInitialReason]);
 
   useEffect(() => {
     return () => {
@@ -445,6 +534,9 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
       return;
     }
 
+    setActiveNoticeReason(null);
+    setLogoutToastOpen(false);
+
     if (cooldownUntilMs !== null) {
       const remainingNow = getCooldownRemainingSeconds(cooldownUntilMs, Date.now());
       if (remainingNow > 0) {
@@ -483,6 +575,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
       setCooldownUntilMs(null);
       setCooldownRemainingSeconds(0);
       setIsRedirecting(true);
+      markAdminLoginSuccessToast();
       setStatusAnnouncement(
         'Autenticação realizada com sucesso. Redirecionando para o painel administrativo...'
       );
@@ -538,34 +631,53 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
     }
   };
 
+  const loginNotice: LoginNotice | null = activeNoticeReason
+    ? {
+        reason: activeNoticeReason,
+        message: ADMIN_LOGIN_NOTICE_BY_REASON[activeNoticeReason],
+      }
+    : null;
+
   return (
-    <LoginFormView
-      email={email}
-      password={password}
-      showPassword={showPassword}
-      fieldErrors={fieldErrors}
-      globalAlert={globalAlert}
-      statusAnnouncement={statusAnnouncement}
-      isSubmitting={isSubmitting}
-      isRedirecting={isRedirecting}
-      cooldownRemainingSeconds={cooldownRemainingSeconds}
-      onSubmit={handleSubmit}
-      onEmailChange={(event) => {
-        setEmail(event.target.value);
-        if (fieldErrors.email) {
-          setFieldErrors((prev) => ({ password: prev.password }));
-        }
-      }}
-      onPasswordChange={(event) => {
-        setPassword(event.target.value);
-        if (fieldErrors.password) {
-          setFieldErrors((prev) => ({ email: prev.email }));
-        }
-      }}
-      onTogglePassword={() => setShowPassword((prev) => !prev)}
-      emailInputRef={emailInputRef}
-      passwordInputRef={passwordInputRef}
-      alertRef={alertRef}
-    />
+    <>
+      <AdminToast
+        open={logoutToastOpen}
+        tone="info"
+        title="Sessão encerrada"
+        message="Sua sessão foi encerrada com sucesso.."
+        dataReason={ADMIN_LOGIN_REASONS.LOGOUT}
+        onDismiss={() => setLogoutToastOpen(false)}
+      />
+
+      <LoginFormView
+        email={email}
+        password={password}
+        showPassword={showPassword}
+        fieldErrors={fieldErrors}
+        globalAlert={globalAlert}
+        loginNotice={loginNotice}
+        statusAnnouncement={statusAnnouncement}
+        isSubmitting={isSubmitting}
+        isRedirecting={isRedirecting}
+        cooldownRemainingSeconds={cooldownRemainingSeconds}
+        onSubmit={handleSubmit}
+        onEmailChange={(event) => {
+          setEmail(event.target.value);
+          if (fieldErrors.email) {
+            setFieldErrors((prev) => ({ password: prev.password }));
+          }
+        }}
+        onPasswordChange={(event) => {
+          setPassword(event.target.value);
+          if (fieldErrors.password) {
+            setFieldErrors((prev) => ({ email: prev.email }));
+          }
+        }}
+        onTogglePassword={() => setShowPassword((prev) => !prev)}
+        emailInputRef={emailInputRef}
+        passwordInputRef={passwordInputRef}
+        alertRef={alertRef}
+      />
+    </>
   );
 }

@@ -147,6 +147,42 @@ describe('US-15 / Task-30 — Tela de Login Acessível e Proteção contra Abuso
       expect(html).not.toContain('Perfil do usuário conectado');
       expect(html).not.toContain('admin-logout-button');
       expect(html).not.toContain('Sair da conta administrativa');
+      expect(html).not.toContain('data-testid="admin-login-notice"');
+      expect(html).not.toContain('data-testid="admin-toast"');
+    });
+
+    it('deve exibir toast discreto em ?motivo=logout e banner persistente em ?motivo=sessao_expirada na allowlist fechada', async () => {
+      const logoutElement = await AdminLoginPage({
+        searchParams: Promise.resolve({ motivo: 'logout' }),
+      });
+      const logoutHtml = renderToStaticMarkup(logoutElement);
+      expect(logoutHtml).toContain('data-testid="admin-toast"');
+      expect(logoutHtml).toContain('data-tone="info"');
+      expect(logoutHtml).toContain('data-reason="logout"');
+      expect(logoutHtml).toContain('role="status"');
+      expect(logoutHtml).toContain('Sessão encerrada');
+      expect(logoutHtml).toContain('Você saiu com segurança.');
+      expect(logoutHtml).not.toContain('data-testid="admin-login-notice"');
+
+      const expiredElement = await AdminLoginPage({
+        searchParams: Promise.resolve({ motivo: 'sessao_expirada' }),
+      });
+      const expiredHtml = renderToStaticMarkup(expiredElement);
+      expect(expiredHtml).toContain('data-testid="admin-login-notice"');
+      expect(expiredHtml).toContain('data-reason="sessao_expirada"');
+      expect(expiredHtml).toContain(
+        'Sua sessão expirou ou foi encerrada. Faça login novamente para continuar.'
+      );
+      expect(expiredHtml).not.toContain('data-testid="admin-toast"');
+
+      // Motivo fora da allowlist nunca deve ser refletido ou renderizado
+      const hostileElement = await AdminLoginPage({
+        searchParams: Promise.resolve({ motivo: 'Conta comprometida clique aqui' }),
+      });
+      const hostileHtml = renderToStaticMarkup(hostileElement);
+      expect(hostileHtml).not.toContain('data-testid="admin-login-notice"');
+      expect(hostileHtml).not.toContain('data-testid="admin-toast"');
+      expect(hostileHtml).not.toContain('Conta comprometida');
     });
 
     it('deve redirecionar automaticamente administrador já autenticado respeitando ?next= seguro e barrando Open Redirect', async () => {

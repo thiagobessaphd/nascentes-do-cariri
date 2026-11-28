@@ -7,7 +7,10 @@ import logoUfcaFull from '@/assets/images/logo_ufca-full.png';
 import nascenteLoginPhoto from '@/assets/images/nascente-cariri-login.png';
 import { LoginForm } from '@/components/admin/auth';
 import { getOptionalAdminPageSession } from '@/lib/security/admin-page-guard';
-import { sanitizeAdminRedirectPath } from '@/modules/auth/auth.contracts';
+import {
+  resolveAdminLoginReason,
+  sanitizeAdminRedirectPath,
+} from '@/modules/auth/auth.contracts';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +29,7 @@ export interface AdminLoginPageProps {
   readonly searchParams?:
     | Promise<{
         readonly next?: string | readonly string[] | undefined;
+        readonly motivo?: string | readonly string[] | undefined;
       }>
     | undefined;
 }
@@ -38,6 +42,7 @@ export default async function AdminLoginPage({
     ? resolvedParams.next[0]
     : resolvedParams?.next;
   const redirectTo = sanitizeAdminRedirectPath(rawNext);
+  const initialNoticeReason = resolveAdminLoginReason(resolvedParams?.motivo);
 
   let existingSession = null;
   try {
@@ -99,7 +104,10 @@ export default async function AdminLoginPage({
                 </p>
               </div>
 
-              <LoginForm redirectTo={redirectTo} />
+              <LoginForm
+                redirectTo={redirectTo}
+                initialNoticeReason={initialNoticeReason}
+              />
 
               <div className={styles.backLinkRow}>
                 <Link

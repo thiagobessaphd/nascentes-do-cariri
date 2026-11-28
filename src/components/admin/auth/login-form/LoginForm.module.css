@@ -21,6 +21,41 @@
   border: 0;
 }
 
+/* Banner Discreto de Aviso Contextual (logout / sessão expirada) */
+.noticeBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.9375rem;
+  border-radius: 6px;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-left: 4px solid #0b4f6c;
+  color: #0b4f6c;
+}
+
+.noticeBannerWarning {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  border-left-color: #b45309;
+  color: #92400e;
+}
+
+.noticeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.noticeMessage {
+  margin: 0;
+  font-size: 0.84375rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 /* Banner de Erro / Rate Limit */
 .alertBanner {
   display: flex;
